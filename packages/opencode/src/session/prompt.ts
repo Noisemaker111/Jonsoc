@@ -1582,8 +1582,8 @@ NOTE: At any point in time through this workflow you should feel free to ask the
   })
   export type CommandInput = z.infer<typeof CommandInput>
   const bashRegex = /!`([^`]+)`/g
-  // Match [Image N] as single token, quoted strings, or non-space sequences
-  const argsRegex = /(?:\[Image\s+\d+\]|"[^"]*"|'[^']*'|[^\s"']+)/gi
+  // Match [Image ...] as single token, quoted strings, or non-space sequences
+  const argsRegex = /(?:\[Image[^\]]*\]|"[^"]*"|'[^']*'|[^\s"']+)/gi
   const placeholderRegex = /\$(\d+)/g
   const quoteTrimRegex = /^["']|["']$/g
   /**

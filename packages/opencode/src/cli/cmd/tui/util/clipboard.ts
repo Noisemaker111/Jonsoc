@@ -26,6 +26,15 @@ export namespace Clipboard {
     mime: string
   }
 
+  export function parseImageDataUrl(text: string): Content | undefined {
+    const normalized = text.trim()
+    const match = normalized.match(/^data:(image\/[a-z0-9.+-]+);base64,([\s\S]+)$/i)
+    if (!match) return
+    const data = match[2]?.replace(/\s+/g, "")
+    if (!data) return
+    return { data, mime: match[1].toLowerCase() }
+  }
+
   export async function read(): Promise<Content | undefined> {
     const os = platform()
 
@@ -37,6 +46,7 @@ export namespace Clipboard {
           .quiet()
         const file = Bun.file(tmpfile)
         const buffer = await file.arrayBuffer()
+        if (buffer.byteLength === 0) return
         return { data: Buffer.from(buffer).toString("base64"), mime: "image/png" }
       } catch {
       } finally {
@@ -45,14 +55,54 @@ export namespace Clipboard {
     }
 
     if (os === "win32" || release().includes("WSL")) {
+      // Terminal paste does not provide image bytes, so we must read the OS clipboard.
+      // On Windows, clipboard access can fail depending on apartment state and API used.
+      // Try WPF first (PresentationCore), then WinForms, then Get-Clipboard.
       const script =
-        "Add-Type -AssemblyName System.Windows.Forms; $img = [System.Windows.Forms.Clipboard]::GetImage(); if ($img) { $ms = New-Object System.IO.MemoryStream; $img.Save($ms, [System.Drawing.Imaging.ImageFormat]::Png); [System.Convert]::ToBase64String($ms.ToArray()) }"
-      const base64 = await $`powershell.exe -NonInteractive -NoProfile -command "${script}"`.nothrow().text()
-      if (base64) {
-        const imageBuffer = Buffer.from(base64.trim(), "base64")
-        if (imageBuffer.length > 0) {
-          return { data: imageBuffer.toString("base64"), mime: "image/png" }
-        }
+        "$ErrorActionPreference='SilentlyContinue';" +
+        "$OutputEncoding=[System.Text.Encoding]::UTF8;" +
+        "[Console]::OutputEncoding=$OutputEncoding;" +
+        "$result=$null;" +
+        "$paths=Get-Clipboard -Format FileDropList;" +
+        "if($paths -and $paths.Count -gt 0){$path=$paths[0];" +
+        "if(Test-Path $path){$result='FILE:'+ $path}}" +
+        "$tmp=$null;" +
+        "if(-not $result){$tmp=Join-Path $env:TEMP ('opencode-clipboard-' + [guid]::NewGuid().ToString() + '.png')}" +
+        // WPF path
+        "if(-not $result){Add-Type -AssemblyName PresentationCore;" +
+        "$src=[System.Windows.Clipboard]::GetImage();" +
+        "if($src){$enc=New-Object System.Windows.Media.Imaging.PngBitmapEncoder;" +
+        "$enc.Frames.Add([System.Windows.Media.Imaging.BitmapFrame]::Create($src));" +
+        "$file=New-Object System.IO.FileStream($tmp,[System.IO.FileMode]::Create);" +
+        "$enc.Save($file); $file.Close(); $result='TMPFILE:'+ $tmp}}" +
+        // WinForms path
+        "if(-not $result){Add-Type -AssemblyName System.Windows.Forms; Add-Type -AssemblyName System.Drawing;" +
+        "$img=[System.Windows.Forms.Clipboard]::GetImage();" +
+        "if(-not $img){$img=Get-Clipboard -Format Image}" +
+        "if($img){$img.Save($tmp,[System.Drawing.Imaging.ImageFormat]::Png); $result='TMPFILE:'+ $tmp}}" +
+        "if($result){$result}"
+
+      const base64 = await $`powershell.exe -NoProfile -NonInteractive -STA -command ${script}`.nothrow().text()
+      const trimmed = base64.trim().replace(/\s+/g, "").replace(/\0/g, "")
+      if (!trimmed) return
+
+      const readFile = async (filepath: string) => {
+        const file = Bun.file(filepath)
+        if (!file.type.startsWith("image/")) return
+        const buffer = await file.arrayBuffer()
+        if (buffer.byteLength === 0) return
+        return { data: Buffer.from(buffer).toString("base64"), mime: file.type }
+      }
+
+      if (trimmed.startsWith("FILE:")) {
+        return readFile(trimmed.slice("FILE:".length))
+      }
+
+      if (trimmed.startsWith("TMPFILE:")) {
+        const filepath = trimmed.slice("TMPFILE:".length)
+        const result = await readFile(filepath)
+        await $`rm -f "${filepath}"`.nothrow().quiet()
+        return result
       }
     }
 
@@ -69,8 +119,53 @@ export namespace Clipboard {
 
     const text = await clipboardy.read().catch(() => {})
     if (text) {
+      const image = parseImageDataUrl(text)
+      if (image) return image
       return { data: text, mime: "text/plain" }
     }
+  }
+
+  export async function readText(): Promise<string | undefined> {
+    const os = platform()
+
+    if (os === "win32" || release().includes("WSL")) {
+      const script =
+        "$ErrorActionPreference='SilentlyContinue';" +
+        "$OutputEncoding=[System.Text.Encoding]::UTF8;" +
+        "[Console]::OutputEncoding=$OutputEncoding;" +
+        "$txt=Get-Clipboard -Format Text -Raw;" +
+        "if($txt){[Console]::Write($txt)}"
+      const text = await $`powershell.exe -NoProfile -NonInteractive -STA -command ${script}`.nothrow().text()
+      const trimmed = text.trim().replace(/\0/g, "")
+      if (trimmed) return trimmed
+    }
+
+    if (os === "darwin" && Bun.which("pbpaste")) {
+      const text = await $`pbpaste`.nothrow().text()
+      const trimmed = text.trim().replace(/\0/g, "")
+      if (trimmed) return trimmed
+    }
+
+    if (os === "linux") {
+      if (process.env["WAYLAND_DISPLAY"] && Bun.which("wl-paste")) {
+        const text = await $`wl-paste -n`.nothrow().text()
+        const trimmed = text.trim().replace(/\0/g, "")
+        if (trimmed) return trimmed
+      }
+      if (Bun.which("xclip")) {
+        const text = await $`xclip -selection clipboard -o`.nothrow().text()
+        const trimmed = text.trim().replace(/\0/g, "")
+        if (trimmed) return trimmed
+      }
+      if (Bun.which("xsel")) {
+        const text = await $`xsel --clipboard --output`.nothrow().text()
+        const trimmed = text.trim().replace(/\0/g, "")
+        if (trimmed) return trimmed
+      }
+    }
+
+    const text = await clipboardy.read().catch(() => {})
+    if (text) return text
   }
 
   const getCopyMethod = lazy(() => {
