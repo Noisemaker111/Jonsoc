@@ -55,10 +55,10 @@ Follow these project-specific patterns to maintain consistency.
 
 - **Repository**: Only make changes to `Noisemaker111/opencode`.
 - **Branching**: The default branch is `dev`. Create feature branches from `dev`.
-- **Commits**: Be extremely concise. Grammar is secondary to brevity.
+- **Commits**: Use descriptive and professional commit messages.
 - **Jujutsu (jj)**: ALWAYS check for a `.jj/` directory before running VCS commands. If present, use `jj` instead of `git`.
 
 ## Efficiency Reminders
 
 - **Parallelism**: Use parallel tool calls (e.g., multiple `read` or `grep` calls) whenever tasks are independent to maximize speed.
-- **No Chitchat**: Keep interaction professional and concise. Focus on the task.
+- **Interaction**: Be professional and helpful, providing sufficient detail while maintaining efficiency.
