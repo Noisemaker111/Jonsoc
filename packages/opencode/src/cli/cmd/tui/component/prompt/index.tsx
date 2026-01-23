@@ -360,14 +360,6 @@ export function Prompt(props: PromptProps) {
             })
             setStore("interrupt", 0)
           }
-          if (store.prompt.input !== "") {
-            setEscClearAt(Date.now())
-            toast.show({
-              variant: "warning",
-              message: "Press esc again to clear input",
-              duration: escClearWindowMs,
-            })
-          }
           dialog.clear()
         },
       },
@@ -965,25 +957,11 @@ export function Prompt(props: PromptProps) {
                   const now = Date.now()
                   const last = escClearAt()
                   const within = last !== undefined && now - last < escClearWindowMs
-                  if (within) {
+                  if (within && status().type === "idle") {
                     clearPromptInput()
                     e.preventDefault()
                     return
                   }
-                }
-                if (keybind.match("input_clear", e) && store.prompt.input !== "") {
-                  clearPromptInput()
-                  return
-                }
-                if (
-                  e.name === "escape" &&
-                  store.prompt.input !== "" &&
-                  store.mode === "normal" &&
-                  status().type === "idle"
-                ) {
-                  const now = Date.now()
-                  const last = escClearAt()
-                  const within = last !== undefined && now - last < escClearWindowMs
                   if (!within) {
                     setEscClearAt(now)
                     toast.show({
@@ -991,11 +969,14 @@ export function Prompt(props: PromptProps) {
                       message: "Press esc again to clear input",
                       duration: escClearWindowMs,
                     })
-                    e.preventDefault()
-                    return
+                    if (status().type === "idle") {
+                      e.preventDefault()
+                      return
+                    }
                   }
+                }
+                if (keybind.match("input_clear", e) && store.prompt.input !== "") {
                   clearPromptInput()
-                  e.preventDefault()
                   return
                 }
                 if (keybind.match("app_exit", e)) {
