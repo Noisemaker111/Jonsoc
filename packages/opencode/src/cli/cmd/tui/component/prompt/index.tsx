@@ -243,6 +243,9 @@ export function Prompt(props: PromptProps) {
     interrupt: 0,
   })
 
+  const [escClearAt, setEscClearAt] = createSignal<number | undefined>()
+  const escClearWindowMs = 1500
+
   // Initialize agent/model/variant from last user message when session changes
   let syncedSessionID: string | undefined
   createEffect(() => {
@@ -264,6 +267,10 @@ export function Prompt(props: PromptProps) {
     }
   })
 
+  createEffect(() => {
+    if (store.prompt.input === "") setEscClearAt(undefined)
+  })
+
   command.register(() => {
     return [
       {
@@ -272,8 +279,7 @@ export function Prompt(props: PromptProps) {
         category: "Prompt",
         hidden: true,
         onSelect: (dialog) => {
-          input.extmarks.clear()
-          input.clear()
+          clearPromptInput()
           dialog.clear()
         },
       },
@@ -786,6 +792,17 @@ export function Prompt(props: PromptProps) {
     )
   }
 
+  function clearPromptInput() {
+    input.clear()
+    input.extmarks.clear()
+    setStore("prompt", {
+      input: "",
+      parts: [],
+    })
+    setStore("extmarkToPartIndex", new Map())
+    setEscClearAt(undefined)
+  }
+
   function insertPlainText(text: string) {
     if (!text) return
     input.focus()
@@ -936,14 +953,30 @@ export function Prompt(props: PromptProps) {
                   e.preventDefault()
                   return
                 }
+                if (e.name === "escape" && store.mode === "normal" && store.prompt.input !== "") {
+                  const now = Date.now()
+                  const last = escClearAt()
+                  const within = last !== undefined && now - last < escClearWindowMs
+                  if (within && status().type === "idle") {
+                    clearPromptInput()
+                    e.preventDefault()
+                    return
+                  }
+                  if (!within) {
+                    setEscClearAt(now)
+                    toast.show({
+                      variant: "warning",
+                      message: "Press esc again to clear input",
+                      duration: escClearWindowMs,
+                    })
+                    if (status().type === "idle") {
+                      e.preventDefault()
+                      return
+                    }
+                  }
+                }
                 if (keybind.match("input_clear", e) && store.prompt.input !== "") {
-                  input.clear()
-                  input.extmarks.clear()
-                  setStore("prompt", {
-                    input: "",
-                    parts: [],
-                  })
-                  setStore("extmarkToPartIndex", new Map())
+                  clearPromptInput()
                   return
                 }
                 if (keybind.match("app_exit", e)) {
