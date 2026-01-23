@@ -1804,6 +1804,10 @@ export type Config = {
     chatMaxRetries?: number
     disable_paste_summary?: boolean
     /**
+     * Allow pasting clipboard images in the TUI (default: true)
+     */
+    paste_clipboard_image?: boolean
+    /**
      * Enable the batch tool
      */
     batch_tool?: boolean

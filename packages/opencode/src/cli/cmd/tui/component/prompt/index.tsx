@@ -31,6 +31,9 @@ import { DialogAlert } from "../../ui/dialog-alert"
 import { useToast } from "../../ui/toast"
 import { useKV } from "../../context/kv"
 import { useTextareaKeybindings } from "../textarea-keybindings"
+import path from "path"
+import { mkdir } from "fs/promises"
+import { tmpdir } from "os"
 
 export type PromptProps = {
   sessionID?: string
@@ -73,6 +76,116 @@ export function Prompt(props: PromptProps) {
   const renderer = useRenderer()
   const { theme, syntax } = useTheme()
   const kv = useKV()
+
+  async function pasteImagePath(filepath: string, event: PasteEvent) {
+    const full = path.isAbsolute(filepath) ? filepath : path.resolve(filepath)
+    const file = Bun.file(full)
+    if (file.type === "image/svg+xml") {
+      const content = await file.text().catch(() => {})
+      if (!content) return false
+      event.preventDefault()
+      pasteText(content, `[SVG: ${file.name ?? "image"}]`)
+      return true
+    }
+    if (file.type.startsWith("image/")) {
+      const content = await file
+        .arrayBuffer()
+        .then((buffer) => Buffer.from(buffer).toString("base64"))
+        .catch(() => {})
+      if (!content) return false
+      event.preventDefault()
+      await pasteImage({ filename: file.name, mime: file.type, content, path: full })
+      return true
+    }
+    return false
+  }
+
+  function imageExt(mime: string) {
+    return iife(() => {
+      if (mime === "image/png") return "png"
+      if (mime === "image/jpeg") return "jpg"
+      if (mime === "image/jpg") return "jpg"
+      if (mime === "image/webp") return "webp"
+      if (mime === "image/gif") return "gif"
+      if (mime === "image/svg+xml") return "svg"
+      return "png"
+    })
+  }
+
+  async function persistImage(file: { content: string; mime: string; filename?: string }) {
+    const dir = path.join(tmpdir(), "opencode", "attachments")
+    await mkdir(dir, { recursive: true })
+    const parsed = file.filename ? path.parse(file.filename) : undefined
+    const baseRaw = parsed?.name ?? "image"
+    const base = baseRaw.replace(/[<>:"/\\|?*]+/g, "-")
+    const ext = parsed?.ext ? parsed.ext.slice(1) : imageExt(file.mime)
+    const name = `${base}-${crypto.randomUUID()}.${ext}`
+    const filepath = path.join(dir, name)
+    const buffer = Buffer.from(file.content, "base64")
+    await Bun.write(filepath, buffer)
+    return { path: filepath, filename: name }
+  }
+
+  async function readLatestScreenClipOnce() {
+    if (process.platform !== "win32") return
+    const local = process.env["LOCALAPPDATA"]
+    if (!local) return
+    const cwd = path.join(local, "Packages")
+    const glob = new Bun.Glob("{MicrosoftWindows.Client.CBS_*,Microsoft.ScreenSketch_*}/TempState/ScreenClip/*.png")
+    const entries: Array<{ path: string; time: number }> = []
+    for await (const item of glob.scan({ cwd, absolute: true })) {
+      const file = Bun.file(item)
+      const stat = await file.stat().catch(() => {})
+      if (!stat?.isFile()) continue
+      const time = typeof stat.mtimeMs === "number" ? stat.mtimeMs : (stat.mtime?.getTime?.() ?? 0)
+      entries.push({ path: item, time })
+    }
+    if (entries.length === 0) return
+    const latest = entries.reduce((acc, entry) => (entry.time > acc.time ? entry : acc), {
+      path: "",
+      time: -1,
+    })
+    if (latest.time < 0) return
+    const file = Bun.file(latest.path)
+    if (!file.type.startsWith("image/")) return
+    const content = await file
+      .arrayBuffer()
+      .then((buffer) => Buffer.from(buffer).toString("base64"))
+      .catch(() => {})
+    if (!content) return
+    return { filename: file.name, mime: file.type, content, path: latest.path }
+  }
+
+  async function readLatestScreenClip() {
+    const delays = [0, 50, 150]
+    for (const delay of delays) {
+      if (delay > 0) await new Promise((resolve) => setTimeout(resolve, delay))
+      const result = await readLatestScreenClipOnce()
+      if (result) return result
+    }
+  }
+
+  async function readClipboardImage(opts?: { allowScreenClip?: boolean }) {
+    const content = await Clipboard.read()
+    if (content?.mime.startsWith("image/")) {
+      const saved = await persistImage({ content: content.data, mime: content.mime, filename: "clipboard" }).catch(
+        () => undefined,
+      )
+      const savedPath = saved?.path
+      const savedName = saved?.filename ?? "clipboard"
+      return {
+        filename: savedName,
+        mime: content.mime,
+        content: content.data,
+        path: savedPath,
+        source: "clipboard" as const,
+      }
+    }
+    if (content) return
+    if (!opts?.allowScreenClip) return
+    const screenClip = await readLatestScreenClip()
+    if (screenClip) return { ...screenClip, source: "screenclip" as const }
+  }
 
   function promptModelWarning() {
     toast.show({
@@ -181,16 +294,35 @@ export function Prompt(props: PromptProps) {
         value: "prompt.paste",
         keybind: "input_paste",
         category: "Prompt",
-        hidden: true,
+        hidden: false,
         onSelect: async () => {
-          const content = await Clipboard.read()
-          if (content?.mime.startsWith("image/")) {
-            await pasteImage({
-              filename: "clipboard",
-              mime: content.mime,
-              content: content.data,
-            })
+          const allowClipboardImage = sync.data.config.experimental?.paste_clipboard_image !== false
+          const text = await Clipboard.readText()
+          if (text) {
+            insertPlainText(text)
+            return
           }
+          if (!allowClipboardImage) {
+            toast.show({
+              variant: "warning",
+              message: "No text in clipboard",
+            })
+            return
+          }
+          const content = await readClipboardImage({ allowScreenClip: true })
+          if (!content) {
+            toast.show({
+              variant: "warning",
+              message: "No image in clipboard",
+            })
+            return
+          }
+          await pasteImage({
+            filename: content.filename,
+            mime: content.mime,
+            content: content.content,
+            path: content.path,
+          })
         },
       },
       {
@@ -654,11 +786,26 @@ export function Prompt(props: PromptProps) {
     )
   }
 
-  async function pasteImage(file: { filename?: string; content: string; mime: string }) {
+  function insertPlainText(text: string) {
+    if (!text) return
+    input.focus()
+    input.insertText(text)
+    input.gotoBufferEnd()
+    const value = input.plainText
+    setStore("prompt", "input", value)
+    autocomplete.onInput(value)
+    syncExtmarksWithPromptParts()
+    setTimeout(() => {
+      input.getLayoutNode().markDirty()
+      renderer.requestRender()
+    }, 0)
+  }
+
+  async function pasteImage(file: { filename?: string; content: string; mime: string; path?: string }) {
     const currentOffset = input.visualCursor.offset
     const extmarkStart = currentOffset
     const count = store.prompt.parts.filter((x) => x.type === "file").length
-    const virtualText = `[Image ${count + 1}]`
+    const virtualText = file.path ? `[Image ${count + 1}: ${file.path}]` : `[Image ${count + 1}]`
     const extmarkEnd = extmarkStart + virtualText.length
     const textToInsert = virtualText + " "
 
@@ -672,6 +819,7 @@ export function Prompt(props: PromptProps) {
       typeId: promptPartTypeId,
     })
 
+    const sourcePath = file.path ?? file.filename ?? ""
     const part: Omit<FilePart, "id" | "messageID" | "sessionID"> = {
       type: "file" as const,
       mime: file.mime,
@@ -679,7 +827,7 @@ export function Prompt(props: PromptProps) {
       url: `data:${file.mime};base64,${file.content}`,
       source: {
         type: "file",
-        path: file.filename ?? "",
+        path: sourcePath,
         text: {
           start: extmarkStart,
           end: extmarkEnd,
@@ -788,23 +936,6 @@ export function Prompt(props: PromptProps) {
                   e.preventDefault()
                   return
                 }
-                // Handle clipboard paste (Ctrl+V) - check for images first on Windows
-                // This is needed because Windows terminal doesn't properly send image data
-                // through bracketed paste, so we need to intercept the keypress and
-                // directly read from clipboard before the terminal handles it
-                if (keybind.match("input_paste", e)) {
-                  const content = await Clipboard.read()
-                  if (content?.mime.startsWith("image/")) {
-                    e.preventDefault()
-                    await pasteImage({
-                      filename: "clipboard",
-                      mime: content.mime,
-                      content: content.data,
-                    })
-                    return
-                  }
-                  // If no image, let the default paste behavior continue
-                }
                 if (keybind.match("input_clear", e) && store.prompt.input !== "") {
                   input.clear()
                   input.extmarks.clear()
@@ -868,14 +999,92 @@ export function Prompt(props: PromptProps) {
                   return
                 }
 
+                const clipboardText = async () => {
+                  return await Clipboard.readText()
+                }
+
                 // Normalize line endings at the boundary
                 // Windows ConPTY/Terminal often sends CR-only newlines in bracketed paste
                 // Replace CRLF first, then any remaining CR
-                const normalizedText = event.text.replace(/\r\n/g, "\n").replace(/\r/g, "\n")
-                const pastedContent = normalizedText.trim()
+                const normalizedText = event.text.replace(/\r\n/g, "\n").replace(/\r/g, "\n").replace(/\0/g, "")
+                const allowClipboardImage = sync.data.config.experimental?.paste_clipboard_image !== false
+                const clipboardFallback = normalizedText.trim() ? undefined : await clipboardText()
+                const text = clipboardFallback ? clipboardFallback : normalizedText
+                const pastedContent = text.trim()
                 if (!pastedContent) {
-                  command.trigger("prompt.paste")
+                  if (allowClipboardImage) {
+                    const clipboard = await readClipboardImage({ allowScreenClip: true })
+                    if (clipboard) {
+                      event.preventDefault()
+                      await pasteImage(clipboard)
+                      return
+                    }
+                  }
                   return
+                }
+
+                if (allowClipboardImage) {
+                  const dataImage = Clipboard.parseImageDataUrl(pastedContent)
+                  if (dataImage) {
+                    event.preventDefault()
+                    await pasteImage({
+                      filename: "clipboard",
+                      mime: dataImage.mime,
+                      content: dataImage.data,
+                    })
+                    return
+                  }
+                }
+
+                // Some terminals paste images as a placeholder string like:
+                // "img 483795798.png". On Win11, Snipping Tool also writes a temp file
+                // under Packages/*/TempState/ScreenClip. Prefer that when present.
+                if (allowClipboardImage && pastedContent.toLowerCase().startsWith("img ")) {
+                  const name = pastedContent
+                    .slice(4)
+                    .trim()
+                    .replace(/^'+|'+$/g, "")
+                  const fromPath = path.isAbsolute(name) ? name : ""
+                  if (fromPath) {
+                    const handled = await pasteImagePath(fromPath, event)
+                    if (handled) return
+                  }
+                  if (name.endsWith(".png")) {
+                    const local = process.env["LOCALAPPDATA"]
+                    if (local) {
+                      const cwd = path.join(local, "Packages")
+                      const glob = new Bun.Glob(
+                        `{MicrosoftWindows.Client.CBS_*,Microsoft.ScreenSketch_*}/TempState/ScreenClip/${name}`,
+                      )
+                      for await (const item of glob.scan({ cwd, absolute: true })) {
+                        const file = Bun.file(item)
+                        if (file.type.startsWith("image/")) {
+                          const content = await file
+                            .arrayBuffer()
+                            .then((buffer) => Buffer.from(buffer).toString("base64"))
+                            .catch(() => {})
+                          if (content) {
+                            event.preventDefault()
+                            await pasteImage({ filename: file.name, mime: file.type, content })
+                            return
+                          }
+                        }
+                      }
+                    }
+                  }
+
+                  if (allowClipboardImage) {
+                    const content = await Clipboard.read()
+                    if (content?.mime.startsWith("image/")) {
+                      event.preventDefault()
+                      await pasteImage({
+                        filename: "clipboard",
+                        mime: content.mime,
+                        content: content.data,
+                      })
+                      return
+                    }
+                  }
                 }
 
                 // trim ' from the beginning and end of the pasted content. just
@@ -883,33 +1092,8 @@ export function Prompt(props: PromptProps) {
                 const filepath = pastedContent.replace(/^'+|'+$/g, "").replace(/\\ /g, " ")
                 const isUrl = /^(https?):\/\//.test(filepath)
                 if (!isUrl) {
-                  try {
-                    const file = Bun.file(filepath)
-                    // Handle SVG as raw text content, not as base64 image
-                    if (file.type === "image/svg+xml") {
-                      event.preventDefault()
-                      const content = await file.text().catch(() => {})
-                      if (content) {
-                        pasteText(content, `[SVG: ${file.name ?? "image"}]`)
-                        return
-                      }
-                    }
-                    if (file.type.startsWith("image/")) {
-                      event.preventDefault()
-                      const content = await file
-                        .arrayBuffer()
-                        .then((buffer) => Buffer.from(buffer).toString("base64"))
-                        .catch(() => {})
-                      if (content) {
-                        await pasteImage({
-                          filename: file.name,
-                          mime: file.type,
-                          content,
-                        })
-                        return
-                      }
-                    }
-                  } catch {}
+                  const handled = await pasteImagePath(filepath, event)
+                  if (handled) return
                 }
 
                 const lineCount = (pastedContent.match(/\n/g)?.length ?? 0) + 1
@@ -919,6 +1103,12 @@ export function Prompt(props: PromptProps) {
                 ) {
                   event.preventDefault()
                   pasteText(pastedContent, `[Pasted ~${lineCount} lines]`)
+                  return
+                }
+
+                if (clipboardFallback) {
+                  event.preventDefault()
+                  insertPlainText(text)
                   return
                 }
 
