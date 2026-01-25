@@ -7,6 +7,7 @@ import {
   For,
   Match,
   on,
+  onCleanup,
   Show,
   Switch,
   useContext,
@@ -19,6 +20,7 @@ import { SplitBorder } from "@tui/component/border"
 import { useTheme } from "@tui/context/theme"
 import {
   BoxRenderable,
+  type MouseEvent,
   ScrollBoxRenderable,
   addDefaultParsers,
   MacOSScrollAccel,
@@ -58,6 +60,7 @@ import { DialogTimeline } from "./dialog-timeline"
 import { DialogForkFromTimeline } from "./dialog-fork-from-timeline"
 import { DialogSessionRename } from "../../component/dialog-session-rename"
 import { Sidebar } from "./sidebar"
+import { Navigator } from "./navigator"
 import { LANGUAGE_EXTENSIONS } from "@/lsp/language"
 import parsers from "../../../../../../parsers-config.ts"
 import { Clipboard } from "../../util/clipboard"
@@ -139,6 +142,10 @@ export function Session() {
   const dimensions = useTerminalDimensions()
   const [sidebar, setSidebar] = kv.signal<"auto" | "hide">("sidebar", "hide")
   const [sidebarOpen, setSidebarOpen] = createSignal(false)
+  const [navigatorOpen, setNavigatorOpen] = kv.signal("navigator_open", false)
+  const [navigatorPinned, setNavigatorPinned] = kv.signal("navigator_pinned", false)
+  const [navigatorTab, setNavigatorTab] = kv.signal<"explorer" | "git">("navigator_tab", "explorer")
+  const [navigatorSide, setNavigatorSide] = kv.signal<"left" | "right">("navigator_side", "left")
   const [conceal, setConceal] = createSignal(true)
   const [showThinking, setShowThinking] = kv.signal("thinking_visibility", true)
   const [timestamps, setTimestamps] = kv.signal<"hide" | "show">("timestamps", "hide")
@@ -149,6 +156,25 @@ export function Session() {
   const [animationsEnabled, setAnimationsEnabled] = kv.signal("animations_enabled", true)
 
   const wide = createMemo(() => dimensions().width > 120)
+  const [navigatorRatio, setNavigatorRatio] = kv.signal("navigator_width_ratio", 0.45)
+  const navigatorWidth = createMemo(() => {
+    const min = 36
+    const max = Math.min(96, Math.floor(dimensions().width * 0.6))
+    const next = Math.floor(dimensions().width * navigatorRatio())
+    return Math.min(max, Math.max(min, next))
+  })
+  const navigatorVisible = createMemo(() => navigatorOpen() || navigatorPinned())
+  const navigatorSideValue = createMemo<"left" | "right">(() => (navigatorSide() === "right" ? "right" : "left"))
+  const navigatorSideNext = createMemo(() => (navigatorSideValue() === "left" ? "right" : "left"))
+  const navigatorRowDirection = createMemo<"row" | "row-reverse">(() =>
+    navigatorSideValue() === "left" ? "row" : "row-reverse",
+  )
+  const [navigatorDisplayWidth, setNavigatorDisplayWidth] = createSignal(navigatorVisible() ? navigatorWidth() : 0)
+  const [navigatorAnimation, setNavigatorAnimation] = createSignal<ReturnType<typeof setInterval> | undefined>(
+    undefined,
+  )
+  const navigatorDisplayVisible = createMemo(() => navigatorDisplayWidth() > 0)
+  const [navigatorMounted, setNavigatorMounted] = createSignal(false)
   const sidebarVisible = createMemo(() => {
     if (session()?.parentID) return false
     if (sidebarOpen()) return true
@@ -156,7 +182,82 @@ export function Session() {
     return false
   })
   const showTimestamps = createMemo(() => timestamps() === "show")
-  const contentWidth = createMemo(() => dimensions().width - (sidebarVisible() ? 42 : 0) - 4)
+  const navigatorSpace = createMemo(() => navigatorDisplayWidth())
+  const contentWidth = createMemo(() => dimensions().width - (sidebarVisible() ? 42 : 0) - navigatorSpace() - 4)
+  const [navigatorDragging, setNavigatorDragging] = createSignal(false)
+  const clampRatio = (value: number) => Math.min(0.6, Math.max(0.2, value))
+  const updateNavigatorRatio = (event: MouseEvent) => {
+    if (!navigatorDragging()) return
+    const width = dimensions().width
+    if (width <= 0) return
+    const ratio = navigatorSideValue() === "left" ? event.x / width : (width - event.x) / width
+    const next = clampRatio(ratio)
+    setNavigatorRatio(() => next)
+  }
+
+  createEffect(() => {
+    if (!navigatorPinned()) return
+    if (navigatorOpen()) return
+    setNavigatorOpen(() => true)
+  })
+
+  createEffect(() => {
+    if (!navigatorVisible()) return
+    if (navigatorMounted()) return
+    setNavigatorMounted(true)
+  })
+
+  createEffect(() => {
+    const side = navigatorSide()
+    if (side === "left") return
+    if (side === "right") return
+    setNavigatorSide(() => "left")
+  })
+
+  const stopNavigatorAnimation = () => {
+    const current = navigatorAnimation()
+    if (!current) return
+    clearInterval(current)
+    setNavigatorAnimation(undefined)
+  }
+
+  const animateNavigatorWidth = (target: number, enabled: boolean) => {
+    stopNavigatorAnimation()
+    if (!enabled) {
+      setNavigatorDisplayWidth(target)
+      return
+    }
+    const start = navigatorDisplayWidth()
+    if (start === target) return
+    const duration = 180
+    const startTime = Date.now()
+    const interval = setInterval(() => {
+      const elapsed = Date.now() - startTime
+      const progress = Math.min(elapsed / duration, 1)
+      const eased = 1 - Math.pow(1 - progress, 3)
+      const next = Math.round(start + (target - start) * eased)
+      setNavigatorDisplayWidth(next)
+      if (progress >= 1) stopNavigatorAnimation()
+    }, 16)
+    setNavigatorAnimation(interval)
+  }
+
+  createEffect(() => {
+    if (!navigatorDragging()) return
+    stopNavigatorAnimation()
+    setNavigatorDisplayWidth(navigatorWidth())
+  })
+
+  createEffect(() => {
+    const target = navigatorVisible() ? navigatorWidth() : 0
+    const enabled = animationsEnabled()
+    if (navigatorDragging()) return
+    animateNavigatorWidth(target, enabled)
+  })
+
+  onCleanup(() => {
+    stopNavigatorAnimation()
+  })
 
   const scrollAcceleration = createMemo(() => {
     const tui = sync.data.config.tui
@@ -294,6 +395,38 @@ export function Session() {
   }
 
   const command = useCommandDialog()
+  const closeNavigator = () => {
+    if (navigatorPinned()) setNavigatorPinned(() => false)
+    setNavigatorOpen(() => false)
+    promptRef.current?.focus()
+  }
+
+  const toggleNavigator = () => {
+    if (navigatorVisible()) {
+      closeNavigator()
+      return
+    }
+    if (!navigatorMounted()) setNavigatorMounted(true)
+    setNavigatorOpen(() => true)
+  }
+
+  const toggleNavigatorPinned = () => {
+    if (navigatorPinned()) {
+      setNavigatorPinned(() => false)
+      return
+    }
+    if (!navigatorMounted()) setNavigatorMounted(true)
+    setNavigatorPinned(() => true)
+    setNavigatorOpen(() => true)
+  }
+
+  const toggleNavigatorTab = () => {
+    setNavigatorTab((prev) => (prev === "git" ? "explorer" : "git"))
+  }
+
+  const toggleNavigatorSide = () => {
+    setNavigatorSide(() => navigatorSideNext())
+  }
   command.register(() => [
     {
       title: "Share session",
@@ -499,6 +632,43 @@ export function Session() {
           setSidebar(() => (isVisible ? "hide" : "auto"))
           setSidebarOpen(!isVisible)
         })
+        dialog.clear()
+      },
+    },
+    {
+      title: navigatorVisible() ? "Hide navigator" : "Show navigator",
+      value: "session.navigator.toggle",
+      keybind: "navigator_toggle",
+      category: "Session",
+      onSelect: (dialog) => {
+        toggleNavigator()
+        dialog.clear()
+      },
+    },
+    {
+      title: navigatorPinned() ? "Unpin file viewer" : "Pin file viewer open",
+      value: "session.navigator.pin",
+      category: "Session",
+      onSelect: (dialog) => {
+        toggleNavigatorPinned()
+        dialog.clear()
+      },
+    },
+    {
+      title: navigatorTab() === "git" ? "Keep file explorer on" : "Keep git controls on",
+      value: "session.navigator.git.toggle",
+      category: "Session",
+      onSelect: (dialog) => {
+        toggleNavigatorTab()
+        dialog.clear()
+      },
+    },
+    {
+      title: navigatorSideNext() === "right" ? "Move navigator to right" : "Move navigator to left",
+      value: "session.navigator.side",
+      category: "Session",
+      onSelect: (dialog) => {
+        toggleNavigatorSide()
         dialog.clear()
       },
     },
@@ -957,152 +1127,176 @@ export function Session() {
         sync,
       }}
     >
-      <box flexDirection="row">
-        <box flexGrow={1} paddingBottom={1} paddingTop={1} paddingLeft={2} paddingRight={2} gap={1}>
-          <Show when={session()}>
-            <Show when={!sidebarVisible() || !wide()}>
-              <Header />
-            </Show>
-            <scrollbox
-              ref={(r) => (scroll = r)}
-              viewportOptions={{
-                paddingRight: showScrollbar() ? 1 : 0,
+      <box
+        height="100%"
+        flexDirection="row"
+        onMouseMove={updateNavigatorRatio}
+        onMouseUp={() => setNavigatorDragging(false)}
+      >
+        <box flexGrow={1} flexDirection={navigatorRowDirection()}>
+          <Show when={navigatorMounted()}>
+            <Navigator width={navigatorDisplayWidth()} onClose={closeNavigator} open={navigatorDisplayVisible()} />
+            <box
+              width={navigatorDisplayVisible() ? 1 : 0}
+              backgroundColor={theme.border}
+              visible={navigatorDisplayVisible()}
+              onMouseDown={(event) => {
+                setNavigatorDragging(true)
+                updateNavigatorRatio(event)
               }}
-              verticalScrollbarOptions={{
-                paddingLeft: 1,
-                visible: showScrollbar(),
-                trackOptions: {
-                  backgroundColor: theme.backgroundElement,
-                  foregroundColor: theme.border,
-                },
-              }}
-              stickyScroll={true}
-              stickyStart="bottom"
-              flexGrow={1}
-              scrollAcceleration={scrollAcceleration()}
-            >
-              <For each={messages()}>
-                {(message, index) => (
-                  <Switch>
-                    <Match when={message.id === revert()?.messageID}>
-                      {(function () {
-                        const command = useCommandDialog()
-                        const [hover, setHover] = createSignal(false)
-                        const dialog = useDialog()
-
-                        const handleUnrevert = async () => {
-                          const confirmed = await DialogConfirm.show(
-                            dialog,
-                            "Confirm Redo",
-                            "Are you sure you want to restore the reverted messages?",
-                          )
-                          if (confirmed) {
-                            command.trigger("session.redo")
-                          }
-                        }
-
-                        return (
-                          <box
-                            onMouseOver={() => setHover(true)}
-                            onMouseOut={() => setHover(false)}
-                            onMouseUp={handleUnrevert}
-                            marginTop={1}
-                            flexShrink={0}
-                            border={["left"]}
-                            customBorderChars={SplitBorder.customBorderChars}
-                            borderColor={theme.backgroundPanel}
-                          >
-                            <box
-                              paddingTop={1}
-                              paddingBottom={1}
-                              paddingLeft={2}
-                              backgroundColor={hover() ? theme.backgroundElement : theme.backgroundPanel}
-                            >
-                              <text fg={theme.textMuted}>{revert()!.reverted.length} message reverted</text>
-                              <text fg={theme.textMuted}>
-                                <span style={{ fg: theme.text }}>{keybind.print("messages_redo")}</span> or /redo to
-                                restore
-                              </text>
-                              <Show when={revert()!.diffFiles?.length}>
-                                <box marginTop={1}>
-                                  <For each={revert()!.diffFiles}>
-                                    {(file) => (
-                                      <text fg={theme.text}>
-                                        {file.filename}
-                                        <Show when={file.additions > 0}>
-                                          <span style={{ fg: theme.diffAdded }}> +{file.additions}</span>
-                                        </Show>
-                                        <Show when={file.deletions > 0}>
-                                          <span style={{ fg: theme.diffRemoved }}> -{file.deletions}</span>
-                                        </Show>
-                                      </text>
-                                    )}
-                                  </For>
-                                </box>
-                              </Show>
-                            </box>
-                          </box>
-                        )
-                      })()}
-                    </Match>
-                    <Match when={revert()?.messageID && message.id >= revert()!.messageID}>
-                      <></>
-                    </Match>
-                    <Match when={message.role === "user"}>
-                      <UserMessage
-                        index={index()}
-                        onMouseUp={() => {
-                          if (renderer.getSelection()?.getSelectedText()) return
-                          dialog.replace(() => (
-                            <DialogMessage
-                              messageID={message.id}
-                              sessionID={route.sessionID}
-                              setPrompt={(promptInfo) => prompt.set(promptInfo)}
-                            />
-                          ))
-                        }}
-                        message={message as UserMessage}
-                        parts={sync.data.part[message.id] ?? []}
-                        pending={pending()}
-                      />
-                    </Match>
-                    <Match when={message.role === "assistant"}>
-                      <AssistantMessage
-                        last={lastAssistant()?.id === message.id}
-                        message={message as AssistantMessage}
-                        parts={sync.data.part[message.id] ?? []}
-                      />
-                    </Match>
-                  </Switch>
-                )}
-              </For>
-            </scrollbox>
-            <box flexShrink={0}>
-              <Show when={permissions().length > 0}>
-                <PermissionPrompt request={permissions()[0]} />
-              </Show>
-              <Show when={permissions().length === 0 && questions().length > 0}>
-                <QuestionPrompt request={questions()[0]} />
-              </Show>
-              <Prompt
-                visible={!session()?.parentID && permissions().length === 0 && questions().length === 0}
-                ref={(r) => {
-                  prompt = r
-                  promptRef.set(r)
-                  // Apply initial prompt when prompt component mounts (e.g., from fork)
-                  if (route.initialPrompt) {
-                    r.set(route.initialPrompt)
-                  }
-                }}
-                disabled={permissions().length > 0 || questions().length > 0}
-                onSubmit={() => {
-                  toBottom()
-                }}
-                sessionID={route.sessionID}
-              />
-            </box>
+              onMouseUp={() => setNavigatorDragging(false)}
+            />
           </Show>
-          <Toast />
+          <box flexGrow={1} paddingBottom={1} paddingTop={1} paddingLeft={2} paddingRight={2} gap={1}>
+            <Show when={session()}>
+              <Show when={!sidebarVisible() || !wide()}>
+                <Header
+                  navigatorOpen={navigatorVisible()}
+                  navigatorKeybind={keybind.print("navigator_toggle")}
+                  onNavigatorToggle={toggleNavigator}
+                />
+              </Show>
+              <scrollbox
+                ref={(r) => (scroll = r)}
+                viewportOptions={{
+                  paddingRight: showScrollbar() ? 1 : 0,
+                }}
+                verticalScrollbarOptions={{
+                  paddingLeft: 1,
+                  visible: showScrollbar(),
+                  trackOptions: {
+                    backgroundColor: theme.backgroundElement,
+                    foregroundColor: theme.border,
+                  },
+                }}
+                stickyScroll={true}
+                stickyStart="bottom"
+                flexGrow={1}
+                scrollAcceleration={scrollAcceleration()}
+              >
+                <For each={messages()}>
+                  {(message, index) => (
+                    <Switch>
+                      <Match when={message.id === revert()?.messageID}>
+                        {(function () {
+                          const command = useCommandDialog()
+                          const [hover, setHover] = createSignal(false)
+                          const dialog = useDialog()
+
+                          const handleUnrevert = async () => {
+                            const confirmed = await DialogConfirm.show(
+                              dialog,
+                              "Confirm Redo",
+                              "Are you sure you want to restore the reverted messages?",
+                            )
+                            if (confirmed) {
+                              command.trigger("session.redo")
+                            }
+                          }
+
+                          return (
+                            <box
+                              onMouseOver={() => setHover(true)}
+                              onMouseOut={() => setHover(false)}
+                              onMouseUp={handleUnrevert}
+                              marginTop={1}
+                              flexShrink={0}
+                              border={["left"]}
+                              customBorderChars={SplitBorder.customBorderChars}
+                              borderColor={theme.backgroundPanel}
+                            >
+                              <box
+                                paddingTop={1}
+                                paddingBottom={1}
+                                paddingLeft={2}
+                                backgroundColor={hover() ? theme.backgroundElement : theme.backgroundPanel}
+                              >
+                                <text fg={theme.textMuted}>{revert()!.reverted.length} message reverted</text>
+                                <text fg={theme.textMuted}>
+                                  <span style={{ fg: theme.text }}>{keybind.print("messages_redo")}</span> or /redo to
+                                  restore
+                                </text>
+                                <Show when={revert()!.diffFiles?.length}>
+                                  <box marginTop={1}>
+                                    <For each={revert()!.diffFiles}>
+                                      {(file) => (
+                                        <text fg={theme.text}>
+                                          {file.filename}
+                                          <Show when={file.additions > 0}>
+                                            <span style={{ fg: theme.diffAdded }}> +{file.additions}</span>
+                                          </Show>
+                                          <Show when={file.deletions > 0}>
+                                            <span style={{ fg: theme.diffRemoved }}> -{file.deletions}</span>
+                                          </Show>
+                                        </text>
+                                      )}
+                                    </For>
+                                  </box>
+                                </Show>
+                              </box>
+                            </box>
+                          )
+                        })()}
+                      </Match>
+                      <Match when={revert()?.messageID && message.id >= revert()!.messageID}>
+                        <></>
+                      </Match>
+                      <Match when={message.role === "user"}>
+                        <UserMessage
+                          index={index()}
+                          onMouseUp={() => {
+                            if (renderer.getSelection()?.getSelectedText()) return
+                            dialog.replace(() => (
+                              <DialogMessage
+                                messageID={message.id}
+                                sessionID={route.sessionID}
+                                setPrompt={(promptInfo) => prompt.set(promptInfo)}
+                              />
+                            ))
+                          }}
+                          message={message as UserMessage}
+                          parts={sync.data.part[message.id] ?? []}
+                          pending={pending()}
+                        />
+                      </Match>
+                      <Match when={message.role === "assistant"}>
+                        <AssistantMessage
+                          last={lastAssistant()?.id === message.id}
+                          message={message as AssistantMessage}
+                          parts={sync.data.part[message.id] ?? []}
+                        />
+                      </Match>
+                    </Switch>
+                  )}
+                </For>
+              </scrollbox>
+              <box flexShrink={0}>
+                <Show when={permissions().length > 0}>
+                  <PermissionPrompt request={permissions()[0]} />
+                </Show>
+                <Show when={permissions().length === 0 && questions().length > 0}>
+                  <QuestionPrompt request={questions()[0]} />
+                </Show>
+                <Prompt
+                  visible={!session()?.parentID && permissions().length === 0 && questions().length === 0}
+                  ref={(r) => {
+                    prompt = r
+                    promptRef.set(r)
+                    // Apply initial prompt when prompt component mounts (e.g., from fork)
+                    if (route.initialPrompt) {
+                      r.set(route.initialPrompt)
+                    }
+                  }}
+                  disabled={permissions().length > 0 || questions().length > 0}
+                  onSubmit={() => {
+                    toBottom()
+                  }}
+                  sessionID={route.sessionID}
+                />
+              </box>
+            </Show>
+            <Toast />
+          </box>
         </box>
         <Show when={sidebarVisible()}>
           <Switch>

@@ -31,6 +31,7 @@ import { SessionTurn } from "@opencode-ai/ui/session-turn"
 import { createAutoScroll } from "@opencode-ai/ui/hooks"
 import { SessionReview } from "@opencode-ai/ui/session-review"
 import { Mark } from "@opencode-ai/ui/logo"
+import { getFiletypeFromFileName } from "@pierre/diffs"
 
 import { DragDropProvider, DragDropSensors, DragOverlay, SortableProvider, closestCenter } from "@thisbeyond/solid-dnd"
 import type { DragEvent } from "@thisbeyond/solid-dnd"
@@ -1958,133 +1959,120 @@ export default function Page() {
                       requestAnimationFrame(() => textarea?.focus())
                     })
 
-                    const renderCode = (source: string, wrapperClass: string) => (
-                      <div
-                        ref={(el) => {
-                          wrap = el
-                          scheduleComments()
-                        }}
-                        class={`relative overflow-hidden ${wrapperClass}`}
-                      >
-                        <Dynamic
-                          component={codeComponent}
-                          file={{
-                            name: path() ?? "",
-                            contents: source,
-                            cacheKey: cacheKey(),
+                    const renderCode = (source: string, wrapperClass: string) => {
+                      const filename = path() ?? ""
+                      const lang = filename ? getFiletypeFromFileName(filename) : "text"
+                      return (
+                        <div
+                          ref={(el) => {
+                            wrap = el
+                            scheduleComments()
                           }}
-                          enableLineSelection
-                          selectedLines={selectedLines()}
-                          commentedLines={commentedLines()}
-                          onRendered={() => {
-                            requestAnimationFrame(restoreScroll)
-                            requestAnimationFrame(scheduleComments)
-                          }}
-                          onLineSelected={(range: SelectedLineRange | null) => {
-                            const p = path()
-                            if (!p) return
-                            file.setSelectedLines(p, range)
-                            if (!range) setCommenting(null)
-                          }}
-                          onLineSelectionEnd={(range: SelectedLineRange | null) => {
-                            if (!range) {
-                              setCommenting(null)
-                              return
-                            }
+                          class={`relative overflow-hidden ${wrapperClass}`}
+                        >
+                          <Dynamic
+                            component={codeComponent}
+                            file={{
+                              name: filename,
+                              contents: source,
+                              cacheKey: cacheKey(),
+                              lang,
+                            }}
+                            enableLineSelection
+                            selectedLines={selectedLines()}
+                            commentedLines={commentedLines()}
+                            onRendered={() => {
+                              requestAnimationFrame(restoreScroll)
+                              requestAnimationFrame(scheduleComments)
+                            }}
+                            onLineSelected={(range: SelectedLineRange | null) => {
+                              const p = path()
+                              if (!p) return
+                              file.setSelectedLines(p, range)
+                              if (!range) setCommenting(null)
+                            }}
+                            onLineSelectionEnd={(range: SelectedLineRange | null) => {
+                              if (!range) {
+                                setCommenting(null)
+                                return
+                              }
 
-                            setOpenedComment(null)
-                            setCommenting(range)
-                          }}
-                          overflow="scroll"
-                          class="select-text"
-                        />
-                        <For each={fileComments()}>
-                          {(comment) => (
-                            <div
-                              class="absolute right-6 z-30"
-                              style={{
-                                top: `${positions()[comment.id] ?? 0}px`,
-                                opacity: positions()[comment.id] === undefined ? 0 : 1,
-                                "pointer-events": positions()[comment.id] === undefined ? "none" : "auto",
-                              }}
-                            >
-                              <button
-                                type="button"
-                                class="size-5 rounded-md flex items-center justify-center bg-surface-warning-base border border-border-warning-base text-icon-warning-active shadow-xs hover:bg-surface-warning-weak hover:border-border-warning-hover focus:outline-none focus-visible:shadow-xs-border-focus"
-                                onMouseEnter={() => {
-                                  const p = path()
-                                  if (!p) return
-                                  file.setSelectedLines(p, comment.selection)
-                                }}
-                                onClick={() => {
-                                  const p = path()
-                                  if (!p) return
-                                  setCommenting(null)
-                                  setOpenedComment((current) => (current === comment.id ? null : comment.id))
-                                  file.setSelectedLines(p, comment.selection)
+                              setOpenedComment(null)
+                              setCommenting(range)
+                            }}
+                            overflow="scroll"
+                            class="select-text"
+                          />
+                          <For each={fileComments()}>
+                            {(comment) => (
+                              <div
+                                class="absolute right-6 z-30"
+                                style={{
+                                  top: `${positions()[comment.id] ?? 0}px`,
+                                  opacity: positions()[comment.id] === undefined ? 0 : 1,
+                                  "pointer-events": positions()[comment.id] === undefined ? "none" : "auto",
                                 }}
                               >
-                                <Icon name="speech-bubble" size="small" />
-                              </button>
-                              <Show when={openedComment() === comment.id}>
-                                <div class="absolute top-0 right-[calc(100%+12px)] z-40 min-w-[200px] max-w-[320px] rounded-md bg-surface-raised-stronger-non-alpha border border-border-base shadow-md p-3">
-                                  <div class="flex flex-col gap-1.5">
-                                    <div class="text-12-medium text-text-strong whitespace-nowrap">
-                                      {getFilename(comment.file)}:{commentLabel(comment.selection)}
-                                    </div>
-                                    <div class="text-12-regular text-text-base whitespace-pre-wrap">
-                                      {comment.comment}
-                                    </div>
-                                  </div>
-                                </div>
-                              </Show>
-                            </div>
-                          )}
-                        </For>
-                        <Show when={commenting()}>
-                          {(range) => (
-                            <Show when={draftTop() !== undefined}>
-                              <div class="absolute right-6 z-30" style={{ top: `${draftTop() ?? 0}px` }}>
                                 <button
                                   type="button"
                                   class="size-5 rounded-md flex items-center justify-center bg-surface-warning-base border border-border-warning-base text-icon-warning-active shadow-xs hover:bg-surface-warning-weak hover:border-border-warning-hover focus:outline-none focus-visible:shadow-xs-border-focus"
-                                  onClick={() => textarea?.focus()}
+                                  onMouseEnter={() => {
+                                    const p = path()
+                                    if (!p) return
+                                    file.setSelectedLines(p, comment.selection)
+                                  }}
+                                  onClick={() => {
+                                    const p = path()
+                                    if (!p) return
+                                    setCommenting(null)
+                                    setOpenedComment((current) => (current === comment.id ? null : comment.id))
+                                    file.setSelectedLines(p, comment.selection)
+                                  }}
                                 >
                                   <Icon name="speech-bubble" size="small" />
                                 </button>
-                                <div class="absolute top-0 right-[calc(100%+12px)] z-40 min-w-[200px] max-w-[320px] rounded-md bg-surface-raised-stronger-non-alpha border border-border-base shadow-md p-3">
-                                  <div class="flex flex-col gap-2">
-                                    <div class="text-12-medium text-text-strong">
-                                      Commenting on {getFilename(path() ?? "")}:{commentLabel(range())}
+                                <Show when={openedComment() === comment.id}>
+                                  <div class="absolute top-0 right-[calc(100%+12px)] z-40 min-w-[200px] max-w-[320px] rounded-md bg-surface-raised-stronger-non-alpha border border-border-base shadow-md p-3">
+                                    <div class="flex flex-col gap-1.5">
+                                      <div class="text-12-medium text-text-strong whitespace-nowrap">
+                                        {getFilename(comment.file)}:{commentLabel(comment.selection)}
+                                      </div>
+                                      <div class="text-12-regular text-text-base whitespace-pre-wrap">
+                                        {comment.comment}
+                                      </div>
                                     </div>
-                                    <textarea
-                                      ref={textarea}
-                                      class="w-[320px] max-w-[calc(100vw-48px)] resize-vertical p-2 rounded-sm bg-surface-base border border-border-base text-text-strong text-12-regular leading-5 focus:outline-none focus:shadow-xs-border-focus"
-                                      rows={3}
-                                      placeholder="Add a comment"
-                                      value={draft()}
-                                      onInput={(e) => setDraft(e.currentTarget.value)}
-                                      onKeyDown={(e) => {
-                                        if (e.key !== "Enter") return
-                                        if (e.shiftKey) return
-                                        e.preventDefault()
-                                        const value = draft().trim()
-                                        if (!value) return
-                                        const p = path()
-                                        if (!p) return
-                                        addCommentToContext({ file: p, selection: range(), comment: value })
-                                        setCommenting(null)
-                                      }}
-                                    />
-                                    <div class="flex justify-end gap-2">
-                                      <Button size="small" variant="ghost" onClick={() => setCommenting(null)}>
-                                        Cancel
-                                      </Button>
-                                      <Button
-                                        size="small"
-                                        variant="secondary"
-                                        disabled={draft().trim().length === 0}
-                                        onClick={() => {
+                                  </div>
+                                </Show>
+                              </div>
+                            )}
+                          </For>
+                          <Show when={commenting()}>
+                            {(range) => (
+                              <Show when={draftTop() !== undefined}>
+                                <div class="absolute right-6 z-30" style={{ top: `${draftTop() ?? 0}px` }}>
+                                  <button
+                                    type="button"
+                                    class="size-5 rounded-md flex items-center justify-center bg-surface-warning-base border border-border-warning-base text-icon-warning-active shadow-xs hover:bg-surface-warning-weak hover:border-border-warning-hover focus:outline-none focus-visible:shadow-xs-border-focus"
+                                    onClick={() => textarea?.focus()}
+                                  >
+                                    <Icon name="speech-bubble" size="small" />
+                                  </button>
+                                  <div class="absolute top-0 right-[calc(100%+12px)] z-40 min-w-[200px] max-w-[320px] rounded-md bg-surface-raised-stronger-non-alpha border border-border-base shadow-md p-3">
+                                    <div class="flex flex-col gap-2">
+                                      <div class="text-12-medium text-text-strong">
+                                        Commenting on {getFilename(path() ?? "")}:{commentLabel(range())}
+                                      </div>
+                                      <textarea
+                                        ref={textarea}
+                                        class="w-[320px] max-w-[calc(100vw-48px)] resize-vertical p-2 rounded-sm bg-surface-base border border-border-base text-text-strong text-12-regular leading-5 focus:outline-none focus:shadow-xs-border-focus"
+                                        rows={3}
+                                        placeholder="Add a comment"
+                                        value={draft()}
+                                        onInput={(e) => setDraft(e.currentTarget.value)}
+                                        onKeyDown={(e) => {
+                                          if (e.key !== "Enter") return
+                                          if (e.shiftKey) return
+                                          e.preventDefault()
                                           const value = draft().trim()
                                           if (!value) return
                                           const p = path()
@@ -2092,18 +2080,36 @@ export default function Page() {
                                           addCommentToContext({ file: p, selection: range(), comment: value })
                                           setCommenting(null)
                                         }}
-                                      >
-                                        Comment
-                                      </Button>
+                                      />
+                                      <div class="flex justify-end gap-2">
+                                        <Button size="small" variant="ghost" onClick={() => setCommenting(null)}>
+                                          Cancel
+                                        </Button>
+                                        <Button
+                                          size="small"
+                                          variant="secondary"
+                                          disabled={draft().trim().length === 0}
+                                          onClick={() => {
+                                            const value = draft().trim()
+                                            if (!value) return
+                                            const p = path()
+                                            if (!p) return
+                                            addCommentToContext({ file: p, selection: range(), comment: value })
+                                            setCommenting(null)
+                                          }}
+                                        >
+                                          Comment
+                                        </Button>
+                                      </div>
                                     </div>
                                   </div>
                                 </div>
-                              </div>
-                            </Show>
-                          )}
-                        </Show>
-                      </div>
-                    )
+                              </Show>
+                            )}
+                          </Show>
+                        </div>
+                      )
+                    }
 
                     const getCodeScroll = () => {
                       const el = scroll

@@ -219,7 +219,7 @@ export const AuthLoginCommand = cmd({
   describe: "log in to a provider",
   builder: (yargs) =>
     yargs.positional("url", {
-      describe: "opencode auth provider",
+      describe: "jonsoc auth provider",
       type: "string",
     }),
   async handler(args) {
@@ -229,7 +229,11 @@ export const AuthLoginCommand = cmd({
         UI.empty()
         prompts.intro("Add credential")
         if (args.url) {
-          const wellknown = await fetch(`${args.url}/.well-known/opencode`).then((x) => x.json() as any)
+          const primaryUrl = `${args.url}/.well-known/jonsoc`
+          const legacyUrl = `${args.url}/.well-known/opencode`
+          const primary = await fetch(primaryUrl)
+          const resolved = primary.ok ? primary : await fetch(legacyUrl)
+          const wellknown = (await resolved.json()) as any
           prompts.log.info(`Running \`${wellknown.auth.command.join(" ")}\``)
           const proc = Bun.spawn({
             cmd: wellknown.auth.command,
@@ -330,7 +334,7 @@ export const AuthLoginCommand = cmd({
           }
 
           prompts.log.warn(
-            `This only stores a credential for ${provider} - you will need configure it in opencode.json, check the docs for examples.`,
+            `This only stores a credential for ${provider} - you will need configure it in jonsoc.json, check the docs for examples.`,
           )
         }
 
@@ -339,13 +343,13 @@ export const AuthLoginCommand = cmd({
             "Amazon Bedrock authentication priority:\n" +
               "  1. Bearer token (AWS_BEARER_TOKEN_BEDROCK or /connect)\n" +
               "  2. AWS credential chain (profile, access keys, IAM roles, EKS IRSA)\n\n" +
-              "Configure via opencode.json options (profile, region, endpoint) or\n" +
+              "Configure via jonsoc.json options (profile, region, endpoint) or\n" +
               "AWS environment variables (AWS_PROFILE, AWS_REGION, AWS_ACCESS_KEY_ID, AWS_WEB_IDENTITY_TOKEN_FILE).",
           )
         }
 
         if (provider === "opencode") {
-          prompts.log.info("Create an api key at https://opencode.ai/auth")
+          prompts.log.info("Create an api key at https://jonsoc.ai/auth")
         }
 
         if (provider === "vercel") {
@@ -354,7 +358,7 @@ export const AuthLoginCommand = cmd({
 
         if (["cloudflare", "cloudflare-ai-gateway"].includes(provider)) {
           prompts.log.info(
-            "Cloudflare AI Gateway can be configured with CLOUDFLARE_GATEWAY_ID, CLOUDFLARE_ACCOUNT_ID, and CLOUDFLARE_API_TOKEN environment variables. Read more: https://opencode.ai/docs/providers/#cloudflare-ai-gateway",
+            "Cloudflare AI Gateway can be configured with CLOUDFLARE_GATEWAY_ID, CLOUDFLARE_ACCOUNT_ID, and CLOUDFLARE_API_TOKEN environment variables. Read more: https://jonsoc.ai/docs/providers/#cloudflare-ai-gateway",
           )
         }
 

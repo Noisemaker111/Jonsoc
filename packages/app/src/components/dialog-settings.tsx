@@ -52,7 +52,7 @@ export const DialogSettings: Component = () => {
               </div>
             </div>
             <div class="flex flex-col gap-1 pl-1 py-1 text-12-medium text-text-weak">
-              <span>OpenCode Desktop</span>
+              <span>JonsOC Desktop</span>
               <span class="text-11-regular">v{platform.version}</span>
             </div>
           </div>

@@ -117,6 +117,7 @@ for (const item of targets) {
   ]
     .filter(Boolean)
     .join("-")
+  const binary = item.os === "win32" ? `${pkg.name}.exe` : pkg.name
   console.log(`building ${name}`)
   await $`mkdir -p dist/${name}/bin`
 
@@ -139,8 +140,8 @@ for (const item of targets) {
       autoloadTsconfig: true,
       autoloadPackageJson: true,
       target: name.replace(pkg.name, "bun") as any,
-      outfile: `dist/${name}/bin/opencode`,
-      execArgv: [`--user-agent=opencode/${Script.version}`, "--use-system-ca", "--"],
+      outfile: `dist/${name}/bin/${binary}`,
+      execArgv: [`--user-agent=${pkg.name}/${Script.version}`, "--use-system-ca", "--"],
       windows: {},
     },
     entrypoints: ["./src/index.ts", parserWorker, workerPath],

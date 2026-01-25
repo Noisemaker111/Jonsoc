@@ -8,6 +8,8 @@ import { createRequire } from "module"
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const require = createRequire(import.meta.url)
+const pkg = require("../package.json")
+const name = pkg.name
 
 function detectPlatformAndArch() {
   // Map platform names
@@ -49,8 +51,8 @@ function detectPlatformAndArch() {
 
 function findBinary() {
   const { platform, arch } = detectPlatformAndArch()
-  const packageName = `opencode-${platform}-${arch}`
-  const binaryName = platform === "windows" ? "opencode.exe" : "opencode"
+  const packageName = `${name}-${platform}-${arch}`
+  const binaryName = platform === "windows" ? `${name}.exe` : name
 
   try {
     // Use require.resolve to find the package
@@ -89,7 +91,7 @@ function symlinkBinary(sourcePath, binaryName) {
   const { targetPath } = prepareBinDirectory(binaryName)
 
   fs.symlinkSync(sourcePath, targetPath)
-  console.log(`opencode binary symlinked: ${targetPath} -> ${sourcePath}`)
+  console.log(`${name} binary symlinked: ${targetPath} -> ${sourcePath}`)
 
   // Verify the file exists after operation
   if (!fs.existsSync(targetPath)) {
@@ -112,7 +114,7 @@ async function main() {
     console.log(`Platform binary verified at: ${binaryPath}`)
     console.log("Wrapper script will handle binary execution")
   } catch (error) {
-    console.error("Failed to setup opencode binary:", error.message)
+    console.error(`Failed to setup ${name} binary:`, error.message)
     process.exit(1)
   }
 }

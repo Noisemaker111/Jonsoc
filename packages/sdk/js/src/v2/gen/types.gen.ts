@@ -970,6 +970,22 @@ export type KeybindsConfig = {
    */
   sidebar_toggle?: string
   /**
+   * Toggle file navigator
+   */
+  navigator_toggle?: string
+  /**
+   * Narrow navigator list panel
+   */
+  navigator_resize_narrow?: string
+  /**
+   * Widen navigator list panel
+   */
+  navigator_resize_wide?: string
+  /**
+   * Save navigator file edits
+   */
+  navigator_save?: string
+  /**
    * Toggle session scrollbar
    */
   scrollbar_toggle?: string
@@ -1635,7 +1651,7 @@ export type Config = {
   }
   server?: ServerConfig
   /**
-   * Command configuration, see https://opencode.ai/docs/commands
+   * Command configuration, see https://jonsoc.ai/docs/commands
    */
   command?: {
     [key: string]: {
@@ -1696,7 +1712,7 @@ export type Config = {
     [key: string]: AgentConfig | undefined
   }
   /**
-   * Agent configuration, see https://opencode.ai/docs/agents
+   * Agent configuration, see https://jonsoc.ai/docs/agents
    */
   agent?: {
     plan?: AgentConfig
@@ -2099,6 +2115,13 @@ export type Path = {
 
 export type VcsInfo = {
   branch: string
+}
+
+export type VcsHistoryLine = {
+  graph: string
+  hash?: string
+  subject?: string
+  refs?: Array<string>
 }
 
 export type Command = {
@@ -4730,6 +4753,25 @@ export type VcsGetResponses = {
 }
 
 export type VcsGetResponse = VcsGetResponses[keyof VcsGetResponses]
+
+export type VcsHistoryData = {
+  body?: never
+  path?: never
+  query?: {
+    directory?: string
+    limit?: number
+  }
+  url: "/vcs/history"
+}
+
+export type VcsHistoryResponses = {
+  /**
+   * VCS history
+   */
+  200: Array<VcsHistoryLine>
+}
+
+export type VcsHistoryResponse = VcsHistoryResponses[keyof VcsHistoryResponses]
 
 export type CommandListData = {
   body?: never

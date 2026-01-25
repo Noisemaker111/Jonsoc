@@ -1,6 +1,6 @@
-# OpenCode Desktop
+# JonsOC Desktop
 
-Native OpenCode desktop app, built with Tauri v2.
+Native JonsOC desktop app, built with Tauri v2.
 
 ## Development
 

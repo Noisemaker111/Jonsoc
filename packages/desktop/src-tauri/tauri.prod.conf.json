@@ -1,13 +1,13 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "OpenCode",
+  "productName": "JonsOC",
   "identifier": "ai.opencode.desktop",
   "app": {
     "windows": [
       {
         "label": "main",
         "create": false,
-        "title": "OpenCode",
+        "title": "JonsOC",
         "url": "/",
         "decorations": true,
         "dragDropEnabled": false,

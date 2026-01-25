@@ -231,7 +231,7 @@ function createOpencode() {
   const host = "127.0.0.1"
   const port = 4096
   const url = `http://${host}:${port}`
-  const proc = spawn(`opencode`, [`serve`, `--hostname=${host}`, `--port=${port}`])
+  const proc = spawn(`jonsoc`, [`serve`, `--hostname=${host}`, `--port=${port}`])
   const client = createOpencodeClient({ baseUrl: url })
 
   return {
@@ -243,8 +243,8 @@ function createOpencode() {
 function assertPayloadKeyword() {
   const payload = useContext().payload as IssueCommentEvent | PullRequestReviewCommentEvent
   const body = payload.comment.body.trim()
-  if (!body.match(/(?:^|\s)(?:\/opencode|\/oc)(?=$|\s)/)) {
-    throw new Error("Comments must mention `/opencode` or `/oc`")
+  if (!body.match(/(?:^|\s)(?:\/jonsoc|\/oc)(?=$|\s)/)) {
+    throw new Error("Comments must mention `/jonsoc` or `/oc`")
   }
 }
 
@@ -362,7 +362,7 @@ function useIssueId() {
 }
 
 function useShareUrl() {
-  return isMock() ? "https://dev.opencode.ai" : "https://opencode.ai"
+  return isMock() ? "https://dev.jonsoc.ai" : "https://jonsoc.ai"
 }
 
 async function getAccessToken() {
@@ -373,7 +373,7 @@ async function getAccessToken() {
 
   let response
   if (isMock()) {
-    response = await fetch("https://api.opencode.ai/exchange_github_app_token_with_pat", {
+    response = await fetch("https://api.jonsoc.ai/exchange_github_app_token_with_pat", {
       method: "POST",
       headers: {
         Authorization: `Bearer ${useEnvMock().mockToken}`,
@@ -382,7 +382,7 @@ async function getAccessToken() {
     })
   } else {
     const oidcToken = await core.getIDToken("opencode-github-action")
-    response = await fetch("https://api.opencode.ai/exchange_github_app_token", {
+    response = await fetch("https://api.jonsoc.ai/exchange_github_app_token", {
       method: "POST",
       headers: {
         Authorization: `Bearer ${oidcToken}`,

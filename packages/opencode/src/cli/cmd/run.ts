@@ -27,7 +27,7 @@ const TOOL: Record<string, [string, string]> = {
 
 export const RunCommand = cmd({
   command: "run [message..]",
-  describe: "run opencode with a message",
+  describe: "run jonsoc with a message",
   builder: (yargs: Argv) => {
     return yargs
       .positional("message", {
@@ -81,7 +81,7 @@ export const RunCommand = cmd({
       })
       .option("attach", {
         type: "string",
-        describe: "attach to a running opencode server (e.g., http://localhost:4096)",
+        describe: "attach to a running jonsoc server (e.g., http://localhost:4096)",
       })
       .option("port", {
         type: "number",
@@ -343,7 +343,7 @@ export const RunCommand = cmd({
         const request = new Request(input, init)
         return Server.App().fetch(request)
       }) as typeof globalThis.fetch
-      const sdk = createOpencodeClient({ baseUrl: "http://opencode.internal", fetch: fetchFn })
+      const sdk = createOpencodeClient({ baseUrl: "http://jonsoc.internal", fetch: fetchFn })
 
       if (args.command) {
         const exists = await Command.get(args.command)

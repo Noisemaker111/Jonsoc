@@ -31,8 +31,8 @@ export default tool({
     offset: tool.schema.number().describe("Number of results to skip for pagination").default(0),
   },
   async execute(args) {
-    const owner = "anomalyco"
-    const repo = "opencode"
+    const owner = "Noisemaker111"
+    const repo = "JonsOpencode"
 
     const page = Math.floor(args.offset / args.limit) + 1
     const searchQuery = encodeURIComponent(`${args.query} repo:${owner}/${repo} type:pr state:open`)

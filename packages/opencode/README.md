@@ -1,4 +1,30 @@
-# js
+# jonsOC
+
+AI-powered development tool for modern coding workflows.
+
+## Installation
+
+Install globally using bun:
+
+```bash
+bun add -g jonsoc
+```
+
+Or with npm:
+
+```bash
+npm install -g jonsoc
+```
+
+## Usage
+
+Once installed, you can use jonsOC from anywhere:
+
+```bash
+jonsoc --help
+```
+
+## Development
 
 To install dependencies:
 
@@ -6,10 +32,27 @@ To install dependencies:
 bun install
 ```
 
-To run:
+To run locally:
 
 ```bash
-bun run index.ts
+bun run dev
 ```
 
-This project was created using `bun init` in bun v1.2.12. [Bun](https://bun.sh) is a fast all-in-one JavaScript runtime.
+To build for all platforms:
+
+```bash
+bun run build
+```
+
+## Publishing
+
+To build and publish to npm:
+
+```bash
+bun run build
+bun run script/publish.ts
+```
+
+## License
+
+MIT

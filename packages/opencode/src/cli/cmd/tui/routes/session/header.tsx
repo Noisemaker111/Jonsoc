@@ -10,6 +10,12 @@ import { useKeybind } from "../../context/keybind"
 import { Installation } from "@/installation"
 import { useTerminalDimensions } from "@opentui/solid"
 
+type HeaderProps = {
+  navigatorOpen?: boolean
+  navigatorKeybind?: string
+  onNavigatorToggle?: () => void
+}
+
 const Title = (props: { session: Accessor<Session> }) => {
   const { theme } = useTheme()
   return (
@@ -30,7 +36,7 @@ const ContextInfo = (props: { context: Accessor<string | undefined>; cost: Acces
   )
 }
 
-export function Header() {
+export function Header(props: HeaderProps) {
   const route = useRouteData("session")
   const sync = useSync()
   const session = createMemo(() => sync.session.get(route.sessionID)!)
@@ -64,8 +70,11 @@ export function Header() {
   const keybind = useKeybind()
   const command = useCommandDialog()
   const [hover, setHover] = createSignal<"parent" | "prev" | "next" | null>(null)
+  const [navigatorHover, setNavigatorHover] = createSignal(false)
   const dimensions = useTerminalDimensions()
   const narrow = createMemo(() => dimensions().width < 80)
+  const showNavigator = createMemo(() => Boolean(props.onNavigatorToggle))
+  const navigatorLabel = createMemo(() => (props.navigatorOpen ? "Hide navigator" : "Show navigator"))
 
   return (
     <box flexShrink={0}>
@@ -84,9 +93,26 @@ export function Header() {
           <Match when={session()?.parentID}>
             <box flexDirection="column" gap={1}>
               <box flexDirection={narrow() ? "column" : "row"} justifyContent="space-between" gap={narrow() ? 1 : 0}>
-                <text fg={theme.text}>
-                  <b>Subagent session</b>
-                </text>
+                <box flexDirection="row" gap={1} alignItems="center">
+                  <Show when={showNavigator()}>
+                    <box
+                      onMouseOver={() => setNavigatorHover(true)}
+                      onMouseOut={() => setNavigatorHover(false)}
+                      onMouseUp={() => props.onNavigatorToggle?.()}
+                      backgroundColor={navigatorHover() ? theme.backgroundElement : theme.backgroundPanel}
+                    >
+                      <text fg={theme.text}>
+                        {navigatorLabel()}
+                        <Show when={props.navigatorKeybind}>
+                          <span style={{ fg: theme.textMuted }}> {props.navigatorKeybind}</span>
+                        </Show>
+                      </text>
+                    </box>
+                  </Show>
+                  <text fg={theme.text}>
+                    <b>Subagent session</b>
+                  </text>
+                </box>
                 <box flexDirection="row" gap={1} flexShrink={0}>
                   <ContextInfo context={context} cost={cost} />
                   <text fg={theme.textMuted}>v{Installation.VERSION}</text>
@@ -128,7 +154,24 @@ export function Header() {
           </Match>
           <Match when={true}>
             <box flexDirection={narrow() ? "column" : "row"} justifyContent="space-between" gap={1}>
-              <Title session={session} />
+              <box flexDirection="row" gap={1} alignItems="center">
+                <Show when={showNavigator()}>
+                  <box
+                    onMouseOver={() => setNavigatorHover(true)}
+                    onMouseOut={() => setNavigatorHover(false)}
+                    onMouseUp={() => props.onNavigatorToggle?.()}
+                    backgroundColor={navigatorHover() ? theme.backgroundElement : theme.backgroundPanel}
+                  >
+                    <text fg={theme.text}>
+                      {navigatorLabel()}
+                      <Show when={props.navigatorKeybind}>
+                        <span style={{ fg: theme.textMuted }}> {props.navigatorKeybind}</span>
+                      </Show>
+                    </text>
+                  </box>
+                </Show>
+                <Title session={session} />
+              </box>
               <box flexDirection="row" gap={1} flexShrink={0}>
                 <ContextInfo context={context} cost={cost} />
                 <text fg={theme.textMuted}>v{Installation.VERSION}</text>

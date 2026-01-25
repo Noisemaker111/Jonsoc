@@ -1,18 +1,18 @@
-# OpenCode Agent Guidelines
+# JonsOC Agent Guidelines
 
-This repository is a fork of OpenCode maintained by **Noisemaker111**. All changes and contributions must be targeted at the `Noisemaker111/opencode` repository on the `dev` branch.
+This repository is a fork of JonsOC maintained by **Noisemaker111**. All changes and contributions must be targeted at the `Noisemaker111/jonsoc` repository on the `dev` branch.
 
 ## Build and Test Commands
 
 The project uses **Bun** as the primary runtime and package manager.
 
 - **Install Dependencies**: `bun install`
-- **Run Development Mode**: `bun dev` (Runs `bun run --conditions=browser ./src/index.ts` in `packages/opencode`)
+- **Run Development Mode**: `bun dev` (Runs `bun run --conditions=browser ./src/index.ts` in `packages/jonsoc`)
 - **Typecheck**: `bun run typecheck` (Runs `tsgo --noEmit`)
 - **Lint**: `bun run lint` (Runs `bun test --coverage`)
 - **Format**: `bun run format` (Runs Prettier)
 - **Run All Tests**: `bun test`
-- **Run Single Test**: `bun test <path-to-test-file>` (e.g., `bun test packages/opencode/test/tool.test.ts`)
+- **Run Single Test**: `bun test <path-to-test-file>` (e.g., `bun test packages/jonsoc/test/tool.test.ts`)
 - **Regenerate SDK**: `./packages/sdk/js/script/build.ts`
 
 ## Code Style & Conventions
@@ -53,7 +53,7 @@ Follow these project-specific patterns to maintain consistency.
 
 ## VCS & PR Guidelines
 
-- **Repository**: Only make changes to `Noisemaker111/opencode`.
+- **Repository**: Only make changes to `Noisemaker111/jonsoc`.
 - **Branching**: The default branch is `dev`. Create feature branches from `dev`.
 - **Commits**: Use descriptive and professional commit messages.
 - **Jujutsu (jj)**: ALWAYS check for a `.jj/` directory before running VCS commands. If present, use `jj` instead of `git`.

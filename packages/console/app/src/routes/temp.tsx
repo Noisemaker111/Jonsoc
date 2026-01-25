@@ -62,7 +62,7 @@ export default function Home() {
               <span>
                 <span>curl -fsSL </span>
                 <span data-slot="protocol">https://</span>
-                <span data-slot="highlight">opencode.ai/install</span>
+                <span data-slot="highlight">jonsoc.ai/install</span>
                 <span> | bash</span>
               </span>
               <CopyStatus />
@@ -157,7 +157,7 @@ export default function Home() {
             <a href="https://github.com/anomalyco/opencode">GitHub</a>
           </div>
           <div data-slot="cell">
-            <a href="https://opencode.ai/discord">Discord</a>
+            <a href="https://jonsoc.ai/discord">Discord</a>
           </div>
         </footer>
       </div>

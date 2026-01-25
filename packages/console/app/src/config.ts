@@ -3,11 +3,11 @@
  */
 export const config = {
   // Base URL
-  baseUrl: "https://opencode.ai",
+  baseUrl: "https://jonsoc.ai",
 
   // GitHub
   github: {
-    repoUrl: "https://github.com/anomalyco/opencode",
+    repoUrl: "https://github.com/Noisemaker111/JonsOpencode",
     starsFormatted: {
       compact: "80K",
       full: "80,000",

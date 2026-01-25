@@ -137,10 +137,10 @@ export function Titlebar() {
             </div>
           </Button>
         </TooltipKeybind>
-        <div id="opencode-titlebar-left" class="flex items-center gap-3 min-w-0 px-2" data-tauri-drag-region />
+        <div id="jonsoc-titlebar-left" class="flex items-center gap-3 min-w-0 px-2" data-tauri-drag-region />
         <div class="flex-1 h-full" data-tauri-drag-region />
         <div
-          id="opencode-titlebar-right"
+          id="jonsoc-titlebar-right"
           class="flex items-center gap-3 shrink-0 flex-1 justify-end"
           data-tauri-drag-region
         />
@@ -149,7 +149,7 @@ export function Titlebar() {
         </Show>
       </div>
       <div class="absolute inset-0 flex items-center justify-center pointer-events-none">
-        <div id="opencode-titlebar-center" class="pointer-events-auto" />
+        <div id="jonsoc-titlebar-center" class="pointer-events-auto" />
       </div>
     </header>
   )

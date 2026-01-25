@@ -31,7 +31,7 @@ permissions:
 jobs:
   publish:
     runs-on: blacksmith-4vcpu-ubuntu-2404
-    if: github.repository == 'anomalyco/opencode'
+    if: github.repository == 'Noisemaker111/jonsoc'
     steps:
       - uses: actions/checkout@v3
         with:
@@ -41,9 +41,9 @@ jobs:
 
       - uses: ./.github/actions/setup-bun
 
-      - name: Install OpenCode
+      - name: Install JonsOC
         if: inputs.bump || inputs.version
-        run: bun i -g opencode-ai@1.0.169
+        run: bun i -g jonsoc-ai@1.0.169
 
       - name: Login to GitHub Container Registry
         uses: docker/login-action@v3
@@ -65,8 +65,8 @@ jobs:
 
       - name: Setup Git Identity
         run: |
-          git config --global user.email "opencode@sst.dev"
-          git config --global user.name "opencode"
+          git config --global user.email "jonsoc@sst.dev"
+          git config --global user.name "jonsoc"
           git remote set-url origin https://x-access-token:${{ secrets.SST_GITHUB_TOKEN }}@github.com/${{ github.repository }}
 
       - name: Publish
@@ -82,7 +82,7 @@ jobs:
 
       - uses: actions/upload-artifact@v4
         with:
-          name: opencode-cli
+          name: jonsoc-cli
           path: packages/opencode/dist
 
     outputs:

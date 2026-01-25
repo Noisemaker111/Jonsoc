@@ -23,9 +23,15 @@ import { AttachCommand } from "./cli/cmd/tui/attach"
 import { TuiThreadCommand } from "./cli/cmd/tui/thread"
 import { AcpCommand } from "./cli/cmd/acp"
 import { EOL } from "os"
+import { existsSync } from "fs"
 import { WebCommand } from "./cli/cmd/web"
 import { PrCommand } from "./cli/cmd/pr"
 import { SessionCommand } from "./cli/cmd/session"
+
+const workdir = process.env.JONSOC_WORKDIR ?? process.env.JOC_WORKDIR ?? process.env.OPENCODE_WORKDIR
+if (workdir && existsSync(workdir)) {
+  process.chdir(workdir)
+}
 
 process.on("unhandledRejection", (e) => {
   Log.Default.error("rejection", {
@@ -41,7 +47,7 @@ process.on("uncaughtException", (e) => {
 
 const cli = yargs(hideBin(process.argv))
   .parserConfiguration({ "populate--": true })
-  .scriptName("opencode")
+  .scriptName("jonsoc")
   .wrap(100)
   .help("help", "show help")
   .alias("help", "h")
@@ -68,9 +74,10 @@ const cli = yargs(hideBin(process.argv))
     })
 
     process.env.AGENT = "1"
+    process.env.JONSOC = "1"
     process.env.OPENCODE = "1"
 
-    Log.Default.info("opencode", {
+    Log.Default.info("jonsoc", {
       version: Installation.VERSION,
       args: process.argv.slice(2),
     })

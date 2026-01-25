@@ -28,6 +28,18 @@ export namespace Vcs {
     })
   export type Info = z.infer<typeof Info>
 
+  export const HistoryLine = z
+    .object({
+      graph: z.string(),
+      hash: z.string().optional(),
+      subject: z.string().optional(),
+      refs: z.array(z.string()).optional(),
+    })
+    .meta({
+      ref: "VcsHistoryLine",
+    })
+  export type HistoryLine = z.infer<typeof HistoryLine>
+
   async function currentBranch() {
     return $`git rev-parse --abbrev-ref HEAD`
       .quiet()
@@ -72,5 +84,46 @@ export namespace Vcs {
 
   export async function branch() {
     return await state().then((s) => s.branch())
+  }
+
+  const HISTORY_SEPARATOR = "\x1f"
+  const HISTORY_LIMIT = 60
+
+  function parseHistoryLine(line: string): HistoryLine {
+    if (!line.includes(HISTORY_SEPARATOR)) return { graph: line }
+    const first = line.indexOf(HISTORY_SEPARATOR)
+    const second = line.indexOf(HISTORY_SEPARATOR, first + HISTORY_SEPARATOR.length)
+    if (second === -1) return { graph: line }
+    const prefix = line.slice(0, first)
+    const hashIndex = prefix.lastIndexOf(" ")
+    const graph = hashIndex >= 0 ? prefix.slice(0, hashIndex + 1) : ""
+    const hash = hashIndex >= 0 ? prefix.slice(hashIndex + 1) : prefix
+    const subject = line.slice(first + HISTORY_SEPARATOR.length, second)
+    const refsRaw = line.slice(second + HISTORY_SEPARATOR.length).trim()
+    const refs = refsRaw.length ? refsRaw.split(", ").filter(Boolean) : undefined
+
+    return {
+      graph,
+      hash: hash.length ? hash : undefined,
+      subject: subject.length ? subject : undefined,
+      refs,
+    }
+  }
+
+  export async function history(limit = HISTORY_LIMIT) {
+    if (Instance.project.vcs !== "git") return []
+    const size = Math.min(Math.max(limit, 1), 200)
+    const format = "%h%x1f%s%x1f%D"
+    const output = await $`git log --graph --decorate=short --pretty=format:${format} --all -n ${size}`
+      .quiet()
+      .nothrow()
+      .cwd(Instance.worktree)
+      .text()
+      .catch(() => "")
+    if (!output.trim()) return []
+    return output
+      .split("\n")
+      .map((line) => line.trimEnd())
+      .map(parseHistoryLine)
   }
 }

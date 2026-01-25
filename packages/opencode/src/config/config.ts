@@ -31,6 +31,12 @@ import { Event } from "../server/event"
 
 export namespace Config {
   const log = Log.create({ service: "config" })
+  const configTargets = [".jonsoc", ".opencode"]
+  const configFiles = ["jonsoc.jsonc", "jonsoc.json", "opencode.jsonc", "opencode.json"]
+  const schemaUrl =
+    process.env.JONSOC_CONFIG_SCHEMA ?? process.env.OPENCODE_CONFIG_SCHEMA ?? "https://jonsoc.ai/config.json"
+  const wellKnownPath = "/.well-known/jonsoc"
+  const legacyWellKnownPath = "/.well-known/opencode"
 
   // Custom merge function that concatenates array fields instead of replacing them
   function mergeConfigConcatArrays(target: Info, source: Info): Info {
@@ -53,18 +59,21 @@ export namespace Config {
     for (const [key, value] of Object.entries(auth)) {
       if (value.type === "wellknown") {
         process.env[value.key] = value.token
-        log.debug("fetching remote config", { url: `${key}/.well-known/opencode` })
-        const response = await fetch(`${key}/.well-known/opencode`)
-        if (!response.ok) {
-          throw new Error(`failed to fetch remote config from ${key}: ${response.status}`)
+        const primaryUrl = `${key}${wellKnownPath}`
+        const legacyUrl = `${key}${legacyWellKnownPath}`
+        log.debug("fetching remote config", { url: primaryUrl })
+        const response = await fetch(primaryUrl)
+        const resolved = response.ok ? response : await fetch(legacyUrl)
+        if (!resolved.ok) {
+          throw new Error(`failed to fetch remote config from ${key}: ${resolved.status}`)
         }
-        const wellknown = (await response.json()) as any
+        const wellknown = (await resolved.json()) as any
         const remoteConfig = wellknown.config ?? {}
         // Add $schema to prevent load() from trying to write back to a non-existent file
-        if (!remoteConfig.$schema) remoteConfig.$schema = "https://opencode.ai/config.json"
+        if (!remoteConfig.$schema) remoteConfig.$schema = schemaUrl
         result = mergeConfigConcatArrays(
           result,
-          await load(JSON.stringify(remoteConfig), `${key}/.well-known/opencode`),
+          await load(JSON.stringify(remoteConfig), response.ok ? primaryUrl : legacyUrl),
         )
         log.debug("loaded remote config from well-known", { url: key })
       }
@@ -81,7 +90,7 @@ export namespace Config {
 
     // Project config has highest precedence (overrides global and remote)
     if (!Flag.OPENCODE_DISABLE_PROJECT_CONFIG) {
-      for (const file of ["opencode.jsonc", "opencode.json"]) {
+      for (const file of configFiles) {
         const found = await Filesystem.findUp(file, Instance.directory, Instance.worktree)
         for (const resolved of found.toReversed()) {
           result = mergeConfigConcatArrays(result, await loadFile(resolved))
@@ -101,20 +110,20 @@ export namespace Config {
 
     const directories = [
       Global.Path.config,
-      // Only scan project .opencode/ directories when project discovery is enabled
+      // Only scan project .jonsoc/ directories when project discovery is enabled
       ...(!Flag.OPENCODE_DISABLE_PROJECT_CONFIG
         ? await Array.fromAsync(
             Filesystem.up({
-              targets: [".opencode"],
+              targets: configTargets,
               start: Instance.directory,
               stop: Instance.worktree,
             }),
           )
         : []),
-      // Always scan ~/.opencode/ (user home directory)
+      // Always scan ~/.jonsoc/ (user home directory)
       ...(await Array.fromAsync(
         Filesystem.up({
-          targets: [".opencode"],
+          targets: configTargets,
           start: Global.Path.home,
           stop: Global.Path.home,
         }),
@@ -127,8 +136,8 @@ export namespace Config {
     }
 
     for (const dir of unique(directories)) {
-      if (dir.endsWith(".opencode") || dir === Flag.OPENCODE_CONFIG_DIR) {
-        for (const file of ["opencode.jsonc", "opencode.json"]) {
+      if (configTargets.some((target) => dir.endsWith(target)) || dir === Flag.OPENCODE_CONFIG_DIR) {
+        for (const file of configFiles) {
           log.debug(`loading config from ${path.join(dir, file)}`)
           result = mergeConfigConcatArrays(result, await loadFile(path.join(dir, file)))
           // to satisfy the type checker
@@ -257,7 +266,14 @@ export namespace Config {
       })
       if (!md) continue
 
-      const patterns = ["/.opencode/command/", "/.opencode/commands/", "/command/", "/commands/"]
+      const patterns = [
+        "/.jonsoc/command/",
+        "/.jonsoc/commands/",
+        "/.opencode/command/",
+        "/.opencode/commands/",
+        "/command/",
+        "/commands/",
+      ]
       const file = rel(item, patterns) ?? path.basename(item)
       const name = trim(file)
 
@@ -297,7 +313,14 @@ export namespace Config {
       })
       if (!md) continue
 
-      const patterns = ["/.opencode/agent/", "/.opencode/agents/", "/agent/", "/agents/"]
+      const patterns = [
+        "/.jonsoc/agent/",
+        "/.jonsoc/agents/",
+        "/.opencode/agent/",
+        "/.opencode/agents/",
+        "/agent/",
+        "/agents/",
+      ]
       const file = rel(item, patterns) ?? path.basename(item)
       const agentName = trim(file)
 
@@ -393,9 +416,9 @@ export namespace Config {
    * Deduplicates plugins by name, with later entries (higher priority) winning.
    * Priority order (highest to lowest):
    * 1. Local plugin/ directory
-   * 2. Local opencode.json
+   * 2. Local jonsoc.json
    * 3. Global plugin/ directory
-   * 4. Global opencode.json
+   * 4. Global jonsoc.json
    *
    * Since plugins are added in low-to-high priority order,
    * we reverse, deduplicate (keeping first occurrence), then restore order.
@@ -648,6 +671,10 @@ export namespace Config {
       editor_open: z.string().optional().default("<leader>e").describe("Open external editor"),
       theme_list: z.string().optional().default("<leader>t").describe("List available themes"),
       sidebar_toggle: z.string().optional().default("<leader>b").describe("Toggle sidebar"),
+      navigator_toggle: z.string().optional().default("ctrl+f,<leader>f").describe("Toggle file navigator"),
+      navigator_resize_narrow: z.string().optional().default("ctrl+left").describe("Narrow navigator list panel"),
+      navigator_resize_wide: z.string().optional().default("ctrl+right").describe("Widen navigator list panel"),
+      navigator_save: z.string().optional().default("ctrl+s").describe("Save navigator file edits"),
       scrollbar_toggle: z.string().optional().default("none").describe("Toggle session scrollbar"),
       username_toggle: z.string().optional().default("none").describe("Toggle username visibility"),
       status_view: z.string().optional().default("<leader>s").describe("View status"),
@@ -1104,6 +1131,8 @@ export namespace Config {
     let result: Info = pipe(
       {},
       mergeDeep(await loadFile(path.join(Global.Path.config, "config.json"))),
+      mergeDeep(await loadFile(path.join(Global.Path.config, "jonsoc.json"))),
+      mergeDeep(await loadFile(path.join(Global.Path.config, "jonsoc.jsonc"))),
       mergeDeep(await loadFile(path.join(Global.Path.config, "opencode.json"))),
       mergeDeep(await loadFile(path.join(Global.Path.config, "opencode.jsonc"))),
     )
@@ -1116,7 +1145,7 @@ export namespace Config {
       .then(async (mod) => {
         const { provider, model, ...rest } = mod.default
         if (provider && model) result.model = `${provider}/${model}`
-        result["$schema"] = "https://opencode.ai/config.json"
+        result["$schema"] = schemaUrl
         result = mergeDeep(result, rest)
         await Bun.write(path.join(Global.Path.config, "config.json"), JSON.stringify(result, null, 2))
         await fs.unlink(path.join(Global.Path.config, "config"))
@@ -1208,9 +1237,9 @@ export namespace Config {
     const parsed = Info.safeParse(data)
     if (parsed.success) {
       if (!parsed.data.$schema) {
-        parsed.data.$schema = "https://opencode.ai/config.json"
+        parsed.data.$schema = schemaUrl
         // Write the $schema to the original text to preserve variables like {env:VAR}
-        const updated = original.replace(/^\s*\{/, '{\n  "$schema": "https://opencode.ai/config.json",')
+        const updated = original.replace(/^\s*\{/, `{\n  "$schema": "${schemaUrl}",`)
         await Bun.write(configFilepath, updated).catch(() => {})
       }
       const data = parsed.data
@@ -1272,7 +1301,7 @@ export namespace Config {
   }
 
   function globalConfigFile() {
-    const candidates = ["opencode.jsonc", "opencode.json", "config.json"].map((file) =>
+    const candidates = ["jonsoc.jsonc", "jonsoc.json", "opencode.jsonc", "opencode.json", "config.json"].map((file) =>
       path.join(Global.Path.config, file),
     )
     for (const file of candidates) {

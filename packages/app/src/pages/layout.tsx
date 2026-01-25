@@ -1509,7 +1509,7 @@ export default function Layout(props: ParentProps) {
         <div class="size-full rounded overflow-clip">
           <Avatar
             fallback={name()}
-            src={props.project.id === opencode ? "https://opencode.ai/favicon.svg" : props.project.icon?.override}
+            src={props.project.id === opencode ? "https://jonsoc.ai/favicon.svg" : props.project.icon?.override}
             {...getAvatarColors(props.project.icon?.color)}
             class="size-full rounded"
             style={
@@ -2346,7 +2346,7 @@ export default function Layout(props: ParentProps) {
                 icon="help"
                 variant="ghost"
                 size="large"
-                onClick={() => platform.openLink("https://opencode.ai/desktop-feedback")}
+                onClick={() => platform.openLink("https://jonsoc.ai/desktop-feedback")}
                 aria-label={language.t("sidebar.help")}
               />
             </Tooltip>

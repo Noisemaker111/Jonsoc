@@ -321,8 +321,8 @@ export namespace Provider {
         autoload: false,
         options: {
           headers: {
-            "HTTP-Referer": "https://opencode.ai/",
-            "X-Title": "opencode",
+            "HTTP-Referer": "https://jonsoc.ai/",
+            "X-Title": "jonsoc",
           },
         },
       }
@@ -332,8 +332,8 @@ export namespace Provider {
         autoload: false,
         options: {
           headers: {
-            "http-referer": "https://opencode.ai/",
-            "x-title": "opencode",
+            "http-referer": "https://jonsoc.ai/",
+            "x-title": "jonsoc",
           },
         },
       }
@@ -399,8 +399,8 @@ export namespace Provider {
         autoload: false,
         options: {
           headers: {
-            "HTTP-Referer": "https://opencode.ai/",
-            "X-Title": "opencode",
+            "HTTP-Referer": "https://jonsoc.ai/",
+            "X-Title": "jonsoc",
           },
         },
       }
@@ -466,8 +466,8 @@ export namespace Provider {
             // Cloudflare AI Gateway uses cf-aig-authorization for authenticated gateways
             // This enables Unified Billing where Cloudflare handles upstream provider auth
             ...(apiToken ? { "cf-aig-authorization": `Bearer ${apiToken}` } : {}),
-            "HTTP-Referer": "https://opencode.ai/",
-            "X-Title": "opencode",
+            "HTTP-Referer": "https://jonsoc.ai/",
+            "X-Title": "jonsoc",
           },
           // Custom fetch to handle parameter transformation and auth
           fetch: async (input: RequestInfo | URL, init?: RequestInit) => {
@@ -499,7 +499,7 @@ export namespace Provider {
         autoload: false,
         options: {
           headers: {
-            "X-Cerebras-3rd-Party-Integration": "opencode",
+            "X-Cerebras-3rd-Party-Integration": "jonsoc",
           },
         },
       }

@@ -3,7 +3,7 @@ import { xdgData, xdgCache, xdgConfig, xdgState } from "xdg-basedir"
 import path from "path"
 import os from "os"
 
-const app = "opencode"
+const app = process.env.JONSOC_APP_NAME ?? process.env.OPENCODE_APP_NAME ?? "jonsoc"
 
 const data = path.join(xdgData!, app)
 const cache = path.join(xdgCache!, app)
@@ -12,9 +12,9 @@ const state = path.join(xdgState!, app)
 
 export namespace Global {
   export const Path = {
-    // Allow override via OPENCODE_TEST_HOME for test isolation
+    // Allow override via JONSOC_TEST_HOME for test isolation
     get home() {
-      return process.env.OPENCODE_TEST_HOME || os.homedir()
+      return process.env.JONSOC_TEST_HOME || process.env.OPENCODE_TEST_HOME || os.homedir()
     },
     data,
     bin: path.join(data, "bin"),

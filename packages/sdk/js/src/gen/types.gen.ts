@@ -791,6 +791,22 @@ export type KeybindsConfig = {
    */
   sidebar_toggle?: string
   /**
+   * Toggle file navigator
+   */
+  navigator_toggle?: string
+  /**
+   * Narrow navigator list panel
+   */
+  navigator_resize_narrow?: string
+  /**
+   * Widen navigator list panel
+   */
+  navigator_resize_wide?: string
+  /**
+   * Save navigator file edits
+   */
+  navigator_save?: string
+  /**
    * Toggle session scrollbar
    */
   scrollbar_toggle?: string
@@ -1209,7 +1225,7 @@ export type Config = {
     diff_style?: "auto" | "stacked"
   }
   /**
-   * Command configuration, see https://opencode.ai/docs/commands
+   * Command configuration, see https://jonsoc.ai/docs/commands
    */
   command?: {
     [key: string]: {
@@ -1266,7 +1282,7 @@ export type Config = {
     [key: string]: AgentConfig | undefined
   }
   /**
-   * Agent configuration, see https://opencode.ai/docs/agent
+   * Agent configuration, see https://jonsoc.ai/docs/agent
    */
   agent?: {
     plan?: AgentConfig

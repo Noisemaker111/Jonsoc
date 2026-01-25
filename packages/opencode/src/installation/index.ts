@@ -14,6 +14,15 @@ declare global {
 
 export namespace Installation {
   const log = Log.create({ service: "installation" })
+  const cliName = "jonsoc"
+  const legacyCliName = "opencode"
+  const npmPackage = `${cliName}-ai`
+  const legacyNpmPackage = "opencode-ai"
+  const repo = (process.env.JONSOC_REPO ?? process.env.OPENCODE_REPO ?? "Noisemaker111/JonsOpencode").replace(
+    /^https?:\/\/github\.com\//,
+    "",
+  )
+  const installUrl = process.env.JONSOC_INSTALL_URL ?? process.env.OPENCODE_INSTALL_URL ?? "https://jonsoc.ai/install"
 
   export type Method = Awaited<ReturnType<typeof method>>
 
@@ -58,6 +67,7 @@ export namespace Installation {
   }
 
   export async function method() {
+    if (process.execPath.includes(path.join(".jonsoc", "bin"))) return "curl"
     if (process.execPath.includes(path.join(".opencode", "bin"))) return "curl"
     if (process.execPath.includes(path.join(".local", "bin"))) return "curl"
     const exec = process.execPath.toLowerCase()
@@ -81,15 +91,15 @@ export namespace Installation {
       },
       {
         name: "brew" as const,
-        command: () => $`brew list --formula opencode`.throws(false).quiet().text(),
+        command: () => $`brew list --formula ${cliName}`.throws(false).quiet().text(),
       },
       {
         name: "scoop" as const,
-        command: () => $`scoop list opencode`.throws(false).quiet().text(),
+        command: () => $`scoop list ${cliName}`.throws(false).quiet().text(),
       },
       {
         name: "choco" as const,
-        command: () => $`choco list --limit-output opencode`.throws(false).quiet().text(),
+        command: () => $`choco list --limit-output ${cliName}`.throws(false).quiet().text(),
       },
     ]
 
@@ -103,9 +113,11 @@ export namespace Installation {
 
     for (const check of checks) {
       const output = await check.command()
-      const installedName =
-        check.name === "brew" || check.name === "choco" || check.name === "scoop" ? "opencode" : "opencode-ai"
-      if (output.includes(installedName)) {
+      const installedNames =
+        check.name === "brew" || check.name === "choco" || check.name === "scoop"
+          ? [cliName, legacyCliName]
+          : [npmPackage, legacyNpmPackage]
+      if (installedNames.some((name) => output.includes(name))) {
         return check.name
       }
     }
@@ -121,30 +133,31 @@ export namespace Installation {
   )
 
   async function getBrewFormula() {
-    const tapFormula = await $`brew list --formula anomalyco/tap/opencode`.throws(false).quiet().text()
-    if (tapFormula.includes("opencode")) return "anomalyco/tap/opencode"
-    const coreFormula = await $`brew list --formula opencode`.throws(false).quiet().text()
-    if (coreFormula.includes("opencode")) return "opencode"
-    return "opencode"
+    const tap = process.env.JONSOC_HOMEBREW_TAP ?? process.env.OPENCODE_HOMEBREW_TAP ?? "sst/homebrew-tap"
+    const tapFormula = await $`brew list --formula ${tap}/${cliName}`.throws(false).quiet().text()
+    if (tapFormula.includes(cliName)) return `${tap}/${cliName}`
+    const coreFormula = await $`brew list --formula ${cliName}`.throws(false).quiet().text()
+    if (coreFormula.includes(cliName)) return cliName
+    return cliName
   }
 
   export async function upgrade(method: Method, target: string) {
     let cmd
     switch (method) {
       case "curl":
-        cmd = $`curl -fsSL https://opencode.ai/install | bash`.env({
+        cmd = $`curl -fsSL ${installUrl} | bash`.env({
           ...process.env,
           VERSION: target,
         })
         break
       case "npm":
-        cmd = $`npm install -g opencode-ai@${target}`
+        cmd = $`npm install -g ${npmPackage}@${target}`
         break
       case "pnpm":
-        cmd = $`pnpm install -g opencode-ai@${target}`
+        cmd = $`pnpm install -g ${npmPackage}@${target}`
         break
       case "bun":
-        cmd = $`bun install -g opencode-ai@${target}`
+        cmd = $`bun install -g ${npmPackage}@${target}`
         break
       case "brew": {
         const formula = await getBrewFormula()
@@ -155,10 +168,10 @@ export namespace Installation {
         break
       }
       case "choco":
-        cmd = $`echo Y | choco upgrade opencode --version=${target}`
+        cmd = $`echo Y | choco upgrade ${cliName} --version=${target}`
         break
       case "scoop":
-        cmd = $`scoop install opencode@${target}`
+        cmd = $`scoop install ${cliName}@${target}`
         break
       default:
         throw new Error(`Unknown method: ${method}`)
@@ -181,15 +194,15 @@ export namespace Installation {
 
   export const VERSION = typeof OPENCODE_VERSION === "string" ? OPENCODE_VERSION : "local"
   export const CHANNEL = typeof OPENCODE_CHANNEL === "string" ? OPENCODE_CHANNEL : "local"
-  export const USER_AGENT = `opencode/${CHANNEL}/${VERSION}/${Flag.OPENCODE_CLIENT}`
+  export const USER_AGENT = `${cliName}/${CHANNEL}/${VERSION}/${Flag.OPENCODE_CLIENT}`
 
   export async function latest(installMethod?: Method) {
     const detectedMethod = installMethod || (await method())
 
     if (detectedMethod === "brew") {
       const formula = await getBrewFormula()
-      if (formula === "opencode") {
-        return fetch("https://formulae.brew.sh/api/formula/opencode.json")
+      if (formula === cliName) {
+        return fetch(`https://formulae.brew.sh/api/formula/${cliName}.json`)
           .then((res) => {
             if (!res.ok) throw new Error(res.statusText)
             return res.json()
@@ -205,7 +218,7 @@ export namespace Installation {
         return reg.endsWith("/") ? reg.slice(0, -1) : reg
       })
       const channel = CHANNEL
-      return fetch(`${registry}/opencode-ai/${channel}`)
+      return fetch(`${registry}/${npmPackage}/${channel}`)
         .then((res) => {
           if (!res.ok) throw new Error(res.statusText)
           return res.json()
@@ -215,7 +228,7 @@ export namespace Installation {
 
     if (detectedMethod === "choco") {
       return fetch(
-        "https://community.chocolatey.org/api/v2/Packages?$filter=Id%20eq%20%27opencode%27%20and%20IsLatestVersion&$select=Version",
+        `https://community.chocolatey.org/api/v2/Packages?$filter=Id%20eq%20%27${cliName}%27%20and%20IsLatestVersion&$select=Version`,
         { headers: { Accept: "application/json;odata=verbose" } },
       )
         .then((res) => {
@@ -226,7 +239,7 @@ export namespace Installation {
     }
 
     if (detectedMethod === "scoop") {
-      return fetch("https://raw.githubusercontent.com/ScoopInstaller/Main/master/bucket/opencode.json", {
+      return fetch(`https://raw.githubusercontent.com/ScoopInstaller/Main/master/bucket/${cliName}.json`, {
         headers: { Accept: "application/json" },
       })
         .then((res) => {
@@ -236,7 +249,7 @@ export namespace Installation {
         .then((data: any) => data.version)
     }
 
-    return fetch("https://api.github.com/repos/anomalyco/opencode/releases/latest")
+    return fetch(`https://api.github.com/repos/${repo}/releases/latest`)
       .then((res) => {
         if (!res.ok) throw new Error(res.statusText)
         return res.json()

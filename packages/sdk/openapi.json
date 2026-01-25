@@ -10,7 +10,7 @@
       "get": {
         "operationId": "global.health",
         "summary": "Get health",
-        "description": "Get health information about the OpenCode server.",
+        "description": "Get health information about the JonsOC server.",
         "responses": {
           "200": {
             "description": "Health information",
@@ -45,7 +45,7 @@
       "get": {
         "operationId": "global.event",
         "summary": "Get global events",
-        "description": "Subscribe to global events from the OpenCode system using server-sent events.",
+        "description": "Subscribe to global events from the JonsOC system using server-sent events.",
         "responses": {
           "200": {
             "description": "Event stream",
@@ -70,7 +70,7 @@
       "post": {
         "operationId": "global.dispose",
         "summary": "Dispose instance",
-        "description": "Clean up and dispose all OpenCode instances, releasing all resources.",
+        "description": "Clean up and dispose all JonsOC instances, releasing all resources.",
         "responses": {
           "200": {
             "description": "Global disposed",
@@ -104,7 +104,7 @@
           }
         ],
         "summary": "List all projects",
-        "description": "Get a list of projects that have been opened with OpenCode.",
+        "description": "Get a list of projects that have been opened with JonsOC.",
         "responses": {
           "200": {
             "description": "List of projects",
@@ -141,7 +141,7 @@
           }
         ],
         "summary": "Get current project",
-        "description": "Retrieve the currently active project that OpenCode is working with.",
+        "description": "Retrieve the currently active project that JonsOC is working with.",
         "responses": {
           "200": {
             "description": "Current project information",
@@ -274,7 +274,7 @@
           }
         ],
         "summary": "List PTY sessions",
-        "description": "Get a list of all active pseudo-terminal (PTY) sessions managed by OpenCode.",
+        "description": "Get a list of all active pseudo-terminal (PTY) sessions managed by JonsOC.",
         "responses": {
           "200": {
             "description": "List of sessions",
@@ -618,7 +618,7 @@
           }
         ],
         "summary": "Get configuration",
-        "description": "Retrieve the current OpenCode configuration settings and preferences.",
+        "description": "Retrieve the current JonsOC configuration settings and preferences.",
         "responses": {
           "200": {
             "description": "Get config info",
@@ -650,7 +650,7 @@
           }
         ],
         "summary": "Update configuration",
-        "description": "Update OpenCode configuration settings and preferences.",
+        "description": "Update JonsOC configuration settings and preferences.",
         "responses": {
           "200": {
             "description": "Successfully updated config",
@@ -1124,7 +1124,7 @@
           }
         ],
         "summary": "List sessions",
-        "description": "Get a list of all OpenCode sessions, sorted by most recently updated.",
+        "description": "Get a list of all JonsOC sessions, sorted by most recently updated.",
         "responses": {
           "200": {
             "description": "List of sessions",
@@ -1159,7 +1159,7 @@
           }
         ],
         "summary": "Create session",
-        "description": "Create a new OpenCode session for interacting with AI assistants and managing conversations.",
+        "description": "Create a new JonsOC session for interacting with AI assistants and managing conversations.",
         "responses": {
           "200": {
             "description": "Successfully created session",
@@ -1283,7 +1283,7 @@
           }
         ],
         "summary": "Get session",
-        "description": "Retrieve detailed information about a specific OpenCode session.",
+        "description": "Retrieve detailed information about a specific JonsOC session.",
         "tags": ["Session"],
         "responses": {
           "200": {
@@ -5287,7 +5287,7 @@
           }
         ],
         "summary": "Dispose instance",
-        "description": "Clean up and dispose the current OpenCode instance, releasing all resources.",
+        "description": "Clean up and dispose the current JonsOC instance, releasing all resources.",
         "responses": {
           "200": {
             "description": "Instance disposed",
@@ -5321,7 +5321,7 @@
           }
         ],
         "summary": "Get paths",
-        "description": "Retrieve the current working directory and related path information for the OpenCode instance.",
+        "description": "Retrieve the current working directory and related path information for the JonsOC instance.",
         "responses": {
           "200": {
             "description": "Path",
@@ -5389,7 +5389,7 @@
           }
         ],
         "summary": "List commands",
-        "description": "Get a list of all available commands in the OpenCode system.",
+        "description": "Get a list of all available commands in the JonsOC system.",
         "responses": {
           "200": {
             "description": "List of commands",
@@ -5503,7 +5503,7 @@
           }
         ],
         "summary": "List agents",
-        "description": "Get a list of all available AI agents in the OpenCode system.",
+        "description": "Get a list of all available AI agents in the JonsOC system.",
         "responses": {
           "200": {
             "description": "List of agents",
@@ -5540,7 +5540,7 @@
           }
         ],
         "summary": "List skills",
-        "description": "Get a list of all available skills in the OpenCode system.",
+        "description": "Get a list of all available skills in the JonsOC system.",
         "responses": {
           "200": {
             "description": "List of skills",
@@ -9415,7 +9415,7 @@
             "$ref": "#/components/schemas/ServerConfig"
           },
           "command": {
-            "description": "Command configuration, see https://opencode.ai/docs/commands",
+            "description": "Command configuration, see https://jonsoc.ai/docs/commands",
             "type": "object",
             "propertyNames": {
               "type": "string"
@@ -9529,7 +9529,7 @@
             }
           },
           "agent": {
-            "description": "Agent configuration, see https://opencode.ai/docs/agents",
+            "description": "Agent configuration, see https://jonsoc.ai/docs/agents",
             "type": "object",
             "properties": {
               "plan": {

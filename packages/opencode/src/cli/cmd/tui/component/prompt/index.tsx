@@ -1,5 +1,5 @@
 import { BoxRenderable, TextareaRenderable, MouseEvent, PasteEvent, t, dim, fg } from "@opentui/core"
-import { createEffect, createMemo, type JSX, onMount, createSignal, onCleanup, Show, Switch, Match } from "solid-js"
+import { createEffect, createMemo, type JSX, onMount, createSignal, onCleanup, Show, Switch, Match, on } from "solid-js"
 import "opentui-spinner/solid"
 import { useLocal } from "@tui/context/local"
 import { useTheme } from "@tui/context/theme"
@@ -113,7 +113,7 @@ export function Prompt(props: PromptProps) {
   }
 
   async function persistImage(file: { content: string; mime: string; filename?: string }) {
-    const dir = path.join(tmpdir(), "opencode", "attachments")
+    const dir = path.join(tmpdir(), "jonsoc", "attachments")
     await mkdir(dir, { recursive: true })
     const parsed = file.filename ? path.parse(file.filename) : undefined
     const baseRaw = parsed?.name ?? "image"
@@ -486,10 +486,15 @@ export function Prompt(props: PromptProps) {
     },
   }
 
-  createEffect(() => {
-    if (props.visible !== false) input?.focus()
-    if (props.visible === false) input?.blur()
-  })
+  createEffect(
+    on(
+      () => props.visible !== false,
+      (visible, prev) => {
+        if (visible && !prev) input?.focus()
+        if (!visible) input?.blur()
+      },
+    ),
+  )
 
   function restoreExtmarksFromParts(parts: PromptInfo["parts"]) {
     input.extmarks.clear()
@@ -537,28 +542,48 @@ export function Prompt(props: PromptProps) {
 
   function syncExtmarksWithPromptParts() {
     const allExtmarks = input.extmarks.getAllForTypeId(promptPartTypeId)
+    const currentMap = store.extmarkToPartIndex
+    const currentParts = store.prompt.parts
+
     setStore(
       produce((draft) => {
         const newMap = new Map<number, number>()
         const newParts: typeof draft.prompt.parts = []
 
         for (const extmark of allExtmarks) {
-          const partIndex = draft.extmarkToPartIndex.get(extmark.id)
+          const partIndex = currentMap.get(extmark.id)
           if (partIndex !== undefined) {
-            const part = draft.prompt.parts[partIndex]
+            const part = currentParts[partIndex]
             if (part) {
+              // Create a deep copy to avoid mutating the original
+              const updatedPart = { ...part }
               if (part.type === "agent" && part.source) {
-                part.source.start = extmark.start
-                part.source.end = extmark.end
+                updatedPart.source = {
+                  ...part.source,
+                  start: extmark.start,
+                  end: extmark.end,
+                }
               } else if (part.type === "file" && part.source?.text) {
-                part.source.text.start = extmark.start
-                part.source.text.end = extmark.end
+                updatedPart.source = {
+                  ...part.source,
+                  text: {
+                    ...part.source.text,
+                    start: extmark.start,
+                    end: extmark.end,
+                  },
+                }
               } else if (part.type === "text" && part.source?.text) {
-                part.source.text.start = extmark.start
-                part.source.text.end = extmark.end
+                updatedPart.source = {
+                  ...part.source,
+                  text: {
+                    ...part.source.text,
+                    start: extmark.start,
+                    end: extmark.end,
+                  },
+                }
               }
               newMap.set(extmark.id, newParts.length)
-              newParts.push(part)
+              newParts.push(updatedPart)
             }
           }
         }

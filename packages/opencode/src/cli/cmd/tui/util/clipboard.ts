@@ -39,7 +39,7 @@ export namespace Clipboard {
     const os = platform()
 
     if (os === "darwin") {
-      const tmpfile = path.join(tmpdir(), "opencode-clipboard.png")
+      const tmpfile = path.join(tmpdir(), "jonsoc-clipboard.png")
       try {
         await $`osascript -e 'set imageData to the clipboard as "PNGf"' -e 'set fileRef to open for access POSIX file "${tmpfile}" with write permission' -e 'set eof fileRef to 0' -e 'write imageData to fileRef' -e 'close access fileRef'`
           .nothrow()
@@ -67,7 +67,7 @@ export namespace Clipboard {
         "if($paths -and $paths.Count -gt 0){$path=$paths[0];" +
         "if(Test-Path $path){$result='FILE:'+ $path}}" +
         "$tmp=$null;" +
-        "if(-not $result){$tmp=Join-Path $env:TEMP ('opencode-clipboard-' + [guid]::NewGuid().ToString() + '.png')}" +
+        "if(-not $result){$tmp=Join-Path $env:TEMP ('jonsoc-clipboard-' + [guid]::NewGuid().ToString() + '.png')}" +
         // WPF path
         "if(-not $result){Add-Type -AssemblyName PresentationCore;" +
         "$src=[System.Windows.Clipboard]::GetImage();" +

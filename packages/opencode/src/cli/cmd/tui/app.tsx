@@ -27,7 +27,7 @@ import { FrecencyProvider } from "./component/prompt/frecency"
 import { PromptStashProvider } from "./component/prompt/stash"
 import { DialogAlert } from "./ui/dialog-alert"
 import { ToastProvider, useToast } from "./ui/toast"
-import { ExitProvider, useExit } from "./context/exit"
+import { ExitProvider, useExit, EXIT_CODE_RESTART } from "./context/exit"
 import { Session as SessionApi } from "@/session"
 import { TuiEvent } from "./event"
 import { KVProvider, useKV } from "./context/kv"
@@ -211,25 +211,30 @@ function App() {
     console.log(JSON.stringify(route.data))
   })
 
+  createEffect(() => {
+    if (route.data.type !== "session") return
+    kv.set("session_last", route.data.sessionID)
+  })
+
   // Update terminal window title based on current route and session
   createEffect(() => {
     if (!terminalTitleEnabled() || Flag.OPENCODE_DISABLE_TERMINAL_TITLE) return
 
     if (route.data.type === "home") {
-      renderer.setTerminalTitle("OpenCode")
+      renderer.setTerminalTitle("JonsOC")
       return
     }
 
     if (route.data.type === "session") {
       const session = sync.session.get(route.data.sessionID)
       if (!session || SessionApi.isDefaultTitle(session.title)) {
-        renderer.setTerminalTitle("OpenCode")
+        renderer.setTerminalTitle("JonsOC")
         return
       }
 
       // Truncate title to 40 chars max
       const title = session.title.length > 40 ? session.title.slice(0, 37) + "..." : session.title
-      renderer.setTerminalTitle(`OC | ${title}`)
+      renderer.setTerminalTitle(`JOC | ${title}`)
     }
   })
 
@@ -281,6 +286,8 @@ function App() {
   )
 
   const connected = useConnected()
+  const docsUrl = process.env.JONSOC_DOCS_URL ?? process.env.OPENCODE_DOCS_URL ?? "https://opencode.ai/docs"
+  const zenUrl = process.env.JONSOC_ZEN_URL ?? process.env.OPENCODE_ZEN_URL ?? "https://opencode.ai/zen"
   command.register(() => [
     {
       title: "Switch session",
@@ -438,7 +445,7 @@ function App() {
     {
       title: "View status",
       keybind: "status_view",
-      value: "opencode.status",
+      value: "jonsoc.status",
       slash: {
         name: "status",
       },
@@ -483,7 +490,7 @@ function App() {
       title: "Open docs",
       value: "docs.open",
       onSelect: () => {
-        open("https://opencode.ai/docs").catch(() => {})
+        open(docsUrl).catch(() => {})
         dialog.clear()
       },
       category: "System",
@@ -505,6 +512,16 @@ function App() {
         aliases: ["quit", "q"],
       },
       onSelect: () => exit(),
+      category: "System",
+    },
+    {
+      title: "Restart and resume session",
+      value: "app.restart",
+      slash: {
+        name: "restart",
+        aliases: ["reload"],
+      },
+      onSelect: () => exit(undefined, EXIT_CODE_RESTART),
       category: "System",
     },
     {
@@ -580,7 +597,7 @@ function App() {
         DialogAlert.show(
           dialog,
           "Warning",
-          "While openrouter is a convenient way to access LLMs your request will often be routed to subpar providers that do not work well in our testing.\n\nFor reliable access to models check out OpenCode Zen\nhttps://opencode.ai/zen",
+          `While openrouter is a convenient way to access LLMs your request will often be routed to subpar providers that do not work well in our testing.\n\nFor reliable access to models check out JonsOC Zen\n${zenUrl}`,
         ).then(() => kv.set("openrouter_warning", true))
       })
     }
@@ -642,7 +659,7 @@ function App() {
     toast.show({
       variant: "info",
       title: "Update Available",
-      message: `OpenCode v${evt.properties.version} is available. Run 'opencode upgrade' to update manually.`,
+      message: `JonsOC v${evt.properties.version} is available. Run 'jonsoc upgrade' to update manually.`,
       duration: 10000,
     })
   })
@@ -700,7 +717,11 @@ function ErrorComponent(props: {
   })
   const [copied, setCopied] = createSignal(false)
 
-  const issueURL = new URL("https://github.com/anomalyco/opencode/issues/new?template=bug-report.yml")
+  const repo = (process.env.JONSOC_REPO ?? process.env.OPENCODE_REPO ?? "anomalyco/opencode").replace(
+    /^https?:\/\/github\.com\//,
+    "",
+  )
+  const issueURL = new URL(`https://github.com/${repo}/issues/new?template=bug-report.yml`)
 
   // Choose safe fallback colors per mode since theme context may not be available
   const isLight = props.mode === "light"
@@ -722,7 +743,7 @@ function ErrorComponent(props: {
     )
   }
 
-  issueURL.searchParams.set("opencode-version", Installation.VERSION)
+  issueURL.searchParams.set("jonsoc-version", Installation.VERSION)
 
   const copyIssueURL = () => {
     Clipboard.copy(issueURL.toString()).then(() => {

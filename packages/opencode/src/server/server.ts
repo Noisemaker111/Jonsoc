@@ -39,6 +39,9 @@ import { errors } from "./error"
 import { QuestionRoutes } from "./routes/question"
 import { PermissionRoutes } from "./routes/permission"
 import { GlobalRoutes } from "./routes/global"
+
+const appHost = process.env.JONSOC_APP_HOST ?? process.env.OPENCODE_APP_HOST ?? "app.opencode.ai"
+const appBaseUrl = process.env.JONSOC_APP_URL ?? process.env.OPENCODE_APP_URL ?? `https://${appHost}`
 import { MDNS } from "./mdns"
 
 // @ts-ignore This global is needed to prevent ai-sdk from logging warnings to stdout https://github.com/vercel/ai/blob/2dc67e0ef538307f21368db32d5a12345d98831b/packages/ai/src/logger/log-warnings.ts#L85
@@ -80,7 +83,7 @@ export namespace Server {
         .use((c, next) => {
           const password = Flag.OPENCODE_SERVER_PASSWORD
           if (!password) return next()
-          const username = Flag.OPENCODE_SERVER_USERNAME ?? "opencode"
+          const username = Flag.OPENCODE_SERVER_USERNAME ?? "jonsoc"
           return basicAuth({ username, password })(c, next)
         })
         .use(async (c, next) => {
@@ -109,8 +112,14 @@ export namespace Server {
               if (input.startsWith("http://127.0.0.1:")) return input
               if (input === "tauri://localhost" || input === "http://tauri.localhost") return input
 
-              // *.opencode.ai (https only, adjust if needed)
-              if (/^https:\/\/([a-z0-9-]+\.)*opencode\.ai$/.test(input)) {
+              // Allow JonsOC/legacy domains (https only, adjust if needed)
+              const domain = process.env.JONSOC_DOMAIN ?? process.env.OPENCODE_DOMAIN ?? "opencode.ai"
+              const domains = [domain, "opencode.ai"].filter((item, index, list) => list.indexOf(item) === index)
+              const matches = domains.some((item) => {
+                const escaped = item.replace(/\./g, "\\.")
+                return new RegExp(`^https:\\/\\/([a-z0-9-]+\\.)*${escaped}$`).test(input)
+              })
+              if (matches) {
                 return input
               }
               if (_corsWhitelist.includes(input)) {
@@ -123,7 +132,11 @@ export namespace Server {
         )
         .route("/global", GlobalRoutes())
         .use(async (c, next) => {
-          let directory = c.req.query("directory") || c.req.header("x-opencode-directory") || process.cwd()
+          let directory =
+            c.req.query("directory") ||
+            c.req.header("x-jonsoc-directory") ||
+            c.req.header("x-opencode-directory") ||
+            process.cwd()
           try {
             directory = decodeURIComponent(directory)
           } catch {
@@ -142,9 +155,9 @@ export namespace Server {
           openAPIRouteHandler(app, {
             documentation: {
               info: {
-                title: "opencode",
+                title: "jonsoc",
                 version: "0.0.3",
-                description: "opencode api",
+                description: "jonsoc api",
               },
               openapi: "3.1.1",
             },
@@ -166,7 +179,7 @@ export namespace Server {
           "/instance/dispose",
           describeRoute({
             summary: "Dispose instance",
-            description: "Clean up and dispose the current OpenCode instance, releasing all resources.",
+            description: "Clean up and dispose the current JonsOC instance, releasing all resources.",
             operationId: "instance.dispose",
             responses: {
               200: {
@@ -188,8 +201,7 @@ export namespace Server {
           "/path",
           describeRoute({
             summary: "Get paths",
-            description:
-              "Retrieve the current working directory and related path information for the OpenCode instance.",
+            description: "Retrieve the current working directory and related path information for the JonsOC instance.",
             operationId: "path.get",
             responses: {
               200: {
@@ -250,10 +262,39 @@ export namespace Server {
           },
         )
         .get(
+          "/vcs/history",
+          describeRoute({
+            summary: "Get VCS history",
+            description: "Retrieve git history with graph metadata for the current project.",
+            operationId: "vcs.history",
+            responses: {
+              200: {
+                description: "VCS history",
+                content: {
+                  "application/json": {
+                    schema: resolver(Vcs.HistoryLine.array()),
+                  },
+                },
+              },
+            },
+          }),
+          validator(
+            "query",
+            z.object({
+              limit: z.coerce.number().int().min(1).max(200).optional(),
+            }),
+          ),
+          async (c) => {
+            const { limit } = c.req.valid("query")
+            const history = await Vcs.history(limit)
+            return c.json(history)
+          },
+        )
+        .get(
           "/command",
           describeRoute({
             summary: "List commands",
-            description: "Get a list of all available commands in the OpenCode system.",
+            description: "Get a list of all available commands in the JonsOC system.",
             operationId: "command.list",
             responses: {
               200: {
@@ -327,7 +368,7 @@ export namespace Server {
           "/agent",
           describeRoute({
             summary: "List agents",
-            description: "Get a list of all available AI agents in the OpenCode system.",
+            description: "Get a list of all available AI agents in the JonsOC system.",
             operationId: "app.agents",
             responses: {
               200: {
@@ -349,7 +390,7 @@ export namespace Server {
           "/skill",
           describeRoute({
             summary: "List skills",
-            description: "Get a list of all available skills in the OpenCode system.",
+            description: "Get a list of all available skills in the JonsOC system.",
             operationId: "app.skills",
             responses: {
               200: {
@@ -500,11 +541,11 @@ export namespace Server {
         .all("/*", async (c) => {
           const path = c.req.path
 
-          const response = await proxy(`https://app.opencode.ai${path}`, {
+          const response = await proxy(`${appBaseUrl}${path}`, {
             ...c.req,
             headers: {
               ...c.req.raw.headers,
-              host: "app.opencode.ai",
+              host: appHost,
             },
           })
           response.headers.set(
@@ -520,9 +561,9 @@ export namespace Server {
     const result = await generateSpecs(App() as Hono, {
       documentation: {
         info: {
-          title: "opencode",
+          title: "jonsoc",
           version: "1.0.0",
-          description: "opencode api",
+          description: "jonsoc api",
         },
         openapi: "3.1.1",
       },

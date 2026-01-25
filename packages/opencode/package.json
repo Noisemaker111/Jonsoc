@@ -1,10 +1,20 @@
 {
   "$schema": "https://json.schemastore.org/package.json",
   "version": "1.1.34",
-  "name": "opencode",
+  "name": "jonsoc",
+  "description": "AI-powered development tool",
   "type": "module",
   "license": "MIT",
-  "private": true,
+  "author": "Jon",
+  "keywords": ["ai", "development", "cli", "opencode", "coding-assistant"],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Noisemaker111/JonsOpencode"
+  },
+  "homepage": "https://github.com/Noisemaker111/JonsOpencode#readme",
+  "bugs": {
+    "url": "https://github.com/Noisemaker111/JonsOpencode/issues"
+  },
   "scripts": {
     "typecheck": "tsgo --noEmit",
     "test": "bun test",
@@ -18,7 +28,7 @@
     "deploy": "echo 'Deploying application...' && bun run build && echo 'Deployment completed successfully'"
   },
   "bin": {
-    "opencode": "./bin/opencode"
+    "jonsoc": "./bin/jonsoc"
   },
   "exports": {
     "./*": "./src/*.ts"

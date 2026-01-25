@@ -1,5 +1,5 @@
 import { useSync } from "@tui/context/sync"
-import { createMemo, For, Show, Switch, Match } from "solid-js"
+import { createEffect, createMemo, For, Show, Switch, Match } from "solid-js"
 import { createStore } from "solid-js/store"
 import { useTheme } from "../../context/theme"
 import { Locale } from "@/util/locale"
@@ -20,12 +20,26 @@ export function Sidebar(props: { sessionID: string; overlay?: boolean }) {
   const todo = createMemo(() => sync.data.todo[props.sessionID] ?? [])
   const messages = createMemo(() => sync.data.message[props.sessionID] ?? [])
 
-  const [expanded, setExpanded] = createStore({
-    mcp: true,
-    diff: true,
-    todo: true,
-    lsp: true,
-  })
+  const kv = useKV()
+  const [showScrollbar] = kv.signal("scrollbar_visible", false)
+  const readExpanded = () => {
+    const stored = kv.get("session_sidebar_expanded")
+    if (!stored || typeof stored !== "object" || Array.isArray(stored)) {
+      return {
+        mcp: true,
+        diff: true,
+        todo: true,
+        lsp: true,
+      }
+    }
+    return {
+      mcp: typeof stored.mcp === "boolean" ? stored.mcp : true,
+      diff: typeof stored.diff === "boolean" ? stored.diff : true,
+      todo: typeof stored.todo === "boolean" ? stored.todo : true,
+      lsp: typeof stored.lsp === "boolean" ? stored.lsp : true,
+    }
+  }
+  const [expanded, setExpanded] = createStore(readExpanded())
 
   // Sort MCP servers alphabetically for consistent display order
   const mcpEntries = createMemo(() => Object.entries(sync.data.mcp).sort(([a], [b]) => a.localeCompare(b)))
@@ -61,12 +75,32 @@ export function Sidebar(props: { sessionID: string; overlay?: boolean }) {
   })
 
   const directory = useDirectory()
-  const kv = useKV()
+
+  const viewportOptions = createMemo(() => ({
+    paddingRight: showScrollbar() ? 1 : 0,
+  }))
+  const verticalScrollbarOptions = createMemo(() => ({
+    paddingLeft: 1,
+    visible: showScrollbar(),
+    trackOptions: {
+      backgroundColor: theme.backgroundPanel,
+      foregroundColor: theme.border,
+    },
+  }))
 
   const hasProviders = createMemo(() =>
     sync.data.provider.some((x) => x.id !== "opencode" || Object.values(x.models).some((y) => y.cost?.input !== 0)),
   )
   const gettingStartedDismissed = createMemo(() => kv.get("dismissed_getting_started", false))
+
+  createEffect(() => {
+    kv.set("session_sidebar_expanded", {
+      mcp: expanded.mcp,
+      diff: expanded.diff,
+      todo: expanded.todo,
+      lsp: expanded.lsp,
+    })
+  })
 
   return (
     <Show when={session()}>
@@ -80,7 +114,11 @@ export function Sidebar(props: { sessionID: string; overlay?: boolean }) {
         paddingRight={2}
         position={props.overlay ? "absolute" : "relative"}
       >
-        <scrollbox flexGrow={1}>
+        <scrollbox
+          flexGrow={1}
+          viewportOptions={viewportOptions()}
+          verticalScrollbarOptions={verticalScrollbarOptions()}
+        >
           <box flexShrink={0} gap={1} paddingRight={1}>
             <box paddingRight={1}>
               <text fg={theme.text}>
@@ -284,7 +322,7 @@ export function Sidebar(props: { sessionID: string; overlay?: boolean }) {
                     ✕
                   </text>
                 </box>
-                <text fg={theme.textMuted}>OpenCode includes free models so you can start immediately.</text>
+                <text fg={theme.textMuted}>JonsOC includes free models so you can start immediately.</text>
                 <text fg={theme.textMuted}>
                   Connect from 75+ providers to use other models, including Claude, GPT, Gemini etc
                 </text>

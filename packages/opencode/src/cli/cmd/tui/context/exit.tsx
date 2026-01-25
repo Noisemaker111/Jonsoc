@@ -2,11 +2,14 @@ import { useRenderer } from "@opentui/solid"
 import { createSimpleContext } from "./helper"
 import { FormatError, FormatUnknownError } from "@/cli/error"
 
+/** Exit code 75 signals to the bin wrapper to restart with the same session */
+export const EXIT_CODE_RESTART = 75
+
 export const { use: useExit, provider: ExitProvider } = createSimpleContext({
   name: "Exit",
   init: (input: { onExit?: () => Promise<void> }) => {
     const renderer = useRenderer()
-    return async (reason?: any) => {
+    return async (reason?: any, code = 0) => {
       // Reset window title before destroying renderer
       renderer.setTerminalTitle("")
       renderer.destroy()
@@ -17,7 +20,7 @@ export const { use: useExit, provider: ExitProvider } = createSimpleContext({
           process.stderr.write(formatted + "\n")
         }
       }
-      process.exit(0)
+      process.exit(code)
     }
   },
 })

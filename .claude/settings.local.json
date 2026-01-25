@@ -1,0 +1,26 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(joc --help:*)",
+      "Bash(~/.bun/bin/joc.exe:*)",
+      "Bash(cmd.exe /c joc:*)",
+      "Bash(/c/Users/Jk101/bin/joc.cmd:*)",
+      "Bash(bun install:*)",
+      "Bash(dir \"C:\\\\Users\\\\Jk101\\\\AppData\\\\Roaming\\\\npm\")",
+      "Bash(findstr:*)",
+      "Bash(C:UsersJk101.bunbinbun.exe --version)",
+      "Bash(powershell.exe -Command \"joc --version\")",
+      "Bash(bun --version:*)",
+      "Bash(node:*)",
+      "Bash(ls:*)",
+      "Bash(dir \"C:\\\\Users\\\\Jk101\\\\AppData\\\\Roaming\\\\npm\\\\bun*\")",
+      "Bash(where:*)",
+      "Bash(joc:*)",
+      "Bash(bun run:*)",
+      "Bash(powershell -Command \"bun run --cwd ''C:\\\\Users\\\\Jk101\\\\Projects\\\\JonsOpencode\\\\packages\\\\opencode'' --conditions=browser src/index.ts --version\")",
+      "Bash(powershell:*)",
+      "Bash(jonsoc --version:*)",
+      "Bash(bun -e:*)"
+    ]
+  }
+}

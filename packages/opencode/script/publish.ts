@@ -10,8 +10,9 @@ process.chdir(dir)
 const { binaries } = await import("./build.ts")
 {
   const name = `${pkg.name}-${process.platform}-${process.arch}`
-  console.log(`smoke test: running dist/${name}/bin/opencode --version`)
-  await $`./dist/${name}/bin/opencode --version`
+  const binary = process.platform === "win32" ? `${pkg.name}.exe` : pkg.name
+  console.log(`smoke test: running dist/${name}/bin/${binary} --version`)
+  await $`./dist/${name}/bin/${binary} --version`
 }
 
 await $`mkdir -p ./dist/${pkg.name}`
@@ -21,7 +22,7 @@ await $`cp ./script/postinstall.mjs ./dist/${pkg.name}/postinstall.mjs`
 await Bun.file(`./dist/${pkg.name}/package.json`).write(
   JSON.stringify(
     {
-      name: pkg.name + "-ai",
+      name: pkg.name,
       bin: {
         [pkg.name]: `./bin/${pkg.name}`,
       },
@@ -62,7 +63,11 @@ if (!Script.preview) {
     }
   }
 
-  const image = "ghcr.io/anomalyco/opencode"
+  const repo = (process.env.JOC_REPO ?? process.env.OPENCODE_REPO ?? "Noisemaker111/JonsOpencode").replace(
+    /^https?:\/\/github\.com\//,
+    "",
+  )
+  const image = process.env.JOC_IMAGE ?? `ghcr.io/${repo}`
   const platforms = "linux/amd64,linux/arm64"
   const tags = [`${image}:${Script.version}`, `${image}:latest`]
   const tagFlags = tags.flatMap((t) => ["-t", t])
