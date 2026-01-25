@@ -32,7 +32,7 @@ const IS_PREVIEW = CHANNEL !== "latest"
 const VERSION = await (async () => {
   if (env.OPENCODE_VERSION) return env.OPENCODE_VERSION
   if (IS_PREVIEW) return `0.0.0-${CHANNEL}-${new Date().toISOString().slice(0, 16).replace(/[-:T]/g, "")}`
-  return "1.1.40"
+  return "1.1.41"
 })()
 
 export const Script = {
