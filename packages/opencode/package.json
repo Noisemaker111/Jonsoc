@@ -38,16 +38,8 @@
   },
   "optionalDependencies": {
     "jonsoc-darwin-arm64": "1.1.41",
-    "jonsoc-darwin-x64": "1.1.41",
-    "jonsoc-darwin-x64-baseline": "1.1.41",
-    "jonsoc-linux-arm64": "1.1.41",
-    "jonsoc-linux-arm64-musl": "1.1.41",
     "jonsoc-linux-x64": "1.1.41",
-    "jonsoc-linux-x64-baseline": "1.1.41",
-    "jonsoc-linux-x64-baseline-musl": "1.1.41",
-    "jonsoc-linux-x64-musl": "1.1.41",
-    "jonsoc-windows-x64": "1.1.41",
-    "jonsoc-windows-x64-baseline": "1.1.41"
+    "jonsoc-windows-x64": "1.1.41"
   },
   "exports": {
     "./*": "./src/*.ts"

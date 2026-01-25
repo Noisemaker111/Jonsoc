@@ -1,7 +1,7 @@
 import { Prompt, type PromptRef } from "@tui/component/prompt"
 import { type MouseEvent } from "@opentui/core"
 import { useTerminalDimensions } from "@opentui/solid"
-import { createEffect, createMemo, createSignal, Match, onCleanup, onMount, Show, Switch } from "solid-js"
+import { batch, createEffect, createMemo, createSignal, Match, onMount, Show, Switch } from "solid-js"
 import { useTheme } from "@tui/context/theme"
 import { useKeybind } from "@tui/context/keybind"
 import { Logo } from "../component/logo"
@@ -46,11 +46,13 @@ export function Home() {
   })
 
   const dimensions = useTerminalDimensions()
-  const [navigatorOpen, setNavigatorOpen] = kv.signal("navigator_open", false)
-  const [navigatorPinned, setNavigatorPinned] = kv.signal("navigator_pinned", false)
+  type NavigatorState = "open" | "closed"
+  const [navigatorState, setNavigatorState] = createSignal<NavigatorState>(
+    kv.get("navigator_open", false) ? "open" : "closed",
+  )
+  const [navigatorPinned, setNavigatorPinned] = createSignal(kv.get("navigator_pinned", false))
   const [navigatorTab, setNavigatorTab] = kv.signal<"explorer" | "git">("navigator_tab", "explorer")
   const [navigatorSide, setNavigatorSide] = kv.signal<"left" | "right">("navigator_side", "left")
-  const [animationsEnabled] = kv.signal("animations_enabled", true)
   const [navigatorRatio, setNavigatorRatio] = kv.signal("navigator_width_ratio", 0.45)
   const navigatorWidth = createMemo(() => {
     const min = 36
@@ -58,18 +60,14 @@ export function Home() {
     const next = Math.floor(dimensions().width * navigatorRatio())
     return Math.min(max, Math.max(min, next))
   })
+  const navigatorOpen = createMemo(() => navigatorState() === "open")
   const navigatorVisible = createMemo(() => navigatorOpen() || navigatorPinned())
   const navigatorSideValue = createMemo<"left" | "right">(() => (navigatorSide() === "right" ? "right" : "left"))
   const navigatorSideNext = createMemo(() => (navigatorSideValue() === "left" ? "right" : "left"))
   const navigatorRowDirection = createMemo<"row" | "row-reverse">(() =>
     navigatorSideValue() === "left" ? "row" : "row-reverse",
   )
-  const [navigatorDisplayWidth, setNavigatorDisplayWidth] = createSignal(navigatorVisible() ? navigatorWidth() : 0)
-  const [navigatorAnimation, setNavigatorAnimation] = createSignal<ReturnType<typeof setInterval> | undefined>(
-    undefined,
-  )
-  const navigatorDisplayVisible = createMemo(() => navigatorDisplayWidth() > 0)
-  const [navigatorMounted, setNavigatorMounted] = createSignal(false)
+  const navigatorDisplayWidth = createMemo(() => (navigatorVisible() ? navigatorWidth() : 0))
   const [navigatorDragging, setNavigatorDragging] = createSignal(false)
   const clampRatio = (value: number) => Math.min(0.6, Math.max(0.2, value))
   const updateNavigatorRatio = (event: MouseEvent) => {
@@ -84,13 +82,7 @@ export function Home() {
   createEffect(() => {
     if (!navigatorPinned()) return
     if (navigatorOpen()) return
-    setNavigatorOpen(() => true)
-  })
-
-  createEffect(() => {
-    if (!navigatorVisible()) return
-    if (navigatorMounted()) return
-    setNavigatorMounted(true)
+    setNavigatorState("open")
   })
 
   createEffect(() => {
@@ -100,54 +92,11 @@ export function Home() {
     setNavigatorSide(() => "left")
   })
 
-  const stopNavigatorAnimation = () => {
-    const current = navigatorAnimation()
-    if (!current) return
-    clearInterval(current)
-    setNavigatorAnimation(undefined)
-  }
-
-  const animateNavigatorWidth = (target: number, enabled: boolean) => {
-    stopNavigatorAnimation()
-    if (!enabled) {
-      setNavigatorDisplayWidth(target)
-      return
-    }
-    const start = navigatorDisplayWidth()
-    if (start === target) return
-    const duration = 180
-    const startTime = Date.now()
-    const interval = setInterval(() => {
-      const elapsed = Date.now() - startTime
-      const progress = Math.min(elapsed / duration, 1)
-      const eased = 1 - Math.pow(1 - progress, 3)
-      const next = Math.round(start + (target - start) * eased)
-      setNavigatorDisplayWidth(next)
-      if (progress >= 1) stopNavigatorAnimation()
-    }, 16)
-    setNavigatorAnimation(interval)
-  }
-
-  createEffect(() => {
-    if (!navigatorDragging()) return
-    stopNavigatorAnimation()
-    setNavigatorDisplayWidth(navigatorWidth())
-  })
-
-  createEffect(() => {
-    const target = navigatorVisible() ? navigatorWidth() : 0
-    const enabled = animationsEnabled()
-    if (navigatorDragging()) return
-    animateNavigatorWidth(target, enabled)
-  })
-
-  onCleanup(() => {
-    stopNavigatorAnimation()
-  })
-
   const closeNavigator = () => {
-    if (navigatorPinned()) setNavigatorPinned(() => false)
-    setNavigatorOpen(() => false)
+    batch(() => {
+      if (navigatorPinned()) setNavigatorPinned(false)
+      setNavigatorState("closed")
+    })
     promptRef.current?.focus()
   }
 
@@ -156,9 +105,8 @@ export function Home() {
       closeNavigator()
       return
     }
-    if (!navigatorMounted()) setNavigatorMounted(true)
     const focused = promptRef.current?.focused
-    setNavigatorOpen(() => true)
+    setNavigatorState("open")
     if (focused) queueMicrotask(() => promptRef.current?.focus())
   }
 
@@ -167,10 +115,9 @@ export function Home() {
       setNavigatorPinned(() => false)
       return
     }
-    if (!navigatorMounted()) setNavigatorMounted(true)
     const focused = promptRef.current?.focused
-    setNavigatorPinned(() => true)
-    setNavigatorOpen(() => true)
+    setNavigatorPinned(true)
+    setNavigatorState("open")
     if (focused) queueMicrotask(() => promptRef.current?.focus())
   }
 
@@ -264,11 +211,6 @@ export function Home() {
       prompt.submit()
     }
   })
-  onMount(() => {
-    if (navigatorPinned()) return
-    if (!navigatorOpen()) return
-    setNavigatorOpen(() => false)
-  })
   const directory = useDirectory()
 
   const keybind = useKeybind()
@@ -280,19 +222,21 @@ export function Home() {
       onMouseMove={updateNavigatorRatio}
       onMouseUp={() => setNavigatorDragging(false)}
     >
-      <Show when={navigatorMounted()}>
-        <Navigator width={navigatorDisplayWidth()} onClose={closeNavigator} open={navigatorDisplayVisible()} />
-        <box
-          width={navigatorDisplayVisible() ? 1 : 0}
-          backgroundColor={theme.border}
-          visible={navigatorDisplayVisible()}
-          onMouseDown={(event) => {
-            setNavigatorDragging(true)
-            updateNavigatorRatio(event)
-          }}
-          onMouseUp={() => setNavigatorDragging(false)}
-        />
-      </Show>
+      <Navigator
+        width={navigatorDisplayWidth()}
+        onClose={closeNavigator}
+        open={navigatorVisible()}
+        side={navigatorSideValue()}
+      />
+      <box
+        width={navigatorVisible() ? 1 : 0}
+        backgroundColor={theme.border}
+        onMouseDown={(event) => {
+          setNavigatorDragging(true)
+          updateNavigatorRatio(event)
+        }}
+        onMouseUp={() => setNavigatorDragging(false)}
+      />
       <box flexGrow={1} flexDirection="column">
         <box flexGrow={1} justifyContent="center" alignItems="center" paddingLeft={2} paddingRight={2} gap={1}>
           <box height={3} />

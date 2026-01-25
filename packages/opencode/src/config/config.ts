@@ -719,6 +719,9 @@ export namespace Config {
         .optional()
         .default("<leader>h")
         .describe("Toggle code block concealment in messages"),
+      question_focus: z.string().optional().default("alt+q,ctrl+q").describe("Focus question prompt"),
+      question_previous: z.string().optional().default("alt+z").describe("Go to previous question"),
+      question_clear: z.string().optional().default("alt+x").describe("Clear current question answer"),
       tool_details: z.string().optional().default("none").describe("Toggle tool details visibility"),
       model_list: z.string().optional().default("<leader>m").describe("List available models"),
       model_cycle_recent: z.string().optional().default("f2").describe("Next recently used model"),

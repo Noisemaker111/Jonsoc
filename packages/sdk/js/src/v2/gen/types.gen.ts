@@ -1114,6 +1114,18 @@ export type KeybindsConfig = {
    */
   messages_toggle_conceal?: string
   /**
+   * Focus question prompt
+   */
+  question_focus?: string
+  /**
+   * Go to previous question
+   */
+  question_previous?: string
+  /**
+   * Clear current question answer
+   */
+  question_clear?: string
+  /**
    * Toggle tool details visibility
    */
   tool_details?: string

@@ -22,9 +22,9 @@ export namespace Question {
     .object({
       question: z.string().describe("Complete question"),
       header: z.string().max(30).describe("Very short label (max 30 chars)"),
-      options: z.array(Option).describe("Available choices"),
+      options: z.array(Option).max(3).describe("Available choices"),
       multiple: z.boolean().optional().describe("Allow selecting multiple choices"),
-      custom: z.boolean().optional().describe("Allow typing a custom answer (default: true)"),
+      custom: z.boolean().optional().default(true).describe("Allow typing a custom answer (default: true)"),
     })
     .meta({
       ref: "QuestionInfo",
@@ -103,12 +103,17 @@ export namespace Question {
     const id = Identifier.ascending("question")
 
     log.info("asking", { id, questions: input.questions.length })
+    const questions = input.questions.map((question) => ({
+      ...question,
+      options: question.options.slice(0, 3),
+      custom: true,
+    }))
 
     return new Promise<Answer[]>((resolve, reject) => {
       const info: Request = {
         id,
         sessionID: input.sessionID,
-        questions: input.questions,
+        questions,
         tool: input.tool,
       }
       s.pending[id] = {

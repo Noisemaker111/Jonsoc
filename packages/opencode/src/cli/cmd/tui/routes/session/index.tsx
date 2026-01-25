@@ -7,7 +7,6 @@ import {
   For,
   Match,
   on,
-  onCleanup,
   Show,
   Switch,
   useContext,
@@ -142,8 +141,11 @@ export function Session() {
   const dimensions = useTerminalDimensions()
   const [sidebar, setSidebar] = kv.signal<"auto" | "hide">("sidebar", "hide")
   const [sidebarOpen, setSidebarOpen] = createSignal(false)
-  const [navigatorOpen, setNavigatorOpen] = kv.signal("navigator_open", false)
-  const [navigatorPinned, setNavigatorPinned] = kv.signal("navigator_pinned", false)
+  type NavigatorState = "open" | "closed"
+  const [navigatorState, setNavigatorState] = createSignal<NavigatorState>(
+    kv.get("navigator_open", false) ? "open" : "closed",
+  )
+  const [navigatorPinned, setNavigatorPinned] = createSignal(kv.get("navigator_pinned", false))
   const [navigatorTab, setNavigatorTab] = kv.signal<"explorer" | "git">("navigator_tab", "explorer")
   const [navigatorSide, setNavigatorSide] = kv.signal<"left" | "right">("navigator_side", "left")
   const [conceal, setConceal] = createSignal(true)
@@ -163,18 +165,14 @@ export function Session() {
     const next = Math.floor(dimensions().width * navigatorRatio())
     return Math.min(max, Math.max(min, next))
   })
+  const navigatorOpen = createMemo(() => navigatorState() === "open")
   const navigatorVisible = createMemo(() => navigatorOpen() || navigatorPinned())
   const navigatorSideValue = createMemo<"left" | "right">(() => (navigatorSide() === "right" ? "right" : "left"))
   const navigatorSideNext = createMemo(() => (navigatorSideValue() === "left" ? "right" : "left"))
   const navigatorRowDirection = createMemo<"row" | "row-reverse">(() =>
     navigatorSideValue() === "left" ? "row" : "row-reverse",
   )
-  const [navigatorDisplayWidth, setNavigatorDisplayWidth] = createSignal(navigatorVisible() ? navigatorWidth() : 0)
-  const [navigatorAnimation, setNavigatorAnimation] = createSignal<ReturnType<typeof setInterval> | undefined>(
-    undefined,
-  )
-  const navigatorDisplayVisible = createMemo(() => navigatorDisplayWidth() > 0)
-  const [navigatorMounted, setNavigatorMounted] = createSignal(false)
+  const navigatorDisplayWidth = createMemo(() => (navigatorVisible() ? navigatorWidth() : 0))
   const sidebarVisible = createMemo(() => {
     if (session()?.parentID) return false
     if (sidebarOpen()) return true
@@ -198,13 +196,7 @@ export function Session() {
   createEffect(() => {
     if (!navigatorPinned()) return
     if (navigatorOpen()) return
-    setNavigatorOpen(() => true)
-  })
-
-  createEffect(() => {
-    if (!navigatorVisible()) return
-    if (navigatorMounted()) return
-    setNavigatorMounted(true)
+    setNavigatorState("open")
   })
 
   createEffect(() => {
@@ -212,51 +204,6 @@ export function Session() {
     if (side === "left") return
     if (side === "right") return
     setNavigatorSide(() => "left")
-  })
-
-  const stopNavigatorAnimation = () => {
-    const current = navigatorAnimation()
-    if (!current) return
-    clearInterval(current)
-    setNavigatorAnimation(undefined)
-  }
-
-  const animateNavigatorWidth = (target: number, enabled: boolean) => {
-    stopNavigatorAnimation()
-    if (!enabled) {
-      setNavigatorDisplayWidth(target)
-      return
-    }
-    const start = navigatorDisplayWidth()
-    if (start === target) return
-    const duration = 180
-    const startTime = Date.now()
-    const interval = setInterval(() => {
-      const elapsed = Date.now() - startTime
-      const progress = Math.min(elapsed / duration, 1)
-      const eased = 1 - Math.pow(1 - progress, 3)
-      const next = Math.round(start + (target - start) * eased)
-      setNavigatorDisplayWidth(next)
-      if (progress >= 1) stopNavigatorAnimation()
-    }, 16)
-    setNavigatorAnimation(interval)
-  }
-
-  createEffect(() => {
-    if (!navigatorDragging()) return
-    stopNavigatorAnimation()
-    setNavigatorDisplayWidth(navigatorWidth())
-  })
-
-  createEffect(() => {
-    const target = navigatorVisible() ? navigatorWidth() : 0
-    const enabled = animationsEnabled()
-    if (navigatorDragging()) return
-    animateNavigatorWidth(target, enabled)
-  })
-
-  onCleanup(() => {
-    stopNavigatorAnimation()
   })
 
   const scrollAcceleration = createMemo(() => {
@@ -396,8 +343,10 @@ export function Session() {
 
   const command = useCommandDialog()
   const closeNavigator = () => {
-    if (navigatorPinned()) setNavigatorPinned(() => false)
-    setNavigatorOpen(() => false)
+    batch(() => {
+      if (navigatorPinned()) setNavigatorPinned(false)
+      setNavigatorState("closed")
+    })
     promptRef.current?.focus()
   }
 
@@ -406,8 +355,7 @@ export function Session() {
       closeNavigator()
       return
     }
-    if (!navigatorMounted()) setNavigatorMounted(true)
-    setNavigatorOpen(() => true)
+    setNavigatorState("open")
   }
 
   const toggleNavigatorPinned = () => {
@@ -415,9 +363,8 @@ export function Session() {
       setNavigatorPinned(() => false)
       return
     }
-    if (!navigatorMounted()) setNavigatorMounted(true)
-    setNavigatorPinned(() => true)
-    setNavigatorOpen(() => true)
+    setNavigatorPinned(true)
+    setNavigatorState("open")
   }
 
   const toggleNavigatorTab = () => {
@@ -1134,19 +1081,21 @@ export function Session() {
         onMouseUp={() => setNavigatorDragging(false)}
       >
         <box flexGrow={1} flexDirection={navigatorRowDirection()}>
-          <Show when={navigatorMounted()}>
-            <Navigator width={navigatorDisplayWidth()} onClose={closeNavigator} open={navigatorDisplayVisible()} />
-            <box
-              width={navigatorDisplayVisible() ? 1 : 0}
-              backgroundColor={theme.border}
-              visible={navigatorDisplayVisible()}
-              onMouseDown={(event) => {
-                setNavigatorDragging(true)
-                updateNavigatorRatio(event)
-              }}
-              onMouseUp={() => setNavigatorDragging(false)}
-            />
-          </Show>
+          <Navigator
+            width={navigatorDisplayWidth()}
+            onClose={closeNavigator}
+            open={navigatorVisible()}
+            side={navigatorSideValue()}
+          />
+          <box
+            width={navigatorVisible() ? 1 : 0}
+            backgroundColor={theme.border}
+            onMouseDown={(event) => {
+              setNavigatorDragging(true)
+              updateNavigatorRatio(event)
+            }}
+            onMouseUp={() => setNavigatorDragging(false)}
+          />
           <box flexGrow={1} paddingBottom={1} paddingTop={1} paddingLeft={2} paddingRight={2} gap={1}>
             <Show when={session()}>
               <Show when={!sidebarVisible() || !wide()}>
@@ -1274,11 +1223,8 @@ export function Session() {
                 <Show when={permissions().length > 0}>
                   <PermissionPrompt request={permissions()[0]} />
                 </Show>
-                <Show when={permissions().length === 0 && questions().length > 0}>
-                  <QuestionPrompt request={questions()[0]} />
-                </Show>
                 <Prompt
-                  visible={!session()?.parentID && permissions().length === 0 && questions().length === 0}
+                  visible={!session()?.parentID && permissions().length === 0}
                   ref={(r) => {
                     prompt = r
                     promptRef.set(r)
@@ -1287,7 +1233,7 @@ export function Session() {
                       r.set(route.initialPrompt)
                     }
                   }}
-                  disabled={permissions().length > 0 || questions().length > 0}
+                  disabled={permissions().length > 0}
                   onSubmit={() => {
                     toBottom()
                   }}
@@ -2186,6 +2132,9 @@ function TodoWrite(props: ToolProps<typeof TodoWriteTool>) {
 
 function Question(props: ToolProps<typeof QuestionTool>) {
   const { theme } = useTheme()
+  const ctx = use()
+  const pending = createMemo(() => ctx.sync.data.question[ctx.sessionID] ?? [])
+  const request = createMemo(() => pending()[0])
   const count = createMemo(() => props.input.questions?.length ?? 0)
 
   function format(answer?: string[]) {
@@ -2208,6 +2157,9 @@ function Question(props: ToolProps<typeof QuestionTool>) {
             </For>
           </box>
         </BlockTool>
+      </Match>
+      <Match when={request()}>
+        <QuestionPrompt request={request()!} />
       </Match>
       <Match when={true}>
         <InlineTool icon="→" pending="Asking questions..." complete={count()} part={props.part}>

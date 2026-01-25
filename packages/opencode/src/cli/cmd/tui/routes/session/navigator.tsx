@@ -28,6 +28,7 @@ type NavigatorProps = {
   width: number
   onClose: () => void
   open: boolean
+  side: "left" | "right"
 }
 
 type NavigatorTab = "explorer" | "git"
@@ -36,6 +37,11 @@ const STATUS_LABELS: Record<FileStatus["status"], string> = {
   added: "A",
   deleted: "D",
   modified: "M",
+}
+
+const NavigatorBorderChars = {
+  ...SplitBorder.customBorderChars,
+  vertical: "│",
 }
 
 export function Navigator(props: NavigatorProps) {
@@ -541,7 +547,6 @@ export function Navigator(props: NavigatorProps) {
   })
 
   createEffect(() => {
-    if (!props.open) return
     if (loaded()) return
     setLoaded(true)
     loadDirectory("")
@@ -686,14 +691,16 @@ export function Navigator(props: NavigatorProps) {
     </box>
   )
 
+  const edgeBorder = createMemo<("left" | "right")[]>(() => (props.side === "left" ? ["left"] : ["right"]))
+
   return (
     <box
       width={props.open ? props.width : 0}
       height="100%"
       flexDirection="column"
       backgroundColor={theme.theme.background}
-      border={SplitBorder.border}
-      customBorderChars={SplitBorder.customBorderChars}
+      border={props.open ? edgeBorder() : undefined}
+      customBorderChars={props.open ? NavigatorBorderChars : undefined}
       borderColor={theme.theme.border}
       visible={props.open}
     >
@@ -706,7 +713,7 @@ export function Navigator(props: NavigatorProps) {
         justifyContent="space-between"
         border={["bottom"]}
         borderColor={theme.theme.border}
-        customBorderChars={SplitBorder.customBorderChars}
+        customBorderChars={NavigatorBorderChars}
       >
         <box flexDirection="column">
           <text fg={theme.theme.text}>
@@ -722,7 +729,7 @@ export function Navigator(props: NavigatorProps) {
         <box
           width={listWidth()}
           border={["right"]}
-          customBorderChars={SplitBorder.customBorderChars}
+          customBorderChars={NavigatorBorderChars}
           borderColor={theme.theme.border}
           flexDirection="column"
           backgroundColor={theme.theme.background}

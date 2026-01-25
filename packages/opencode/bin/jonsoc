@@ -1,11 +1,11 @@
 #!/usr/bin/env node
 
 import { spawnSync } from "child_process"
-import { existsSync, readdirSync, readFileSync, realpathSync } from "fs"
+import { existsSync, mkdirSync, readFileSync, realpathSync, writeFileSync } from "fs"
 import { dirname, join } from "path"
 import { platform as osPlatform, arch as osArch, homedir } from "os"
 import { fileURLToPath } from "url"
-import { xdgState } from "xdg-basedir"
+import { xdgData, xdgState } from "xdg-basedir"
 
 /** Exit code 75 signals a restart request from the TUI */
 const EXIT_CODE_RESTART = 75
@@ -151,14 +151,23 @@ const scriptPath = realpathSync(__filename)
 const scriptDir = dirname(scriptPath)
 const pkgDir = dirname(scriptDir)
 
-// Development mode: run TypeScript source directly with bun
-const srcEntry = join(pkgDir, "src", "index.ts")
-if (existsSync(srcEntry)) {
-  runWithRestart("bun", ["run", "--conditions=browser", srcEntry], restartArgs, { cwd: pkgDir, env })
+// Development mode: run TypeScript source directly with bun when inside repo
+function repoRoot(dir) {
+  const entry = join(dir, "packages", "opencode", "src", "index.ts")
+  if (existsSync(entry)) return dir
+  const parent = dirname(dir)
+  if (parent === dir) return
+  return repoRoot(parent)
+}
+
+const root = repoRoot(cwd)
+if (root) {
+  const workdir = join(root, "packages", "opencode")
+  runWithRestart("bun", ["run", "--conditions=browser", "src/index.ts"], restartArgs, { cwd: workdir, env })
 }
 
 
-// Production mode: find compiled binary
+// Production mode: fetch compiled binary into XDG data dir
 const platformMap = {
   darwin: "darwin",
   linux: "linux",
@@ -181,49 +190,90 @@ if (!arch) {
 const base = "jonsoc-" + platform + "-" + arch
 const binary = platform === "windows" ? "jonsoc.exe" : "jonsoc"
 
-function findBinary(startDir) {
-  let current = startDir
-  for (;;) {
-    const modules = join(current, "node_modules")
-    if (existsSync(modules)) {
-      // 1. Try to find the exact platform package in node_modules
-      const candidate = join(modules, base, "bin", binary)
-      if (existsSync(candidate)) {
-        return candidate
-      }
+const supported = new Set(["darwin-arm64", "linux-x64", "windows-x64"])
+if (!supported.has(`${platform}-${arch}`)) {
+  console.error(`[jonsoc] Unsupported platform: ${platform}-${arch}. Supported: ${Array.from(supported).join(", ")}`)
+  process.exit(1)
+}
 
-      // 2. Fallback to searching (legacy)
-      const entries = readdirSync(modules)
-      for (const entry of entries) {
-        if (!entry.startsWith("jonsoc-")) continue
-        if (!entry.includes(platform)) continue
-        if (!entry.includes(arch)) continue
-        const searchCandidate = join(modules, entry, "bin", binary)
-        if (existsSync(searchCandidate)) {
-          return searchCandidate
-        }
-      }
-    }
-    const parent = dirname(current)
-    if (parent === current) return
-    current = parent
+const pkgJsonPath = join(pkgDir, "package.json")
+const version = (() => {
+  if (!existsSync(pkgJsonPath)) return "latest"
+  const raw = readFileSync(pkgJsonPath, "utf8")
+  const data = JSON.parse(raw)
+  return typeof data.version === "string" ? data.version : "latest"
+})()
+
+const repo = (process.env.JONSOC_REPO ?? process.env.OPENCODE_REPO ?? "Noisemaker111/JonsOpencode").replace(
+  /^https?:\/\/github\.com\//,
+  "",
+)
+const dataRoot = xdgData ?? join(homedir(), ".local", "share")
+const dataDir = join(dataRoot, appName)
+const binDir = join(dataDir, "bin")
+const versionFile = join(binDir, "version")
+const binaryPath = join(binDir, binary)
+
+function ensureDir(dir) {
+  if (existsSync(dir)) return
+  mkdirSync(dir, { recursive: true })
+}
+
+function versionMatch() {
+  if (!existsSync(binaryPath)) return false
+  if (!existsSync(versionFile)) return false
+  const stored = readFileSync(versionFile, "utf8").trim()
+  return stored === version
+}
+
+function releaseUrl() {
+  const asset = platform === "linux" ? `${base}.tar.gz` : `${base}.zip`
+  const releasePath = version === "latest" ? "latest/download" : `download/v${version}`
+  return {
+    asset,
+    url: `https://github.com/${repo}/releases/${releasePath}/${asset}`,
   }
 }
 
+function extractArchive(archivePath) {
+  if (platform === "linux") {
+    const code = run("tar", ["-xzf", archivePath, "-C", binDir], { env })
+    if (code !== 0) process.exit(code)
+    return
+  }
 
-const resolved = findBinary(scriptDir)
-if (!resolved) {
-  // If we can't find a binary, we'll try to just execute the native binary package directly
-  // since we added the 'bin' field to them in version 1.1.40
-  try {
-    const pkgName = `jonsoc-${platform}-${arch}`
-    runWithRestart("npx", [pkgName], restartArgs, { env })
-    process.exit(0)
-  } catch (e) {
-    console.error(`Error: Could not find or run native binary for ${platform}-${arch}`)
+  if (platform === "windows") {
+    const cmd = `Expand-Archive -Path "${archivePath}" -DestinationPath "${binDir}" -Force`
+    const code = run("powershell", ["-NoProfile", "-Command", cmd], { env })
+    if (code !== 0) process.exit(code)
+    return
+  }
+
+  const code = run("unzip", ["-o", archivePath, "-d", binDir], { env })
+  if (code !== 0) process.exit(code)
+}
+
+function ensureBinary() {
+  if (versionMatch()) return binaryPath
+  ensureDir(binDir)
+  const { asset, url } = releaseUrl()
+  const archivePath = join(dataDir, asset)
+  const code = run("curl", ["-fL", "-o", archivePath, url], { env })
+  if (code !== 0) {
+    console.error(`[jonsoc] Failed to download ${url}`)
+    process.exit(code)
+  }
+  extractArchive(archivePath)
+  if (platform !== "windows") {
+    run("chmod", ["+x", binaryPath], { env })
+  }
+  if (!existsSync(binaryPath)) {
+    console.error(`[jonsoc] Expected binary not found at ${binaryPath}`)
     process.exit(1)
   }
+  writeFileSync(versionFile, version)
+  return binaryPath
 }
 
+const resolved = ensureBinary()
 runWithRestart(resolved, [], restartArgs, { env })
-

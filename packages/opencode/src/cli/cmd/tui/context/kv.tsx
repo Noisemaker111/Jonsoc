@@ -1,5 +1,5 @@
 import { Global } from "@/global"
-import { createSignal, type Setter } from "solid-js"
+import { createSignal, type Setter, untrack } from "solid-js"
 import { createStore } from "solid-js/store"
 import { createSimpleContext } from "./helper"
 import path from "path"
@@ -44,7 +44,8 @@ export const { use: useKV, provider: KVProvider } = createSimpleContext({
       },
       set(key: string, value: any) {
         setStore(key, value)
-        Bun.write(file, JSON.stringify(store, null, 2))
+        const payload = untrack(() => JSON.stringify(store, null, 2))
+        Bun.write(file, payload)
       },
     }
     return result
