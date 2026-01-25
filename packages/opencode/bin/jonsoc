@@ -37,6 +37,7 @@ const rawArgs = process.argv.slice(2)
 const hasFlag = (value) => rawArgs.includes(value)
 const safe = hasFlag("-safe") || hasFlag("--safe")
 const restart = hasFlag("-restart") || hasFlag("--restart") || hasFlag("-return") || hasFlag("--return")
+const autoReturn = hasFlag("-auto-return") || hasFlag("--auto-return")
 const check = hasFlag("-check") || hasFlag("--check")
 const safeIsolated =
   hasFlag("-safe-isolated") ||
@@ -50,6 +51,8 @@ const flagSet = new Set([
   "--restart",
   "-return",
   "--return",
+  "-auto-return",
+  "--auto-return",
   "-check",
   "--check",
   "-safe-isolated",
@@ -108,10 +111,22 @@ function runWithRestart(target, prefix, trailingArgs, options = {}) {
   let args = [...prefix, ...trailingArgs]
   for (;;) {
     const code = run(target, args, options)
+
+    // Requested restart
     if (code === EXIT_CODE_RESTART) {
       args = [...prefix, ...buildRestartArgs()]
       continue
     }
+
+    // Automatic return on crash/error
+    if (code !== 0 && (restart || autoReturn)) {
+      console.error(`\nJonsOC exited with code ${code}. Reconnecting to session...`)
+      // Small delay to prevent rapid-fire loops on startup errors
+      spawnSync("node", ["-e", "setTimeout(() => {}, 1000)"], { stdio: "inherit" })
+      args = [...prefix, ...buildRestartArgs()]
+      continue
+    }
+
     process.exit(code)
   }
 }
