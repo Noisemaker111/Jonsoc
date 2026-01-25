@@ -36,7 +36,7 @@ function run(target, args, options = {}) {
 const rawArgs = process.argv.slice(2)
 const hasFlag = (value) => rawArgs.includes(value)
 const safe = hasFlag("-safe") || hasFlag("--safe")
-const restart = hasFlag("-restart") || hasFlag("--restart")
+const restart = hasFlag("-restart") || hasFlag("--restart") || hasFlag("-return") || hasFlag("--return")
 const check = hasFlag("-check") || hasFlag("--check")
 const safeIsolated =
   hasFlag("-safe-isolated") ||
@@ -48,6 +48,8 @@ const flagSet = new Set([
   "--safe",
   "-restart",
   "--restart",
+  "-return",
+  "--return",
   "-check",
   "--check",
   "-safe-isolated",
