@@ -162,6 +162,9 @@ for (const item of targets) {
         version: Script.version,
         os: [item.os],
         cpu: [item.arch],
+        bin: {
+          jonsoc: process.platform === "win32" ? "bin/jonsoc.exe" : "bin/jonsoc",
+        },
       },
       null,
       2,

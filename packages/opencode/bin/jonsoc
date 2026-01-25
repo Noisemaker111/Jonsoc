@@ -213,12 +213,16 @@ function findBinary(startDir) {
 
 const resolved = findBinary(scriptDir)
 if (!resolved) {
-  console.error(
-    'It seems that your package manager failed to install the right version of the joc CLI for your platform. You can try manually installing the "' +
-      base +
-      '" package',
-  )
-  process.exit(1)
+  // If we can't find a binary, we'll try to just execute the native binary package directly
+  // since we added the 'bin' field to them in version 1.1.40
+  try {
+    const pkgName = `jonsoc-${platform}-${arch}`
+    runWithRestart("npx", [pkgName], restartArgs, { env })
+    process.exit(0)
+  } catch (e) {
+    console.error(`Error: Could not find or run native binary for ${platform}-${arch}`)
+    process.exit(1)
+  }
 }
 
 runWithRestart(resolved, [], restartArgs, { env })
