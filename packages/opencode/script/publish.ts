@@ -66,7 +66,15 @@ for (const [name] of Object.entries(binaries)) {
   await $`bun pm pack`.cwd(targetDir)
   const otpArg = otp ? `--otp=${otp}` : ""
   for (const tag of tags) {
-    await $`npm publish *.tgz --access public --tag ${tag} ${otpArg}`.cwd(targetDir)
+    try {
+      await $`npm publish *.tgz --access public --tag ${tag} ${otpArg}`.cwd(targetDir)
+    } catch (e: any) {
+      if (e.stderr?.toString().includes("previously published versions")) {
+        console.log(`  Already published ${name}. Skipping...`)
+        continue
+      }
+      throw e
+    }
   }
 }
 
