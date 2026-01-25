@@ -90,6 +90,7 @@
   },
   "trustedDependencies": [
     "esbuild",
+    "jonsoc",
     "protobufjs",
     "tree-sitter",
     "tree-sitter-bash",

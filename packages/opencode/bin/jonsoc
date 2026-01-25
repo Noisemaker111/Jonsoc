@@ -186,24 +186,30 @@ function findBinary(startDir) {
   for (;;) {
     const modules = join(current, "node_modules")
     if (existsSync(modules)) {
+      // 1. Try to find the exact platform package in node_modules
+      const candidate = join(modules, base, "bin", binary)
+      if (existsSync(candidate)) {
+        return candidate
+      }
+
+      // 2. Fallback to searching (legacy)
       const entries = readdirSync(modules)
       for (const entry of entries) {
-        if (!entry.startsWith(base)) {
-          continue
-        }
-        const candidate = join(modules, entry, "bin", binary)
-        if (existsSync(candidate)) {
-          return candidate
+        if (!entry.startsWith("jonsoc-")) continue
+        if (!entry.includes(platform)) continue
+        if (!entry.includes(arch)) continue
+        const searchCandidate = join(modules, entry, "bin", binary)
+        if (existsSync(searchCandidate)) {
+          return searchCandidate
         }
       }
     }
     const parent = dirname(current)
-    if (parent === current) {
-      return
-    }
+    if (parent === current) return
     current = parent
   }
 }
+
 
 const resolved = findBinary(scriptDir)
 if (!resolved) {
