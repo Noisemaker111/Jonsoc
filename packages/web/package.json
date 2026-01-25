@@ -34,7 +34,7 @@
     "toolbeam-docs-theme": "0.4.8"
   },
   "devDependencies": {
-    "jonsoc": "workspace:*",
+    "@noisemakerjon/jonsoc": "workspace:*",
     "@types/node": "catalog:",
     "typescript": "catalog:"
   }
