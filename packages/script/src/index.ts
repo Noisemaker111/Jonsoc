@@ -17,22 +17,22 @@ if (!semver.satisfies(process.versions.bun, expectedBunVersionRange)) {
 }
 
 const env = {
-  OPENCODE_CHANNEL: process.env["OPENCODE_CHANNEL"],
+  OPENCODE_CHANNEL: process.env["OPENCODE_CHANNEL"] || "latest",
   OPENCODE_BUMP: process.env["OPENCODE_BUMP"],
   OPENCODE_VERSION: process.env["OPENCODE_VERSION"],
 }
 const CHANNEL = await (async () => {
-  if (env.OPENCODE_CHANNEL) return env.OPENCODE_CHANNEL
+  if (env.OPENCODE_CHANNEL !== "latest") return env.OPENCODE_CHANNEL
   if (env.OPENCODE_BUMP) return "latest"
   if (env.OPENCODE_VERSION && !env.OPENCODE_VERSION.startsWith("0.0.0-")) return "latest"
-  return await $`git branch --show-current`.text().then((x) => x.trim())
+  return "latest"
 })()
 const IS_PREVIEW = CHANNEL !== "latest"
 
 const VERSION = await (async () => {
   if (env.OPENCODE_VERSION) return env.OPENCODE_VERSION
   if (IS_PREVIEW) return `0.0.0-${CHANNEL}-${new Date().toISOString().slice(0, 16).replace(/[-:T]/g, "")}`
-  const version = await fetch("https://registry.npmjs.org/@noisemaker11/jonsoc/latest")
+  const version = await fetch("https://registry.npmjs.org/jonsoc/latest")
     .then((res) => {
       if (!res.ok) throw new Error(res.statusText)
       return res.json()
