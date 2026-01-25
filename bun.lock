@@ -489,6 +489,7 @@
   },
   "trustedDependencies": [
     "esbuild",
+    "jonsoc",
     "web-tree-sitter",
     "tree-sitter-bash",
   ],
