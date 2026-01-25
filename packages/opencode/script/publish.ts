@@ -3,21 +3,28 @@ import { $ } from "bun"
 import pkg from "../package.json"
 import { Script } from "@opencode-ai/script"
 import { fileURLToPath } from "url"
+import { dirname, join } from "path"
 
 const dir = fileURLToPath(new URL("..", import.meta.url))
 process.chdir(dir)
 
 const { binaries } = await import("./build.ts")
 {
-  const name = `${pkg.name}-${process.platform}-${process.arch}`
+  const platform = process.platform === "win32" ? "windows" : process.platform
+  const name = `${pkg.name}-${platform}-${process.arch}`
   const binary = process.platform === "win32" ? `${pkg.name}.exe` : pkg.name
   console.log(`smoke test: running dist/${name}/bin/${binary} --version`)
   await $`./dist/${name}/bin/${binary} --version`
 }
 
 await $`mkdir -p ./dist/${pkg.name}`
-await $`cp -r ./bin ./dist/${pkg.name}/bin`
-await $`cp ./script/postinstall.mjs ./dist/${pkg.name}/postinstall.mjs`
+if (process.platform === "win32") {
+  await $`xcopy /E /I /Y bin .\\dist\\${pkg.name}\\bin`
+  await Bun.write(`./dist/${pkg.name}/postinstall.mjs`, await Bun.file(`./script/postinstall.mjs`).arrayBuffer())
+} else {
+  await $`cp -r ./bin ./dist/${pkg.name}/bin`
+  await $`cp ./script/postinstall.mjs ./dist/${pkg.name}/postinstall.mjs`
+}
 
 await Bun.file(`./dist/${pkg.name}/package.json`).write(
   JSON.stringify(
@@ -38,6 +45,17 @@ await Bun.file(`./dist/${pkg.name}/package.json`).write(
 )
 
 const tags = [Script.channel]
+
+const npmToken = process.env.NPM_TOKEN
+if (npmToken) {
+  const registry = "registry.npmjs.org"
+  const home = process.env.HOME || process.env.USERPROFILE
+  if (!home) throw new Error("Could not find home directory")
+  const configPath = join(home, ".npmrc")
+  const config = `//${registry}/:_authToken=${npmToken}\n`
+  await Bun.write(configPath, config)
+  console.log(`Configured .npmrc with token for ${registry}`)
+}
 
 const tasks = Object.entries(binaries).map(async ([name]) => {
   if (process.platform !== "win32") {
