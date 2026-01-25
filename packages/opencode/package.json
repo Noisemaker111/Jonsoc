@@ -1,12 +1,18 @@
 {
   "$schema": "https://json.schemastore.org/package.json",
   "version": "1.1.34",
-  "name": "jonsoc",
+  "name": "@noisemakerjon/jonsoc",
   "description": "AI-powered development tool",
   "type": "module",
   "license": "MIT",
   "author": "Jon",
-  "keywords": ["ai", "development", "cli", "opencode", "coding-assistant"],
+  "keywords": [
+    "ai",
+    "development",
+    "cli",
+    "opencode",
+    "coding-assistant"
+  ],
   "repository": {
     "type": "git",
     "url": "https://github.com/Noisemaker111/JonsOpencode"
