@@ -3,7 +3,7 @@ import { $ } from "bun"
 import pkg from "../package.json"
 import { Script } from "@opencode-ai/script"
 import { fileURLToPath } from "url"
-import { dirname, join } from "path"
+import path, { dirname, join } from "path"
 
 const dir = fileURLToPath(new URL("..", import.meta.url))
 process.chdir(dir)
@@ -19,7 +19,9 @@ const { binaries } = await import("./build.ts")
 
 await $`mkdir -p ./dist/${pkg.name}`
 if (process.platform === "win32") {
-  await $`xcopy /E /I /Y bin .\\dist\\${pkg.name}\\bin`
+  const dest = path.join("dist", pkg.name, "bin")
+  await $`mkdir -p ${dest}`
+  await $`xcopy /E /I /Y bin ${dest.replaceAll("/", "\\")}`
   await Bun.write(`./dist/${pkg.name}/postinstall.mjs`, await Bun.file(`./script/postinstall.mjs`).arrayBuffer())
 } else {
   await $`cp -r ./bin ./dist/${pkg.name}/bin`
@@ -57,7 +59,8 @@ if (npmToken) {
   console.log(`Configured .npmrc with token for ${registry}`)
 }
 
-const tasks = Object.entries(binaries).map(async ([name]) => {
+for (const [name] of Object.entries(binaries)) {
+  console.log(`Publishing ${name}...`)
   if (process.platform !== "win32") {
     await $`chmod -R 755 .`.cwd(`./dist/${name}`)
   }
@@ -65,9 +68,9 @@ const tasks = Object.entries(binaries).map(async ([name]) => {
   for (const tag of tags) {
     await $`npm publish *.tgz --access public --tag ${tag}`.cwd(`./dist/${name}`)
   }
-})
-await Promise.all(tasks)
+}
 for (const tag of tags) {
+  console.log(`Publishing main package with tag ${tag}...`)
   await $`cd ./dist/${pkg.name} && bun pm pack && npm publish *.tgz --access public --tag ${tag}`
 }
 
