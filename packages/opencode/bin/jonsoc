@@ -112,17 +112,19 @@ function runWithRestart(target, prefix, trailingArgs, options = {}) {
   for (;;) {
     const code = run(target, args, options)
 
-    // Requested restart
-    if (code === EXIT_CODE_RESTART) {
-      args = [...prefix, ...buildRestartArgs()]
-      continue
+    // Clean exit (user typed /exit, /quit, or Ctrl+C handled cleanly)
+    if (code === 0) {
+      process.exit(0)
     }
 
-    // Automatic return on crash/error
-    if (code !== 0 && (restart || autoReturn)) {
-      console.error(`\nJonsOC exited with code ${code}. Reconnecting to session...`)
-      // Small delay to prevent rapid-fire loops on startup errors
-      spawnSync("node", ["-e", "setTimeout(() => {}, 1000)"], { stdio: "inherit" })
+    // Requested restart (code 75) or Crash/Error (code != 0)
+    // We always attempt to return to the session on any failure.
+    if (code !== 0) {
+      if (code !== EXIT_CODE_RESTART) {
+        console.error(`\n[jonsoc] unexpected exit (${code}). recovering session...`)
+        // 1s throttle only on actual crashes to prevent cpu pinning if there's a persistent boot error
+        spawnSync("node", ["-e", "setTimeout(() => {}, 1000)"], { stdio: "inherit" })
+      }
       args = [...prefix, ...buildRestartArgs()]
       continue
     }
