@@ -102,7 +102,7 @@ for (const item of targets) {
         os: [item.os],
         cpu: [item.arch],
         bin: {
-          jonsoc: process.platform === "win32" ? "bin/jonsoc.exe" : "bin/jonsoc",
+          jonsoc: item.os === "win32" ? "bin/jonsoc.exe" : "bin/jonsoc",
         },
       },
       null,
