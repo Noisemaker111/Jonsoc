@@ -16,11 +16,8 @@ jonsOC uses a multi-package distribution strategy (similar to esbuild, Parcel, e
 1. **Main package (`jonsoc`)**: Contains the wrapper script that users install
 2. **Platform-specific packages**: Compiled binaries for each platform:
    - `jonsoc-linux-x64`
-   - `jonsoc-linux-arm64`
-   - `jonsoc-darwin-x64`
    - `jonsoc-darwin-arm64`
    - `jonsoc-windows-x64`
-   - etc.
 
 When users install `jonsoc`, npm automatically installs the correct platform-specific binary as an optional dependency.
 
@@ -71,6 +68,7 @@ bun run script/publish.ts
 ```
 
 This will:
+
 - Publish all platform-specific packages
 - Publish the main `jonsoc` package
 - Create GitHub release archives (if configured)
@@ -141,6 +139,7 @@ When publishing updates:
 3. Run `bun run script/publish.ts`
 
 The publish script automatically:
+
 - Tags releases based on the channel (stable, preview, etc.)
 - Creates platform-specific packages
 - Updates the main package
