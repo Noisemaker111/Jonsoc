@@ -21,9 +21,11 @@ if (process.platform === "win32") {
   const dest = path.join("dist", pkg.name, "bin")
   await $`mkdir -p ${dest}`
   await $`xcopy /E /I /Y bin ${dest.replaceAll("/", "\\")}`
+  await Bun.write(`./dist/${pkg.name}/postinstall.mjs`, await Bun.file(`./script/postinstall.mjs`).arrayBuffer())
 } else {
   await $`mkdir -p ./dist/${pkg.name}/bin`
   await $`cp -r ./bin ./dist/${pkg.name}/bin`
+  await $`cp ./script/postinstall.mjs ./dist/${pkg.name}/postinstall.mjs`
 }
 
 await Bun.file(`./dist/${pkg.name}/package.json`).write(
