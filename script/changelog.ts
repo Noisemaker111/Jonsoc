@@ -54,6 +54,8 @@ async function resolveRef(ref: string): Promise<string> {
 }
 
 async function hasJonsoc(): Promise<boolean> {
+  // Skip AI changelog for local builds - requires running server
+  if (process.env.SKIP_AI_CHANGELOG) return false
   const check = process.platform === "win32" ? await $`where jonsoc`.nothrow() : await $`command -v jonsoc`.nothrow()
   return check.exitCode === 0
 }

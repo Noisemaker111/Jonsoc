@@ -1,6 +1,7 @@
 #!/usr/bin/env bun
 
 import { $ } from "bun"
+import { fileURLToPath } from "url"
 import { Script } from "@opencode-ai/script"
 import { buildNotes, getLatestRelease } from "./changelog"
 
@@ -26,7 +27,7 @@ for (const file of pkgjsons) {
   await Bun.file(file).write(pkg)
 }
 
-const extensionToml = new URL("../packages/extensions/zed/extension.toml", import.meta.url).pathname
+const extensionToml = fileURLToPath(new URL("../packages/extensions/zed/extension.toml", import.meta.url))
 let toml = await Bun.file(extensionToml).text()
 toml = toml.replace(/^version = "[^"]+"/m, `version = "${Script.version}"`)
 toml = toml.replaceAll(/releases\/download\/v[^/]+\//g, `releases/download/v${Script.version}/`)
@@ -38,13 +39,14 @@ await $`bun install`
 console.log("\n=== jonsoc ===\n")
 await import(`../packages/opencode/script/publish.ts`)
 
-console.log("\n=== sdk ===\n")
-await import(`../packages/sdk/js/script/publish.ts`)
+// SDK and plugin packages remain under @opencode-ai namespace
+// Plugin developers can use the upstream packages which are API-compatible
+// console.log("\n=== sdk ===\n")
+// await import(`../packages/sdk/js/script/publish.ts`)
+// console.log("\n=== plugin ===\n")
+// await import(`../packages/plugin/script/publish.ts`)
 
-console.log("\n=== plugin ===\n")
-await import(`../packages/plugin/script/publish.ts`)
-
-const dir = new URL("..", import.meta.url).pathname
+const dir = fileURLToPath(new URL("..", import.meta.url))
 process.chdir(dir)
 
 let output = `version=${Script.version}\n`
