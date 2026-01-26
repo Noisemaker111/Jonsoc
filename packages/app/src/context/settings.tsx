@@ -18,6 +18,7 @@ export interface SoundSettings {
 export interface Settings {
   general: {
     autoSave: boolean
+    navigatorAlwaysOpen: boolean
   }
   appearance: {
     fontSize: number
@@ -34,6 +35,7 @@ export interface Settings {
 const defaultSettings: Settings = {
   general: {
     autoSave: true,
+    navigatorAlwaysOpen: false,
   },
   appearance: {
     fontSize: 14,
@@ -95,6 +97,12 @@ export const { use: useSettings, provider: SettingsProvider } = createSimpleCont
         autoSave: createMemo(() => store.general?.autoSave ?? defaultSettings.general.autoSave),
         setAutoSave(value: boolean) {
           setStore("general", "autoSave", value)
+        },
+        navigatorAlwaysOpen: createMemo(
+          () => store.general?.navigatorAlwaysOpen ?? defaultSettings.general.navigatorAlwaysOpen,
+        ),
+        setNavigatorAlwaysOpen(value: boolean) {
+          setStore("general", "navigatorAlwaysOpen", value)
         },
       },
       appearance: {

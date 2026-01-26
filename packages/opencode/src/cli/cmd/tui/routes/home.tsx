@@ -8,7 +8,7 @@ import { Logo } from "../component/logo"
 import { Tips } from "../component/tips"
 import { Locale } from "@/util/locale"
 import { useSync } from "../context/sync"
-import { Toast } from "../ui/toast"
+import { Toast, useToast } from "../ui/toast"
 import { useArgs } from "../context/args"
 import { useDirectory } from "../context/directory"
 import { useRouteData } from "@tui/context/route"
@@ -28,6 +28,7 @@ export function Home() {
   const route = useRouteData("home")
   const promptRef = usePromptRef()
   const command = useCommandDialog()
+  const toast = useToast()
   const mcp = createMemo(() => Object.keys(sync.data.mcp).length > 0)
   const mcpError = createMemo(() => {
     return Object.values(sync.data.mcp).some((x) => x.status === "failed")
@@ -50,7 +51,8 @@ export function Home() {
   const [navigatorState, setNavigatorState] = createSignal<NavigatorState>(
     kv.get("navigator_open", false) ? "open" : "closed",
   )
-  const [navigatorPinned, setNavigatorPinned] = createSignal(kv.get("navigator_pinned", false))
+  const [navigatorPinned, setNavigatorPinned] = kv.signal("navigator_pinned", false)
+  const [navigatorAlwaysOpen, setNavigatorAlwaysOpen] = kv.signal("navigator_always_open", false)
   const [navigatorTab, setNavigatorTab] = kv.signal<"explorer" | "git">("navigator_tab", "explorer")
   const [navigatorSide, setNavigatorSide] = kv.signal<"left" | "right">("navigator_side", "left")
   const [navigatorRatio, setNavigatorRatio] = kv.signal("navigator_width_ratio", 0.45)
@@ -61,7 +63,7 @@ export function Home() {
     return Math.min(max, Math.max(min, next))
   })
   const navigatorOpen = createMemo(() => navigatorState() === "open")
-  const navigatorVisible = createMemo(() => navigatorOpen() || navigatorPinned())
+  const navigatorVisible = createMemo(() => navigatorOpen() || navigatorPinned() || navigatorAlwaysOpen())
   const navigatorSideValue = createMemo<"left" | "right">(() => (navigatorSide() === "right" ? "right" : "left"))
   const navigatorSideNext = createMemo(() => (navigatorSideValue() === "left" ? "right" : "left"))
   const navigatorRowDirection = createMemo<"row" | "row-reverse">(() =>
@@ -80,6 +82,10 @@ export function Home() {
   }
 
   createEffect(() => {
+    if (navigatorAlwaysOpen()) {
+      if (navigatorState() !== "open") setNavigatorState("open")
+      return
+    }
     if (!navigatorPinned()) return
     if (navigatorOpen()) return
     setNavigatorState("open")
@@ -93,8 +99,9 @@ export function Home() {
   })
 
   const closeNavigator = () => {
+    if (navigatorAlwaysOpen()) return
     batch(() => {
-      if (navigatorPinned()) setNavigatorPinned(false)
+      if (navigatorPinned()) setNavigatorPinned(() => false)
       setNavigatorState("closed")
     })
     promptRef.current?.focus()
@@ -116,7 +123,7 @@ export function Home() {
       return
     }
     const focused = promptRef.current?.focused
-    setNavigatorPinned(true)
+    setNavigatorPinned(() => true)
     setNavigatorState("open")
     if (focused) queueMicrotask(() => promptRef.current?.focus())
   }
@@ -177,6 +184,20 @@ export function Home() {
         dialog.clear()
       },
     },
+    {
+      title: navigatorAlwaysOpen() ? "Navigator: Always on" : "Navigator: Normal mode",
+      value: "session.navigator.always_open",
+      category: "Session",
+      onSelect: (dialog) => {
+        const value = !navigatorAlwaysOpen()
+        setNavigatorAlwaysOpen(() => value)
+        toast.show({
+          message: value ? "Navigator always on" : "Navigator normal mode",
+          variant: "success",
+        })
+        dialog.clear()
+      },
+    },
   ])
 
   const Hint = (
@@ -227,6 +248,7 @@ export function Home() {
         onClose={closeNavigator}
         open={navigatorVisible()}
         side={navigatorSideValue()}
+        promptRef={promptRef.current}
       />
       <box
         width={navigatorVisible() ? 1 : 0}
@@ -237,7 +259,7 @@ export function Home() {
         }}
         onMouseUp={() => setNavigatorDragging(false)}
       />
-      <box flexGrow={1} flexDirection="column">
+      <box flexGrow={1} flexDirection="column" onMouseUp={() => promptRef.current?.focus()}>
         <box flexGrow={1} justifyContent="center" alignItems="center" paddingLeft={2} paddingRight={2} gap={1}>
           <box height={3} />
           <Logo />

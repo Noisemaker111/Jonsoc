@@ -145,7 +145,8 @@ export function Session() {
   const [navigatorState, setNavigatorState] = createSignal<NavigatorState>(
     kv.get("navigator_open", false) ? "open" : "closed",
   )
-  const [navigatorPinned, setNavigatorPinned] = createSignal(kv.get("navigator_pinned", false))
+  const [navigatorPinned, setNavigatorPinned] = kv.signal("navigator_pinned", false)
+  const [navigatorAlwaysOpen, setNavigatorAlwaysOpen] = kv.signal("navigator_always_open", false)
   const [navigatorTab, setNavigatorTab] = kv.signal<"explorer" | "git">("navigator_tab", "explorer")
   const [navigatorSide, setNavigatorSide] = kv.signal<"left" | "right">("navigator_side", "left")
   const [conceal, setConceal] = createSignal(true)
@@ -166,7 +167,7 @@ export function Session() {
     return Math.min(max, Math.max(min, next))
   })
   const navigatorOpen = createMemo(() => navigatorState() === "open")
-  const navigatorVisible = createMemo(() => navigatorOpen() || navigatorPinned())
+  const navigatorVisible = createMemo(() => navigatorOpen() || navigatorPinned() || navigatorAlwaysOpen())
   const navigatorSideValue = createMemo<"left" | "right">(() => (navigatorSide() === "right" ? "right" : "left"))
   const navigatorSideNext = createMemo(() => (navigatorSideValue() === "left" ? "right" : "left"))
   const navigatorRowDirection = createMemo<"row" | "row-reverse">(() =>
@@ -194,6 +195,10 @@ export function Session() {
   }
 
   createEffect(() => {
+    if (navigatorAlwaysOpen()) {
+      if (navigatorState() !== "open") setNavigatorState("open")
+      return
+    }
     if (!navigatorPinned()) return
     if (navigatorOpen()) return
     setNavigatorState("open")
@@ -343,8 +348,9 @@ export function Session() {
 
   const command = useCommandDialog()
   const closeNavigator = () => {
+    if (navigatorAlwaysOpen()) return
     batch(() => {
-      if (navigatorPinned()) setNavigatorPinned(false)
+      if (navigatorPinned()) setNavigatorPinned(() => false)
       setNavigatorState("closed")
     })
     promptRef.current?.focus()
@@ -363,7 +369,7 @@ export function Session() {
       setNavigatorPinned(() => false)
       return
     }
-    setNavigatorPinned(true)
+    setNavigatorPinned(() => true)
     setNavigatorState("open")
   }
 
@@ -616,6 +622,20 @@ export function Session() {
       category: "Session",
       onSelect: (dialog) => {
         toggleNavigatorSide()
+        dialog.clear()
+      },
+    },
+    {
+      title: navigatorAlwaysOpen() ? "Navigator: Always on" : "Navigator: Normal mode",
+      value: "session.navigator.always_open",
+      category: "Session",
+      onSelect: (dialog) => {
+        const value = !navigatorAlwaysOpen()
+        setNavigatorAlwaysOpen(() => value)
+        toast.show({
+          message: value ? "Navigator always on" : "Navigator normal mode",
+          variant: "success",
+        })
         dialog.clear()
       },
     },
@@ -1086,6 +1106,7 @@ export function Session() {
             onClose={closeNavigator}
             open={navigatorVisible()}
             side={navigatorSideValue()}
+            promptRef={promptRef.current}
           />
           <box
             width={navigatorVisible() ? 1 : 0}
@@ -1096,7 +1117,15 @@ export function Session() {
             }}
             onMouseUp={() => setNavigatorDragging(false)}
           />
-          <box flexGrow={1} paddingBottom={1} paddingTop={1} paddingLeft={2} paddingRight={2} gap={1}>
+          <box
+            flexGrow={1}
+            paddingBottom={1}
+            paddingTop={1}
+            paddingLeft={2}
+            paddingRight={2}
+            gap={1}
+            onMouseUp={() => promptRef.current?.focus()}
+          >
             <Show when={session()}>
               <Show when={!sidebarVisible() || !wide()}>
                 <Header

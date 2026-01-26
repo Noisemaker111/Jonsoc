@@ -29,6 +29,7 @@ type NavigatorProps = {
   onClose: () => void
   open: boolean
   side: "left" | "right"
+  promptRef?: { focused: boolean; focus: () => void } | undefined
 }
 
 type NavigatorTab = "explorer" | "git"
@@ -570,10 +571,6 @@ export function Navigator(props: NavigatorProps) {
     if (data.encoding === "base64") return
     if (!editor) return
     editor.setText(data.content ?? "")
-    if (!props.open) return
-    queueMicrotask(() => {
-      editor?.focus()
-    })
   })
 
   const fileViewer = () => (
@@ -693,6 +690,11 @@ export function Navigator(props: NavigatorProps) {
 
   const edgeBorder = createMemo<("left" | "right")[]>(() => (props.side === "left" ? ["left"] : ["right"]))
 
+  const handleNavigatorClick = () => {
+    if (props.promptRef?.focused) return
+    props.promptRef?.focus()
+  }
+
   return (
     <box
       width={props.open ? props.width : 0}
@@ -703,6 +705,7 @@ export function Navigator(props: NavigatorProps) {
       customBorderChars={props.open ? NavigatorBorderChars : undefined}
       borderColor={theme.theme.border}
       visible={props.open}
+      onMouseUp={handleNavigatorClick}
     >
       <box
         paddingLeft={2}

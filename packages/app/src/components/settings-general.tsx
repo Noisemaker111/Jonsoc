@@ -154,6 +154,16 @@ export const SettingsGeneral: Component = () => {
                 )}
               </Select>
             </SettingsRow>
+
+            <SettingsRow
+              title={language.t("settings.general.row.navigatorAlwaysOpen.title")}
+              description={language.t("settings.general.row.navigatorAlwaysOpen.description")}
+            >
+              <Switch
+                checked={settings.general.navigatorAlwaysOpen()}
+                onChange={(checked) => settings.general.setNavigatorAlwaysOpen(checked)}
+              />
+            </SettingsRow>
           </div>
         </div>
 
