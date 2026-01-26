@@ -7,7 +7,7 @@ export const config = {
 
   // GitHub
   github: {
-    repoUrl: "https://github.com/Noisemaker111/JonsOpencode",
+    repoUrl: "https://github.com/Noisemaker111/Jonsoc",
     starsFormatted: {
       compact: "80K",
       full: "80,000",

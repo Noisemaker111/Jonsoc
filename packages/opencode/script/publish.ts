@@ -98,7 +98,7 @@ if (!Script.preview) {
     }
   }
 
-  const repo = (process.env.JOC_REPO ?? process.env.OPENCODE_REPO ?? "Noisemaker111/JonsOpencode").replace(
+  const repo = (process.env.JOC_REPO ?? process.env.OPENCODE_REPO ?? "Noisemaker111/Jonsoc").replace(
     /^https?:\/\/github\.com\//,
     "",
   )

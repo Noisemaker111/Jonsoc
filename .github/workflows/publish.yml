@@ -31,7 +31,7 @@ permissions:
 jobs:
   publish:
     runs-on: blacksmith-4vcpu-ubuntu-2404
-    if: github.repository == 'Noisemaker111/jonsoc'
+    if: github.repository == 'Noisemaker111/Jonsoc'
     steps:
       - uses: actions/checkout@v3
         with:

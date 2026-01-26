@@ -32,7 +32,7 @@ export default tool({
   },
   async execute(args) {
     const owner = "Noisemaker111"
-    const repo = "JonsOpencode"
+    const repo = "Jonsoc"
 
     const page = Math.floor(args.offset / args.limit) + 1
     const searchQuery = encodeURIComponent(`${args.query} repo:${owner}/${repo} type:pr state:open`)

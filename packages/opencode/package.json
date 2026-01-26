@@ -15,11 +15,11 @@
   ],
   "repository": {
     "type": "git",
-    "url": "https://github.com/Noisemaker111/JonsOpencode"
+    "url": "https://github.com/Noisemaker111/Jonsoc"
   },
-  "homepage": "https://github.com/Noisemaker111/JonsOpencode#readme",
+  "homepage": "https://github.com/Noisemaker111/Jonsoc#readme",
   "bugs": {
-    "url": "https://github.com/Noisemaker111/JonsOpencode/issues"
+    "url": "https://github.com/Noisemaker111/Jonsoc/issues"
   },
   "scripts": {
     "typecheck": "tsgo --noEmit",

@@ -18,7 +18,7 @@ export namespace Installation {
   const legacyCliName = "opencode"
   const npmPackage = `${cliName}-ai`
   const legacyNpmPackage = "opencode-ai"
-  const repo = (process.env.JONSOC_REPO ?? process.env.OPENCODE_REPO ?? "Noisemaker111/JonsOpencode").replace(
+  const repo = (process.env.JONSOC_REPO ?? process.env.OPENCODE_REPO ?? "Noisemaker111/Jonsoc").replace(
     /^https?:\/\/github\.com\//,
     "",
   )

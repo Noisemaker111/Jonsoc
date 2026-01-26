@@ -41,7 +41,7 @@ export default tool({
     const issue = getIssueNumber()
     // const octokit = new Octokit({ auth: process.env.GITHUB_TOKEN })
     const owner = "Noisemaker111"
-    const repo = "JonsOpencode"
+    const repo = "Jonsoc"
 
     const results: string[] = []
 
