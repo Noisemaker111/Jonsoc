@@ -1499,9 +1499,99 @@ function AssistantMessage(props: { message: AssistantMessage; parts: Part[]; las
 }
 
 const PART_MAPPING = {
-  text: TextPart,
+  text: FileReferenceText,
   tool: ToolPart,
   reasoning: ReasoningPart,
+}
+
+function FileReferenceText(props: { last: boolean; part: TextPart; message: AssistantMessage }) {
+  const ctx = use()
+  const { theme, syntax } = useTheme()
+  const sdk = useSDK()
+  const kv = useKV()
+
+  const parseFileReferences = (text: string) => {
+    const fileRefRegex = /([`'"<]?)([\w\-./]+\/[\w\-./]+(?:\.[\w]+)?)\.?(?::(\d+))?/g
+    const parts: Array<{ type: "text" | "fileref"; content: string; path?: string; line?: number }> = []
+    let lastIndex = 0
+    let match
+
+    while ((match = fileRefRegex.exec(text)) !== null) {
+      const textBefore = text.slice(lastIndex, match.index)
+      if (textBefore) {
+        parts.push({ type: "text", content: textBefore })
+      }
+
+      const fullMatch = match[0]
+      const filePath = match[2]
+      const lineNum = match[3] ? parseInt(match[3], 10) : undefined
+
+      parts.push({
+        type: "fileref",
+        content: fullMatch,
+        path: filePath,
+        line: lineNum,
+      })
+
+      lastIndex = match.index + fullMatch.length
+    }
+
+    const remaining = text.slice(lastIndex)
+    if (remaining) {
+      parts.push({ type: "text", content: remaining })
+    }
+
+    return parts
+  }
+
+  const parts = createMemo(() => parseFileReferences(props.part.text.trim()))
+
+  const handleFileClick = (path?: string, line?: number) => {
+    if (!path) return
+    void (async () => {
+      const file = await sdk.client.file.read({ path }).catch(() => undefined)
+      if (!file?.data) return
+      if (file.data.encoding === "base64") return
+      const content = file.data.content ?? ""
+      const lines = content.split("\n")
+      if (line && line > 0 && line <= lines.length) {
+        const lineIndex = line - 1
+        const linesBefore = lines.slice(0, lineIndex)
+        const charsBefore = linesBefore.join("\n").length + linesBefore.length
+        kv.set("navigator_open_file", { path, line: charsBefore })
+      } else {
+        kv.set("navigator_open_file", { path, line: 0 })
+      }
+    })()
+  }
+
+  return (
+    <Show when={props.part.text.trim()}>
+      <box id={"text-" + props.part.id} paddingLeft={3} marginTop={1} flexShrink={0}>
+        <For each={parts()}>
+          {(part) => (
+            <Switch>
+              <Match when={part.type === "fileref"}>
+                <text fg={theme.primary} onMouseUp={() => handleFileClick(part.path!, part.line)}>
+                  {part.content}
+                </text>
+              </Match>
+              <Match when={true}>
+                <code
+                  filetype="markdown"
+                  drawUnstyledText={false}
+                  streaming={true}
+                  syntaxStyle={syntax()}
+                  content={part.content}
+                  fg={theme.text}
+                />
+              </Match>
+            </Switch>
+          )}
+        </For>
+      </box>
+    </Show>
+  )
 }
 
 function ReasoningPart(props: { last: boolean; part: ReasoningPart; message: AssistantMessage }) {
