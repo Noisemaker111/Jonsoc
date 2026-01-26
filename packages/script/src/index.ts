@@ -30,9 +30,24 @@ const CHANNEL = await (async () => {
 const IS_PREVIEW = CHANNEL !== "latest"
 
 const VERSION = await (async () => {
-  if (env.OPENCODE_VERSION) return env.OPENCODE_VERSION
   if (IS_PREVIEW) return `0.0.0-${CHANNEL}-${new Date().toISOString().slice(0, 16).replace(/[-:T]/g, "")}`
-  return "1.1.41"
+
+  const base = env.OPENCODE_VERSION ?? "1.1.41"
+  const bump = env.OPENCODE_BUMP
+  if (!bump) return base
+
+  const match = base.match(/^(\d+)\.(\d+)\.(\d+)/)
+  if (!match) throw new Error(`Cannot bump invalid version: ${base}`)
+
+  const major = Number(match[1])
+  const minor = Number(match[2])
+  const patch = Number(match[3])
+
+  if (bump === "major") return `${major + 1}.0.0`
+  if (bump === "minor") return `${major}.${minor + 1}.0`
+  if (bump === "patch") return `${major}.${minor}.${patch + 1}`
+
+  throw new Error(`Unknown bump: ${bump}`)
 })()
 
 export const Script = {
