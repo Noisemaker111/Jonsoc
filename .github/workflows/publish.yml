@@ -44,7 +44,6 @@ jobs:
       - uses: ./.github/actions/setup-bun
 
       - name: Install JonsOC
-        if: inputs.bump || inputs.version
         run: bun i -g jonsoc-ai@1.0.169
 
       - name: Login to GitHub Container Registry
