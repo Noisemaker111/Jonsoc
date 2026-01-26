@@ -32,7 +32,8 @@ const IS_PREVIEW = CHANNEL !== "latest"
 const VERSION = await (async () => {
   if (IS_PREVIEW) return `0.0.0-${CHANNEL}-${new Date().toISOString().slice(0, 16).replace(/[-:T]/g, "")}`
 
-  const base = env.OPENCODE_VERSION ?? "1.1.41"
+  const raw = env.OPENCODE_VERSION ?? ""
+  const base = raw.trim() ? raw.trim() : "1.1.41"
   const bump = env.OPENCODE_BUMP
   if (!bump) return base
 
