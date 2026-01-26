@@ -48,6 +48,11 @@ async function resolveRef(ref: string): Promise<string> {
   return getRootRef()
 }
 
+async function hasJonsoc(): Promise<boolean> {
+  const check = process.platform === "win32" ? await $`where jonsoc`.nothrow() : await $`command -v jonsoc`.nothrow()
+  return check.exitCode === 0
+}
+
 export async function getCommits(from: string | null, to: string): Promise<Commit[]> {
   const fromRef = from ? await resolveRef(from.startsWith("v") ? from : `v${from}`) : await getRootRef()
   const toRef = to === "HEAD" ? to : to.startsWith("v") ? to : `v${to}`
@@ -236,27 +241,36 @@ export async function buildNotes(from: string | null, to: string) {
 
   console.log("generating changelog since " + from)
 
-  const opencode = await createOpencode({ port: 5044 })
   const notes: string[] = []
+  const canSummarize = await hasJonsoc()
 
-  try {
-    const lines = await generateChangelog(commits, opencode)
-    notes.push(...lines)
-    console.log("---- Generated Changelog ----")
-    console.log(notes.join("\n"))
-    console.log("-----------------------------")
-  } catch (error) {
-    if (error instanceof Error && error.name === "TimeoutError") {
-      console.log("Changelog generation timed out, using raw commits")
-      for (const commit of commits) {
-        const attribution = commit.author && !team.includes(commit.author) ? ` (@${commit.author})` : ""
-        notes.push(`- ${commit.message}${attribution}`)
-      }
-    } else {
-      throw error
+  if (!canSummarize) {
+    console.log("jonsoc not found in PATH, using raw commits")
+    for (const commit of commits) {
+      const attribution = commit.author && !team.includes(commit.author) ? ` (@${commit.author})` : ""
+      notes.push(`- ${commit.message}${attribution}`)
     }
-  } finally {
-    opencode.server.close()
+  } else {
+    const opencode = await createOpencode({ port: 5044 })
+    try {
+      const lines = await generateChangelog(commits, opencode)
+      notes.push(...lines)
+      console.log("---- Generated Changelog ----")
+      console.log(notes.join("\n"))
+      console.log("-----------------------------")
+    } catch (error) {
+      if (error instanceof Error && error.name === "TimeoutError") {
+        console.log("Changelog generation timed out, using raw commits")
+        for (const commit of commits) {
+          const attribution = commit.author && !team.includes(commit.author) ? ` (@${commit.author})` : ""
+          notes.push(`- ${commit.message}${attribution}`)
+        }
+      } else {
+        throw error
+      }
+    } finally {
+      opencode.server.close()
+    }
   }
 
   const contributors = await getContributors(from, to)
