@@ -32,6 +32,8 @@ jobs:
   publish:
     runs-on: ubuntu-latest
     if: github.repository == 'Noisemaker111/Jonsoc'
+    env:
+      GH_TOKEN: ${{ github.token }}
     steps:
       - uses: actions/checkout@v3
         with:
@@ -78,7 +80,6 @@ jobs:
           OPENCODE_API_KEY: ${{ secrets.OPENCODE_API_KEY }}
           AUR_KEY: ${{ secrets.AUR_KEY }}
           GITHUB_TOKEN: ${{ secrets.SST_GITHUB_TOKEN }}
-          GH_TOKEN: ${{ github.token }}
           NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
           NPM_CONFIG_PROVENANCE: false
 
