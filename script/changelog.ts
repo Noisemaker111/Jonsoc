@@ -22,7 +22,12 @@ type ReleasePayload = {
 }
 
 export async function getLatestRelease(): Promise<string | null> {
-  return fetch("https://api.github.com/repos/Noisemaker111/Jonsoc/releases/latest")
+  const token = process.env.GH_TOKEN ?? process.env.GITHUB_TOKEN
+  const headers = new Headers({
+    "User-Agent": "jonsoc-publish",
+  })
+  if (token) headers.set("Authorization", `Bearer ${token}`)
+  return fetch("https://api.github.com/repos/Noisemaker111/Jonsoc/releases/latest", { headers })
     .then((res) => {
       if (res.status === 404) return null
       if (!res.ok) throw new Error(res.statusText)
