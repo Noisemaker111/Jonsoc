@@ -43,9 +43,6 @@ jobs:
 
       - uses: ./.github/actions/setup-bun
 
-      - name: Install JonsOC
-        run: bun i -g jonsoc-ai@1.0.169
-
       - name: Login to GitHub Container Registry
         uses: docker/login-action@v3
         with:
