@@ -1107,6 +1107,21 @@ export function Session() {
             open={navigatorVisible()}
             side={navigatorSideValue()}
             promptRef={promptRef.current}
+            onOpenFile={async (path: string, line?: number) => {
+              const file = await sdk.client.file.read({ path }).catch(() => undefined)
+              if (!file?.data) return
+              if (file.data.encoding === "base64") return
+              const content = file.data.content ?? ""
+              const lines = content.split("\n")
+              if (line && line > 0 && line <= lines.length) {
+                const lineIndex = line - 1
+                const linesBefore = lines.slice(0, lineIndex)
+                const charsBefore = linesBefore.join("\n").length + linesBefore.length
+                kv.set("navigator_open_file", { path, line: charsBefore })
+              } else {
+                kv.set("navigator_open_file", { path, line: 0 })
+              }
+            }}
           />
           <box
             width={navigatorVisible() ? 1 : 0}

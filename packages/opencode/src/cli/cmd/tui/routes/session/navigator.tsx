@@ -30,6 +30,7 @@ type NavigatorProps = {
   open: boolean
   side: "left" | "right"
   promptRef?: { focused: boolean; focus: () => void } | undefined
+  onOpenFile?: (path: string, line?: number) => void
 }
 
 type NavigatorTab = "explorer" | "git"
@@ -104,6 +105,11 @@ export function Navigator(props: NavigatorProps) {
   const [fileError, setFileError] = createSignal(false)
   const [cache, setCache] = createStore<Record<string, FileContent>>({})
   const [dirty, setDirty] = createSignal(false)
+  const [targetLine, setTargetLine] = createSignal<number | undefined>(undefined)
+  const [openFileInfo, setOpenFileInfo] = kv.signal<{ path: string; line: number } | undefined>(
+    "navigator_open_file",
+    undefined,
+  )
   let editor: TextareaRenderable | undefined
 
   const listWidth = createMemo(() => {
@@ -313,6 +319,18 @@ export function Navigator(props: NavigatorProps) {
     if (node.type !== "file") return
     if (activePath() === node.path) return
     setActivePath(() => node.path)
+    setTargetLine(undefined)
+  }
+
+  const openFileAtLine = async (path: string, line?: number) => {
+    if (activePath() !== path) {
+      setActivePath(() => path)
+      await new Promise((resolve) => setTimeout(resolve, 100))
+    }
+    if (line && line > 0) {
+      setTargetLine(line)
+    }
+    props.onOpenFile?.(path, line)
   }
 
   const handleExplorerSelect = async () => {
@@ -541,10 +559,19 @@ export function Navigator(props: NavigatorProps) {
   })
 
   createEffect(() => {
-    const list = gitEntries()
-    if (list.length === 0) return
-    if (selectedGit() < list.length) return
-    setSelectedGit(() => list.length - 1)
+    const file = activePath()
+    const fileInfo = openFileInfo()
+    if (!file) {
+      setFileContent(undefined)
+      setFileLoading(false)
+      setFileError(false)
+      return
+    }
+    if (fileInfo?.path === file) {
+      setTargetLine(() => fileInfo.line)
+      setOpenFileInfo(() => undefined)
+    }
+    loadFile(file)
   })
 
   createEffect(() => {
@@ -571,6 +598,19 @@ export function Navigator(props: NavigatorProps) {
     if (data.encoding === "base64") return
     if (!editor) return
     editor.setText(data.content ?? "")
+    if (targetLine()) {
+      queueMicrotask(() => {
+        const line = targetLine()
+        if (!line || !editor) return
+        const lines = data.content?.split("\n") ?? []
+        if (line > lines.length) return
+        const lineIndex = line - 1
+        const linesBefore = lines.slice(0, lineIndex)
+        const charsBefore = linesBefore.join("\n").length + linesBefore.length
+        editor.cursorOffset = Math.min(charsBefore, editor.plainText.length)
+        setTargetLine(undefined)
+      })
+    }
   })
 
   const fileViewer = () => (
@@ -594,32 +634,45 @@ export function Navigator(props: NavigatorProps) {
             </Match>
             <Match when={true}>
               <box flexDirection="column" gap={1}>
-                <textarea
-                  ref={(val: TextareaRenderable) => {
-                    editor = val
-                  }}
-                  initialValue={fileData()?.content ?? ""}
-                  textColor={theme.theme.text}
-                  focusedTextColor={theme.theme.text}
-                  cursorColor={theme.theme.primary}
-                  minHeight={8}
-                  maxHeight={40}
-                  onContentChange={() => {
-                    const value = editor?.plainText ?? ""
-                    setDirty(value !== (fileData()?.content ?? ""))
-                  }}
-                  onKeyDown={(e) => {
-                    if (keybind.match("navigator_save", e)) {
-                      e.preventDefault()
-                      saveFile()
-                      return
-                    }
-                    if (e.name === "escape") {
-                      e.preventDefault()
-                      promptRef.current?.focus()
-                    }
-                  }}
-                />
+                <box flexDirection="row">
+                  <box width={4} flexGrow={0} flexShrink={0} backgroundColor={theme.theme.background} paddingTop={1}>
+                    <For each={(fileData()?.content ?? "").split("\n")}>
+                      {(_, i) => (
+                        <text fg={theme.theme.textMuted} paddingBottom={1}>
+                          {(i() + 1).toString().padStart(3, " ")}
+                        </text>
+                      )}
+                    </For>
+                  </box>
+                  <box flexGrow={1}>
+                    <textarea
+                      ref={(val: TextareaRenderable) => {
+                        editor = val
+                      }}
+                      initialValue={fileData()?.content ?? ""}
+                      textColor={theme.theme.text}
+                      focusedTextColor={theme.theme.text}
+                      cursorColor={theme.theme.primary}
+                      minHeight={8}
+                      maxHeight={40}
+                      onContentChange={() => {
+                        const value = editor?.plainText ?? ""
+                        setDirty(value !== (fileData()?.content ?? ""))
+                      }}
+                      onKeyDown={(e) => {
+                        if (keybind.match("navigator_save", e)) {
+                          e.preventDefault()
+                          saveFile()
+                          return
+                        }
+                        if (e.name === "escape") {
+                          e.preventDefault()
+                          promptRef.current?.focus()
+                        }
+                      }}
+                    />
+                  </box>
+                </box>
                 <Show when={fileData()?.diff}>
                   <box paddingTop={1}>
                     <text fg={theme.theme.textMuted}>Git diff</text>
