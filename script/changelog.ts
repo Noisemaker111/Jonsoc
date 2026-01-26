@@ -17,13 +17,18 @@ export const team = [
   "opencode-agent[bot]",
 ]
 
-export async function getLatestRelease() {
+type ReleasePayload = {
+  tag_name: string
+}
+
+export async function getLatestRelease(): Promise<string | null> {
   return fetch("https://api.github.com/repos/Noisemaker111/Jonsoc/releases/latest")
     .then((res) => {
+      if (res.status === 404) return null
       if (!res.ok) throw new Error(res.statusText)
-      return res.json()
+      return res.json() as Promise<ReleasePayload>
     })
-    .then((data: any) => data.tag_name.replace(/^v/, ""))
+    .then((data) => (data ? data.tag_name.replace(/^v/, "") : null))
 }
 
 type Commit = {
@@ -33,8 +38,18 @@ type Commit = {
   areas: Set<string>
 }
 
-export async function getCommits(from: string, to: string): Promise<Commit[]> {
-  const fromRef = from.startsWith("v") ? from : `v${from}`
+async function getRootRef(): Promise<string> {
+  return $`git rev-list --max-parents=0 HEAD`.text().then((value) => value.trim())
+}
+
+async function resolveRef(ref: string): Promise<string> {
+  const result = await $`git rev-parse --verify ${ref}`.nothrow()
+  if (result.exitCode === 0) return ref
+  return getRootRef()
+}
+
+export async function getCommits(from: string | null, to: string): Promise<Commit[]> {
+  const fromRef = from ? await resolveRef(from.startsWith("v") ? from : `v${from}`) : await getRootRef()
   const toRef = to === "HEAD" ? to : to.startsWith("v") ? to : `v${to}`
 
   // Get commit data with GitHub usernames from the API
@@ -191,8 +206,8 @@ export async function generateChangelog(commits: Commit[], opencode: Awaited<Ret
   return lines
 }
 
-export async function getContributors(from: string, to: string) {
-  const fromRef = from.startsWith("v") ? from : `v${from}`
+export async function getContributors(from: string | null, to: string) {
+  const fromRef = from ? await resolveRef(from.startsWith("v") ? from : `v${from}`) : await getRootRef()
   const toRef = to === "HEAD" ? to : to.startsWith("v") ? to : `v${to}`
   const compare =
     await $`gh api "/repos/Noisemaker111/Jonsoc/compare/${fromRef}...${toRef}" --jq '.commits[] | {login: .author.login, message: .commit.message}'`.text()
@@ -212,7 +227,7 @@ export async function getContributors(from: string, to: string) {
   return contributors
 }
 
-export async function buildNotes(from: string, to: string) {
+export async function buildNotes(from: string | null, to: string) {
   const commits = await getCommits(from, to)
 
   if (commits.length === 0) {
@@ -290,8 +305,10 @@ Examples:
 
   const to = values.to!
   const from = values.from ?? (await getLatestRelease())
+  const fromLabel = from ?? "root"
 
-  console.log(`Generating changelog: v${from} -> ${to}\n`)
+  const displayFrom = fromLabel === "root" ? "root" : `v${fromLabel}`
+  console.log(`Generating changelog: ${displayFrom} -> ${to}\n`)
 
   const notes = await buildNotes(from, to)
   console.log("\n=== Final Notes ===")
