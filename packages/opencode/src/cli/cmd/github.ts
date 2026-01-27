@@ -27,6 +27,7 @@ import { Bus } from "../../bus"
 import { MessageV2 } from "../../session/message-v2"
 import { SessionPrompt } from "@/session/prompt"
 import { $ } from "bun"
+import { Brand } from "../../brand"
 
 type GitHubAuthor = {
   login: string
@@ -236,7 +237,7 @@ export const GithubInstallCommand = cmd({
                 "",
                 "    3. Go to a GitHub issue and comment `/oc summarize` to see the agent in action",
                 "",
-                "   Learn more about the GitHub agent - https://jonsoc.ai/docs/github/#usage-examples",
+                `   Learn more about the GitHub agent - ${Brand.DOCS_URL}/docs/github/#usage-examples`,
               ].join("\n"),
             )
           }
@@ -355,9 +356,7 @@ export const GithubInstallCommand = cmd({
             s.stop("Installed GitHub app")
 
             async function getInstallation() {
-              return await fetch(
-                `https://api.jonsoc.ai/get_github_app_installation?owner=${app.owner}&repo=${app.repo}`,
-              )
+              return await fetch(`${Brand.API_URL}/get_github_app_installation?owner=${app.owner}&repo=${app.repo}`)
                 .then((res) => res.json())
                 .then((data) => data.installation)
             }
@@ -468,7 +467,7 @@ export const GithubRunCommand = cmd({
           ? (payload as IssueCommentEvent | IssuesEvent).issue.number
           : (payload as PullRequestEvent | PullRequestReviewCommentEvent).pull_request.number
       const runUrl = `/${owner}/${repo}/actions/runs/${runId}`
-      const shareBaseUrl = isMock ? "https://dev.jonsoc.ai" : "https://jonsoc.ai"
+      const shareBaseUrl = isMock ? `https://dev.${Brand.DOMAIN}` : Brand.DOMAIN_WITH_PROTOCOL
 
       let appToken: string
       let octoRest: Octokit
@@ -684,7 +683,7 @@ export const GithubRunCommand = cmd({
 
       function normalizeOidcBaseUrl(): string {
         const value = process.env["OIDC_BASE_URL"]
-        if (!value) return "https://api.jonsoc.ai"
+        if (!value) return Brand.API_URL
         return value.replace(/\/+$/, "")
       }
 

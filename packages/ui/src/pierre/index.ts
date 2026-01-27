@@ -63,42 +63,55 @@ const unsafeCSS = `
   color: var(--diffs-selection-number-fg);
 }
 
-[data-diffs-header],
-[data-diffs] {
-  [data-separator-wrapper] {
-    margin: 0 !important;
-    border-radius: 0 !important;
-  }
-  [data-expand-button] {
-    width: 6.5ch !important;
-    height: 24px !important;
-    justify-content: end !important;
-    padding-left: 3ch !important;
-    padding-inline: 1ch !important;
-  }
-  [data-separator-multi-button] {
-    grid-template-rows: 10px 10px !important;
-    [data-expand-button] {
-      height: 12px !important;
+  [data-diffs-header],
+  [data-diffs] {
+    [data-separator-wrapper] {
+      margin: 0 !important;
+      border-radius: 0 !important;
     }
-  }
-  [data-separator-content] {
-    height: 24px !important;
-  }
-  [data-column-number] {
-    background-color: var(--background-stronger);
-  }
-  [data-code] {
-    overflow-x: auto !important;
-  }
-}`
+    [data-expand-button] {
+      width: 6.5ch !important;
+      height: 24px !important;
+      justify-content: end !important;
+      padding-left: 3ch !important;
+      padding-inline: 1ch !important;
+    }
+    [data-separator-multi-button] {
+      grid-template-rows: 10px 10px !important;
+      [data-expand-button] {
+        height: 12px !important;
+      }
+    }
+    [data-separator-content] {
+      height: 24px !important;
+    }
+    [data-line] {
+      display: grid !important;
+      grid-template-columns: subgrid !important;
+      grid-column: 1 / -1 !important;
+      align-items: stretch !important;
+    }
+    [data-column-number] {
+      display: flex !important;
+      justify-content: flex-end !important;
+      align-items: center !important;
+      min-height: 100% !important;
+      width: var(--diffs-min-number-column-width, 4ch) !important;
+      background-color: var(--diffs-bg) !important;
+      z-index: 10 !important;
+    }
+    [data-column-content] {
+      display: block !important;
+      min-width: 0 !important;
+    }
+  }`
 
 export function createDefaultOptions<T>(style: FileDiffOptions<T>["diffStyle"]) {
   return {
     theme: "JonsOC",
     themeType: "system",
     disableLineNumbers: false,
-    overflow: "wrap",
+    overflow: "scroll",
     diffStyle: style ?? "unified",
     diffIndicators: "bars",
     disableBackground: false,

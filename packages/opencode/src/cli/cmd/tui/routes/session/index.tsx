@@ -1510,8 +1510,10 @@ function FileReferenceText(props: { last: boolean; part: TextPart; message: Assi
   const sdk = useSDK()
   const kv = useKV()
 
+  const fileRefRegex = /([`'"<]?)([\w\-./]+\/[\w\-./]+(?:\.[\w]+)?)(?::(\d+))?/g
+  const hasFileRefs = createMemo(() => fileRefRegex.test(props.part.text.trim()))
+
   const parseFileReferences = (text: string) => {
-    const fileRefRegex = /([`'"<]?)([\w\-./]+\/[\w\-./]+(?:\.[\w]+)?)\.?(?::(\d+))?/g
     const parts: Array<{ type: "text" | "fileref"; content: string; path?: string; line?: number }> = []
     let lastIndex = 0
     let match
@@ -1554,41 +1556,59 @@ function FileReferenceText(props: { last: boolean; part: TextPart; message: Assi
       if (file.data.encoding === "base64") return
       const content = file.data.content ?? ""
       const lines = content.split("\n")
+      let charOffset = 0
       if (line && line > 0 && line <= lines.length) {
         const lineIndex = line - 1
         const linesBefore = lines.slice(0, lineIndex)
-        const charsBefore = linesBefore.join("\n").length + linesBefore.length
-        kv.set("navigator_open_file", { path, line: charsBefore })
-      } else {
-        kv.set("navigator_open_file", { path, line: 0 })
+        charOffset = linesBefore.join("\n").length
       }
+      kv.set("navigator_open", true)
+      kv.set("navigator_active_path", path)
+      kv.set("navigator_open_file", { path, line: charOffset })
     })()
   }
 
   return (
     <Show when={props.part.text.trim()}>
       <box id={"text-" + props.part.id} paddingLeft={3} marginTop={1} flexShrink={0}>
-        <For each={parts()}>
-          {(part) => (
-            <Switch>
-              <Match when={part.type === "fileref"}>
-                <text fg={theme.primary} onMouseUp={() => handleFileClick(part.path!, part.line)}>
-                  {part.content}
-                </text>
-              </Match>
-              <Match when={true}>
-                <code
-                  filetype="markdown"
-                  drawUnstyledText={false}
-                  streaming={true}
-                  syntaxStyle={syntax()}
-                  content={part.content}
-                  fg={theme.text}
-                />
-              </Match>
-            </Switch>
-          )}
-        </For>
+        <Show
+          when={hasFileRefs()}
+          fallback={
+            <code
+              filetype="markdown"
+              drawUnstyledText={false}
+              streaming={true}
+              syntaxStyle={syntax()}
+              content={props.part.text.trim()}
+              conceal={ctx.conceal()}
+              fg={theme.text}
+            />
+          }
+        >
+          <For each={parts()}>
+            {(part) => (
+              <Switch>
+                <Match when={part.type === "fileref"}>
+                  <text fg={theme.markdownLink} onMouseUp={() => handleFileClick(part.path!, part.line)}>
+                    <span style={{ fg: theme.textMuted }}>[</span>
+                    {part.content}
+                    <span style={{ fg: theme.textMuted }}>]</span>
+                  </text>
+                </Match>
+                <Match when={true}>
+                  <code
+                    filetype="markdown"
+                    drawUnstyledText={false}
+                    streaming={true}
+                    syntaxStyle={syntax()}
+                    content={part.content}
+                    fg={theme.text}
+                  />
+                </Match>
+              </Switch>
+            )}
+          </For>
+        </Show>
       </box>
     </Show>
   )

@@ -1,6 +1,7 @@
 import z from "zod"
 import { EOL } from "os"
 import { NamedError } from "@opencode-ai/util/error"
+import * as path from "path"
 
 export namespace UI {
   const LOGO = [
@@ -79,6 +80,18 @@ export namespace UI {
   }
 
   export function markdown(text: string): string {
-    return text
+    const fileRefRegex = /([`'"<]?)([\w\-./]+\/[\w\-./]+(?:\.[\w]+)?)(?::(\d+))?/g
+    return text.replace(fileRefRegex, (match, quote, filePath, lineNum) => {
+      const fullPath = path.resolve(process.cwd(), filePath)
+      const normalizedPath = fullPath.replace(/\\/g, "/")
+      let url = "file://"
+      if (/^[A-Za-z]:/.test(normalizedPath)) {
+        url += "/" + normalizedPath
+      } else {
+        url += normalizedPath
+      }
+      if (lineNum) url += `:${lineNum}`
+      return `\x1b]8;;${url}\x1b\\${match}\x1b]8;;\x1b\\`
+    })
   }
 }

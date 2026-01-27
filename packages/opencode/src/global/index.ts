@@ -2,8 +2,9 @@ import fs from "fs/promises"
 import { xdgData, xdgCache, xdgConfig, xdgState } from "xdg-basedir"
 import path from "path"
 import os from "os"
+import { Brand } from "../brand"
 
-const app = process.env.JONSOC_APP_NAME ?? process.env.OPENCODE_APP_NAME ?? "jonsoc"
+const app = Brand.APP_NAME
 
 const data = path.join(xdgData!, app)
 const cache = path.join(xdgCache!, app)
@@ -12,7 +13,6 @@ const state = path.join(xdgState!, app)
 
 export namespace Global {
   export const Path = {
-    // Allow override via JONSOC_TEST_HOME for test isolation
     get home() {
       return process.env.JONSOC_TEST_HOME || process.env.OPENCODE_TEST_HOME || os.homedir()
     },
@@ -22,9 +22,8 @@ export namespace Global {
     cache,
     config,
     state,
-    // Allow overriding models.dev URL for offline deployments
     get modelsDevUrl() {
-      return process.env.OPENCODE_MODELS_URL || "https://models.dev"
+      return Brand.MODELS_URL
     },
   }
 }

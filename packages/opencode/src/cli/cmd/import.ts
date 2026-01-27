@@ -5,13 +5,14 @@ import { bootstrap } from "../bootstrap"
 import { Storage } from "../../storage/storage"
 import { Instance } from "../../project/instance"
 import { EOL } from "os"
+import { Brand } from "../../brand"
 
 export const ImportCommand = cmd({
   command: "import <file>",
   describe: "import session data from JSON file or URL",
   builder: (yargs: Argv) => {
     return yargs.positional("file", {
-      describe: "path to JSON file or jonsoc.ai share URL",
+      describe: `path to JSON file or ${Brand.DOMAIN} share URL`,
       type: "string",
       demandOption: true,
     })

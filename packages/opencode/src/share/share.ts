@@ -3,6 +3,7 @@ import { Installation } from "../installation"
 import { Session } from "../session"
 import { MessageV2 } from "../session/message-v2"
 import { Log } from "../util/log"
+import { Brand } from "../brand"
 
 export namespace Share {
   const log = Log.create({ service: "share" })
@@ -66,10 +67,7 @@ export namespace Share {
     })
   }
 
-  export const URL =
-    process.env["JONSOC_API"] ??
-    process.env["OPENCODE_API"] ??
-    (Installation.isPreview() || Installation.isLocal() ? "https://api.dev.opencode.ai" : "https://api.opencode.ai")
+  export const URL = process.env["JONSOC_API"] ?? process.env["OPENCODE_API"] ?? Brand.API_URL
 
   const disabled =
     process.env["JONSOC_DISABLE_SHARE"] === "true" ||

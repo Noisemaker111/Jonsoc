@@ -143,7 +143,7 @@ const TIPS = [
   "Enable {highlight}tui.scroll_acceleration{/highlight} for smooth macOS-style scrolling",
   "Toggle username display in chat via command palette ({highlight}Ctrl+P{/highlight})",
   "Run {highlight}docker run -it --rm ghcr.io/anomalyco/jonsoc{/highlight} for containerized use",
-  "Use {highlight}/connect{/highlight} with JonsOC Zen for curated, tested models",
+  "Use {highlight}/connect{/highlight} with OpenCode Zen for curated, tested models",
   "Commit your project's {highlight}AGENTS.md{/highlight} file to Git for team sharing",
   "Use {highlight}/review{/highlight} to review uncommitted changes, branches, or PRs",
   "Run {highlight}/help{/highlight} or {highlight}Ctrl+X H{/highlight} to show the help dialog",

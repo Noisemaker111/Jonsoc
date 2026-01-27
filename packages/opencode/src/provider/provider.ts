@@ -13,6 +13,7 @@ import { Env } from "../env"
 import { Instance } from "../project/instance"
 import { Flag } from "../flag/flag"
 import { iife } from "@/util/iife"
+import { Brand } from "../brand"
 
 // Direct imports for bundled providers
 import { createAmazonBedrock, type AmazonBedrockProviderSettings } from "@ai-sdk/amazon-bedrock"
@@ -321,8 +322,8 @@ export namespace Provider {
         autoload: false,
         options: {
           headers: {
-            "HTTP-Referer": "https://jonsoc.ai/",
-            "X-Title": "jonsoc",
+            "HTTP-Referer": `${Brand.DOMAIN_WITH_PROTOCOL}/`,
+            "X-Title": Brand.BRAND_LOWER,
           },
         },
       }
@@ -332,8 +333,8 @@ export namespace Provider {
         autoload: false,
         options: {
           headers: {
-            "http-referer": "https://jonsoc.ai/",
-            "x-title": "jonsoc",
+            "http-referer": `${Brand.DOMAIN_WITH_PROTOCOL}/`,
+            "x-title": Brand.BRAND_LOWER,
           },
         },
       }
@@ -399,8 +400,8 @@ export namespace Provider {
         autoload: false,
         options: {
           headers: {
-            "HTTP-Referer": "https://jonsoc.ai/",
-            "X-Title": "jonsoc",
+            "HTTP-Referer": "https://opencode.ai/",
+            "X-Title": "opencode",
           },
         },
       }
@@ -466,8 +467,8 @@ export namespace Provider {
             // Cloudflare AI Gateway uses cf-aig-authorization for authenticated gateways
             // This enables Unified Billing where Cloudflare handles upstream provider auth
             ...(apiToken ? { "cf-aig-authorization": `Bearer ${apiToken}` } : {}),
-            "HTTP-Referer": "https://jonsoc.ai/",
-            "X-Title": "jonsoc",
+            "HTTP-Referer": `${Brand.DOMAIN_WITH_PROTOCOL}/`,
+            "X-Title": Brand.BRAND_LOWER,
           },
           // Custom fetch to handle parameter transformation and auth
           fetch: async (input: RequestInfo | URL, init?: RequestInit) => {

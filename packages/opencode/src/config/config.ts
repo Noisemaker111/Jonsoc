@@ -28,15 +28,15 @@ import { existsSync } from "fs"
 import { Bus } from "@/bus"
 import { GlobalBus } from "@/bus/global"
 import { Event } from "../server/event"
+import { Brand } from "../brand"
 
 export namespace Config {
   const log = Log.create({ service: "config" })
-  const configTargets = [".jonsoc", ".opencode"]
-  const configFiles = ["jonsoc.jsonc", "jonsoc.json", "opencode.jsonc", "opencode.json"]
-  const schemaUrl =
-    process.env.JONSOC_CONFIG_SCHEMA ?? process.env.OPENCODE_CONFIG_SCHEMA ?? "https://jonsoc.ai/config.json"
-  const wellKnownPath = "/.well-known/jonsoc"
-  const legacyWellKnownPath = "/.well-known/opencode"
+  const configTargets = Brand.CONFIG_TARGETS
+  const configFiles = Brand.CONFIG_FILES
+  const schemaUrl = Brand.CONFIG_SCHEMA_URL
+  const wellKnownPath = Brand.WELL_KNOWN_PATH
+  const legacyWellKnownPath = Brand.LEGACY_WELL_KNOWN_PATH
 
   // Custom merge function that concatenates array fields instead of replacing them
   function mergeConfigConcatArrays(target: Info, source: Info): Info {
@@ -919,11 +919,11 @@ export namespace Config {
       keybinds: Keybinds.optional().describe("Custom keybind configurations"),
       logLevel: Log.Level.optional().describe("Log level"),
       tui: TUI.optional().describe("TUI specific settings"),
-      server: Server.optional().describe("Server configuration for opencode serve and web commands"),
+      server: Server.optional().describe(`Server configuration for ${Brand.CLI_NAME} serve and web commands`),
       command: z
         .record(z.string(), Command)
         .optional()
-        .describe("Command configuration, see https://opencode.ai/docs/commands"),
+        .describe(`Command configuration, see ${Brand.DOCS_URL}/docs/commands`),
       watcher: z
         .object({
           ignore: z.array(z.string()).optional(),
@@ -990,7 +990,7 @@ export namespace Config {
         })
         .catchall(Agent)
         .optional()
-        .describe("Agent configuration, see https://opencode.ai/docs/agents"),
+        .describe(`Agent configuration, see ${Brand.DOCS_URL}/docs/agents`),
       provider: z
         .record(z.string(), Provider)
         .optional()

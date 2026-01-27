@@ -39,8 +39,9 @@ import { errors } from "./error"
 import { QuestionRoutes } from "./routes/question"
 import { PermissionRoutes } from "./routes/permission"
 import { GlobalRoutes } from "./routes/global"
+import { Brand } from "../brand"
 
-const appHost = process.env.JONSOC_APP_HOST ?? process.env.OPENCODE_APP_HOST ?? "app.opencode.ai"
+const appHost = process.env.JONSOC_APP_HOST ?? process.env.OPENCODE_APP_HOST ?? `app.${Brand.DOMAIN}`
 const appBaseUrl = process.env.JONSOC_APP_URL ?? process.env.OPENCODE_APP_URL ?? `https://${appHost}`
 import { MDNS } from "./mdns"
 
@@ -83,7 +84,7 @@ export namespace Server {
         .use((c, next) => {
           const password = Flag.OPENCODE_SERVER_PASSWORD
           if (!password) return next()
-          const username = Flag.OPENCODE_SERVER_USERNAME ?? "jonsoc"
+          const username = Flag.OPENCODE_SERVER_USERNAME ?? Brand.CLI_NAME
           return basicAuth({ username, password })(c, next)
         })
         .use(async (c, next) => {
@@ -113,7 +114,7 @@ export namespace Server {
               if (input === "tauri://localhost" || input === "http://tauri.localhost") return input
 
               // Allow JonsOC/legacy domains (https only, adjust if needed)
-              const domain = process.env.JONSOC_DOMAIN ?? process.env.OPENCODE_DOMAIN ?? "opencode.ai"
+              const domain = process.env.JONSOC_DOMAIN ?? process.env.OPENCODE_DOMAIN ?? Brand.DOMAIN
               const domains = [domain, "opencode.ai"].filter((item, index, list) => list.indexOf(item) === index)
               const matches = domains.some((item) => {
                 const escaped = item.replace(/\./g, "\\.")

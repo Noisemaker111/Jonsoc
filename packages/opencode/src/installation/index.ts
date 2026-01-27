@@ -12,17 +12,16 @@ declare global {
   const OPENCODE_CHANNEL: string
 }
 
+import { Brand } from "../brand"
+
 export namespace Installation {
   const log = Log.create({ service: "installation" })
-  const cliName = "jonsoc"
-  const legacyCliName = "opencode"
-  const npmPackage = `${cliName}-ai`
-  const legacyNpmPackage = "opencode-ai"
-  const repo = (process.env.JONSOC_REPO ?? process.env.OPENCODE_REPO ?? "Noisemaker111/Jonsoc").replace(
-    /^https?:\/\/github\.com\//,
-    "",
-  )
-  const installUrl = process.env.JONSOC_INSTALL_URL ?? process.env.OPENCODE_INSTALL_URL ?? "https://jonsoc.ai/install"
+  const cliName = Brand.CLI_NAME
+  const legacyCliName = Brand.LEGACY_CLI_NAME
+  const npmPackage = Brand.NPM_PACKAGE
+  const legacyNpmPackage = Brand.LEGACY_NPM_PACKAGE
+  const repo = Brand.REPO.replace(/^https?:\/\/github\.com\//, "")
+  const installUrl = Brand.INSTALL_URL
 
   export type Method = Awaited<ReturnType<typeof method>>
 
@@ -133,7 +132,7 @@ export namespace Installation {
   )
 
   async function getBrewFormula() {
-    const tap = process.env.JONSOC_HOMEBREW_TAP ?? process.env.OPENCODE_HOMEBREW_TAP ?? "sst/homebrew-tap"
+    const tap = Brand.HOMEBREW_TAP
     const tapFormula = await $`brew list --formula ${tap}/${cliName}`.throws(false).quiet().text()
     if (tapFormula.includes(cliName)) return `${tap}/${cliName}`
     const coreFormula = await $`brew list --formula ${cliName}`.throws(false).quiet().text()
@@ -194,7 +193,7 @@ export namespace Installation {
 
   export const VERSION = typeof OPENCODE_VERSION === "string" ? OPENCODE_VERSION : "local"
   export const CHANNEL = typeof OPENCODE_CHANNEL === "string" ? OPENCODE_CHANNEL : "local"
-  export const USER_AGENT = `${cliName}/${CHANNEL}/${VERSION}/${Flag.OPENCODE_CLIENT}`
+  export const USER_AGENT = Brand.USER_AGENT
 
   export async function latest(installMethod?: Method) {
     const detectedMethod = installMethod || (await method())

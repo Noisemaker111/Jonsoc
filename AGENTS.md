@@ -1,64 +1,129 @@
 # JonsOC Agent Guidelines
 
-This repository is a fork of JonsOC maintained by **Noisemaker111**. All changes and contributions must be targeted at the `Noisemaker111/jonsoc` repository on the `dev` branch.
+This repository is a fork of JonsOC maintained by **Noisemaker111**. Target: `Noisemaker111/jonsoc` on `dev` branch.
 
-## Build and Test Commands
+## Build & Test
 
-The project uses **Bun** as the primary runtime and package manager.
+- Install: `bun install`
+- Dev: `bun dev`
+- Typecheck: `bun run typecheck`
+- Test: `bun test`
 
-- **Install Dependencies**: `bun install`
-- **Run Development Mode**: `bun dev` (Runs `bun run --conditions=browser ./src/index.ts` in `packages/jonsoc`)
-- **Typecheck**: `bun run typecheck` (Runs `tsgo --noEmit`)
-- **Lint**: `bun run lint` (Runs `bun test --coverage`)
-- **Format**: `bun run format` (Runs Prettier)
-- **Run All Tests**: `bun test`
-- **Run Single Test**: `bun test <path-to-test-file>` (e.g., `bun test packages/jonsoc/test/tool.test.ts`)
-- **Regenerate SDK**: `./packages/sdk/js/script/build.ts`
+## Code Style
 
-## Code Style & Conventions
+- Avoid `any`, use strict types
+- Prefer `const` over `let`
+- Early returns, avoid `else`
+- Single-word variable names where possible
 
-Follow these project-specific patterns to maintain consistency.
+## Core Architecture
 
-### 1. General Principles
+### Brand System (`packages/opencode/src/brand/index.ts`)
 
-- **Minimal Changes**: Favor surgical, precise edits over broad refactors.
-- **Type Safety**: Avoid `any`. Use strict TypeScript types and Zod schemas for validation.
-- **Single Functionality**: Keep things in one function unless they are explicitly reusable or composable.
-- **Early Returns**: Prefer early returns and IIFEs over nested `if/else` blocks. Avoid `else` whenever possible.
+**Single source of truth for all branding.**
 
-### 2. Naming Conventions
+Constants: `CLI_NAME`, `DOMAIN`, `API_URL`, `MODELS_URL`, `CONFIG_FILES`, etc.
 
-- **Variables & Functions**: Use `camelCase`.
-- **Classes & Namespaces**: Use `PascalCase`.
-- **Variable Names**: Prefer single-word names (e.g., `item` instead of `selectedItem`) where context allows. Avoid unnecessary verbosity.
+All support both `JONSOC_*` and `OPENCODE_*` env var prefixes.
 
-### 3. Imports & Structure
+### Provider System (`packages/opencode/src/provider/provider.ts`)
 
-- **Relative Imports**: Use relative paths for local modules.
-- **Named Imports**: Preferred over default imports for better grep-ability and clarity.
-- **Persistence**: Use the `Storage` namespace for persistent data.
-- **DI**: Use `App.provide()` for dependency injection patterns.
+**Manages AI model providers.**
 
-### 4. Logic & State
+Key: `Provider.list()` returns all providers with models.
 
-- **Avoid `let`**: Prefer `const` with ternary operators for conditional assignments.
-- **Immutability**: Favor immutable patterns.
-- **Error Handling**: Use Result patterns instead of throwing exceptions in tool implementations.
+**Critical**:
 
-### 5. Tool Implementation
+- Neutral providers (openrouter, vercel, etc.) → use `Brand.*` constants
+- **Paid services (zenmux/OpenCode Zen)** → hardcode to opencode.ai, DO NOT rebrand
 
-- Implement the `Tool.Info` interface.
-- Always include `sessionID` in tool context.
-- Validate all inputs using **Zod**.
+### Config Loading (`packages/opencode/src/config/config.ts`)
 
-## VCS & PR Guidelines
+**Multi-source config merging.**
 
-- **Repository**: Only make changes to `Noisemaker111/jonsoc`.
-- **Branching**: The default branch is `dev`. Create feature branches from `dev`.
-- **Commits**: Use descriptive and professional commit messages.
-- **Jujutsu (jj)**: ALWAYS check for a `.jj/` directory before running VCS commands. If present, use `jj` instead of `git`.
+Priority: remote → global → custom → project → inline
 
-## Efficiency Reminders
+Uses `Brand.CONFIG_FILES` and `Brand.CONFIG_TARGETS` for file/directory discovery.
 
-- **Parallelism**: Use parallel tool calls (e.g., multiple `read` or `grep` calls) whenever tasks are independent to maximize speed.
-- **Interaction**: Be professional and helpful, providing sufficient detail while maintaining efficiency.
+`ALLOW_LEGACY_OPENCODE_CONFIGS=true` (default) enables opencode.json/.opencode/ support.
+
+### Models (`packages/opencode/src/provider/models.ts`)
+
+**Fetches/caches model info from `Brand.MODELS_URL`.**
+
+Default: `https://models.dev` (opencode.ai's infrastructure).
+
+### Auth (`packages/opencode/src/auth/index.ts`)
+
+**Credential storage via `Storage` namespace.**
+
+Types: `api`, `oauth`, `wellknown`.
+
+## Key Patterns
+
+### Branding
+
+```typescript
+import { Brand } from "../brand"
+
+// Use Brand constants
+const url = Brand.API_URL
+const name = Brand.CLI_NAME
+
+// For providers, use Brand in headers
+options: {
+  headers: {
+    "HTTP-Referer": `${Brand.DOMAIN_WITH_PROTOCOL}/`,
+    "X-Title": Brand.BRAND_LOWER,
+  },
+}
+
+// EXCEPT: Paid services (zenmux) - hardcode to opencode.ai
+```
+
+### Config Discovery
+
+```typescript
+// Search paths use Brand constants
+const files = Brand.CONFIG_FILES // ["jonsoc.json", "opencode.json", ...]
+const targets = Brand.CONFIG_TARGETS // [".opencode", ".jonsoc"]
+```
+
+### Don't Rebrand These
+
+- **OpenCode Zen (zenmux)**: opencode.ai's paid service
+- Third-party providers (openai, anthropic, google-vertex): External services
+- models.dev: opencode.ai's infrastructure (default)
+
+## Important Files
+
+| File                    | Purpose                      |
+| ----------------------- | ---------------------------- |
+| `brand/index.ts`        | All brand constants          |
+| `global/index.ts`       | Paths, cache                 |
+| `provider/provider.ts`  | All provider implementations |
+| `provider/models.ts`    | Model discovery              |
+| `config/config.ts`      | Config loading               |
+| `auth/index.ts`         | Credential storage           |
+| `installation/index.ts` | Updates, versioning          |
+| `cli/cmd/*.ts`          | CLI commands                 |
+
+## VCS
+
+Check `.jj/` dir first → use `jj`, else `git`.
+
+Target: `Noisemaker111/jonsoc` on `dev` branch.
+
+## Quick Reference
+
+**Add brand constant**: Edit `packages/opencode/src/brand/index.ts`
+
+**Add provider**:
+
+1. Add to `Provider.Info` schema in config.ts
+2. Implement in `provider/provider.ts`
+3. Use `Brand.*` in headers (or hardcode if paid service)
+
+**Test**: `bun run typecheck` before committing
+
+**Fork**: Set `JONSOC_*` env vars for branding, keep models.dev default

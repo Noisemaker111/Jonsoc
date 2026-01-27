@@ -27,6 +27,7 @@ import { existsSync } from "fs"
 import { WebCommand } from "./cli/cmd/web"
 import { PrCommand } from "./cli/cmd/pr"
 import { SessionCommand } from "./cli/cmd/session"
+import { Brand } from "./brand"
 
 const workdir = process.env.JONSOC_WORKDIR ?? process.env.JOC_WORKDIR ?? process.env.OPENCODE_WORKDIR
 if (workdir && existsSync(workdir)) {
@@ -47,7 +48,7 @@ process.on("uncaughtException", (e) => {
 
 const cli = yargs(hideBin(process.argv))
   .parserConfiguration({ "populate--": true })
-  .scriptName("jonsoc")
+  .scriptName(Brand.CLI_NAME)
   .wrap(100)
   .help("help", "show help")
   .alias("help", "h")
@@ -77,7 +78,7 @@ const cli = yargs(hideBin(process.argv))
     process.env.JONSOC = "1"
     process.env.OPENCODE = "1"
 
-    Log.Default.info("jonsoc", {
+    Log.Default.info(Brand.BRAND_LOWER, {
       version: Installation.VERSION,
       args: process.argv.slice(2),
     })
