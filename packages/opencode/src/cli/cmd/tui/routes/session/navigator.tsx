@@ -756,7 +756,7 @@ export function Navigator(props: NavigatorProps) {
                 focusedBackgroundColor={theme.theme.background}
                 minHeight={10}
                 flexGrow={1}
-                wrapMode={props.wrapMode ?? "word"}
+                wrapMode={props.wrapMode ?? "none"}
                 syntaxStyle={theme.syntax()}
                 onContentChange={handleEditorChange}
                 onKeyDown={(e: { name: string; ctrl?: boolean; meta?: boolean; preventDefault: () => void }) => {
@@ -782,7 +782,7 @@ export function Navigator(props: NavigatorProps) {
                   syntaxStyle={theme.syntax()}
                   showLineNumbers={true}
                   width="100%"
-                  wrapMode="word"
+                  wrapMode={props.wrapMode ?? "none"}
                   fg={theme.theme.text}
                   addedBg={theme.theme.diffAddedBg}
                   removedBg={theme.theme.diffRemovedBg}
@@ -988,10 +988,16 @@ export function Navigator(props: NavigatorProps) {
           paddingTop={1}
           paddingBottom={1}
         >
-          <box justifyContent="center" paddingTop={1} paddingBottom={1}>
-            <text fg={theme.theme.text}>
-              <b>{viewTitle()}</b>
-            </text>
+          <box flexDirection="row" justifyContent="space-between" alignItems="center" paddingTop={1} paddingBottom={1}>
+            <box flexGrow={1} alignItems="center">
+              <text fg={theme.theme.text}>
+                <b>{viewTitle()}</b>
+              </text>
+            </box>
+            <ActionButton
+              label={props.wrapMode === "word" ? "Wrap: ON" : "Wrap: OFF"}
+              onSelect={() => runCommand("navwrap")}
+            />
           </box>
           {fileViewer()}
         </box>

@@ -159,7 +159,7 @@ export function Session() {
   const [showDetails, setShowDetails] = kv.signal("tool_details_visibility", true)
   const [showAssistantMetadata, setShowAssistantMetadata] = kv.signal("assistant_metadata_visibility", true)
   const [showScrollbar, setShowScrollbar] = kv.signal("scrollbar_visible", false)
-  const [diffWrapMode, setDiffWrapMode] = createSignal<"word" | "none">("word")
+  const [diffWrapMode, setDiffWrapMode] = kv.signal<"word" | "none">("diff_wrap_mode", "none")
   const [navigatorWrapMode, setNavigatorWrapMode] = kv.signal<"word" | "none">("navigator_wrap_mode", "none")
   const [animationsEnabled, setAnimationsEnabled] = kv.signal("animations_enabled", true)
 
@@ -681,7 +681,7 @@ export function Session() {
       },
     },
     {
-      title: "Toggle diff wrapping",
+      title: diffWrapMode() === "word" ? "Diff: Disable line wrap" : "Diff: Enable line wrap",
       value: "session.toggle.diffwrap",
       category: "Session",
       slash: {
