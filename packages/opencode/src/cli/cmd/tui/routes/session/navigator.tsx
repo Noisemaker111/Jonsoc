@@ -1,4 +1,4 @@
-import { batch, createEffect, createMemo, createResource, createSignal, For, Match, on, Show, Switch, untrack } from "solid-js"
+import { batch, createEffect, createMemo, createResource, createSignal, For, Match, on, onCleanup, Show, Switch, untrack } from "solid-js"
 import { createStore } from "solid-js/store"
 import path from "path"
 import type { ScrollBoxRenderable, TextareaRenderable } from "@opentui/core"
@@ -7,11 +7,13 @@ import { selectedForeground, useTheme } from "@tui/context/theme"
 import { useSDK } from "@tui/context/sdk"
 import { useToast } from "@tui/ui/toast"
 import { useDialog } from "@tui/ui/dialog"
+import { DialogAlert } from "@tui/ui/dialog-alert"
 import { DialogPrompt } from "@tui/ui/dialog-prompt"
 import { usePromptRef } from "@tui/context/prompt"
 import { useSync } from "@tui/context/sync"
 import { SplitBorder } from "@tui/component/border"
 import { useKV } from "@tui/context/kv"
+import { useErrorLog } from "@tui/context/error-log"
 import { useKeybind } from "@tui/context/keybind"
 import { Filesystem } from "@/util/filesystem"
 import { Locale } from "@/util/locale"
@@ -55,6 +57,7 @@ export function Navigator(props: NavigatorProps) {
   const promptRef = usePromptRef()
   const sync = useSync()
   const kv = useKV()
+  const errorLog = useErrorLog()
   const keybind = useKeybind()
   const term = useTerminalDimensions()
   const [loaded, setLoaded] = createSignal(false)
@@ -118,31 +121,27 @@ export function Navigator(props: NavigatorProps) {
   const [currentFilePath, setCurrentFilePath] = createSignal<string | null>(null)
 
   const saveFile = async () => {
-    const path = activePath()
-    if (!path || !editorRef || !isDirty()) return
+    const filePath = activePath()
+    if (!filePath || !editorRef || !isDirty() || saveStatus() === "saving") return
 
     const content = editorRef.plainText
     setSaveStatus("saving")
     try {
-      const response = await fetch(`${sdk.url}/file/content`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ path, content }),
-      })
-      if (response.ok) {
-        setIsDirty(false)
-        setSaveStatus("saved")
-        // Update cache with new content
-        setCache(path, { type: "text", content })
-        setFileContent({ type: "text", content })
-        setTimeout(() => setSaveStatus("idle"), 2000)
-      } else {
-        setSaveStatus("error")
-        toast.show({ variant: "error", message: "Failed to save file" })
-      }
-    } catch {
+      const directory = sync.data.path.directory
+      const fullPath = path.isAbsolute(filePath) ? filePath : path.join(directory, filePath)
+
+      await Bun.write(fullPath, content)
+
+      setIsDirty(false)
+      setSaveStatus("saved")
+      // Update cache with new content
+      setCache(filePath, { type: "text", content })
+      setFileContent({ type: "text", content })
+      setTimeout(() => setSaveStatus("idle"), 2000)
+    } catch (err: any) {
+      const fullMessage = `Failed to save ${filePath}\n\n${err.message || "FileSystem error"}`
       setSaveStatus("error")
-      toast.show({ variant: "error", message: "Failed to save file" })
+      errorLog.add(fullMessage, "Navigator")
     }
   }
 
@@ -150,6 +149,12 @@ export function Navigator(props: NavigatorProps) {
     setIsDirty(true)
     setSaveStatus("idle")
   }
+
+  onCleanup(() => {
+    if (isDirty()) {
+      void saveFile()
+    }
+  })
 
   const listWidth = createMemo(() => {
     if (!props.open) return 0
@@ -218,8 +223,11 @@ export function Navigator(props: NavigatorProps) {
     const file = activePath()
     if (!file) return "File Viewer"
     const statusEntry = activeStatus()
-    if (!statusEntry) return file
-    return `${STATUS_LABELS[statusEntry.status]} ${file}`
+    const filename = path.basename(file)
+    const dirname = path.dirname(file)
+    const displayPath = dirname === "." ? "./ " : `${dirname}/ `
+    const prefix = statusEntry ? `${STATUS_LABELS[statusEntry.status]} ` : ""
+    return `${prefix}${displayPath}${filename}`
   })
 
   const hasExplorerEntries = createMemo(() => explorerEntries().length > 0)
@@ -351,25 +359,29 @@ export function Navigator(props: NavigatorProps) {
     }
   })
 
-  const openFilePath = (nextPath: string) => {
+  const openFilePath = async (nextPath: string) => {
     const current = activePath()
-    // Set loading state FIRST to prevent "No content" flash
-    if (current !== nextPath) {
-      batch(() => {
-        setFileLoading(true)
-        setFileError(false)
-        setIsDirty(false)
-        setSaveStatus("idle")
-        setActivePath(() => nextPath)
-        setTargetLine(undefined)
-      })
-      // Notify parent/sync navigation state
-      props.onOpenFile?.(nextPath)
-      // loadFile will be triggered by the effect on activePath
-    } else if (loaded()) {
-      // Force reload if path is the same
-      void loadFile(nextPath, true)
+    if (current === nextPath) {
+      if (loaded()) {
+        void loadFile(nextPath, true)
+      }
+      return
     }
+
+    if (isDirty()) {
+      await saveFile()
+    }
+
+    batch(() => {
+      setFileLoading(true)
+      setFileError(false)
+      setIsDirty(false)
+      setSaveStatus("idle")
+      setActivePath(() => nextPath)
+      setTargetLine(undefined)
+    })
+    // Notify parent/sync navigation state
+    props.onOpenFile?.(nextPath)
   }
 
   const openFile = (node: FileNode) => {
@@ -490,11 +502,13 @@ export function Navigator(props: NavigatorProps) {
     ref.submit()
   }
 
-  const runCommand = (command: string) => {
+  const runCommand = async (command: string) => {
+    if (isDirty()) await saveFile()
     runPrompt(`/${command}`)
   }
 
-  const runShell = (command: string) => {
+  const runShell = async (command: string) => {
+    if (isDirty()) await saveFile()
     runPrompt(command, "shell")
   }
 
@@ -599,6 +613,13 @@ export function Navigator(props: NavigatorProps) {
       if (evt.name === "return") {
         handleGitSelect()
       }
+    }
+  })
+
+  // Auto-save when closing the navigator
+  createEffect(() => {
+    if (!props.open && isDirty()) {
+      void saveFile()
     }
   })
 
@@ -893,12 +914,12 @@ export function Navigator(props: NavigatorProps) {
           </box>
           <Show when={tab() === "git"}>
             <box paddingLeft={1} paddingRight={1} paddingBottom={1} gap={1}>
-              <box flexDirection="row" gap={1}>
+              <box flexDirection="row" gap={1} flexShrink={0}>
                 <ActionButton label="Commit" onSelect={() => runCommand("commit")} />
                 <ActionButton label="Push" onSelect={() => runShell("git push")} />
                 <ActionButton label="Pull" onSelect={() => runShell("git pull --rebase")} />
               </box>
-              <box flexDirection="row" gap={1}>
+              <box flexDirection="row" gap={1} flexShrink={0}>
                 <ActionButton label="Merge" onSelect={openMergeDialog} />
                 <ActionButton label="Refresh" onSelect={refreshGit} />
               </box>
@@ -988,16 +1009,10 @@ export function Navigator(props: NavigatorProps) {
           paddingTop={1}
           paddingBottom={1}
         >
-          <box flexDirection="row" justifyContent="space-between" alignItems="center" paddingTop={1} paddingBottom={1}>
-            <box flexGrow={1} alignItems="center">
-              <text fg={theme.theme.text}>
-                <b>{viewTitle()}</b>
-              </text>
-            </box>
-            <ActionButton
-              label={props.wrapMode === "word" ? "Wrap: ON" : "Wrap: OFF"}
-              onSelect={() => runCommand("navwrap")}
-            />
+          <box justifyContent="center" paddingTop={1} paddingBottom={1} flexShrink={0}>
+            <text fg={theme.theme.text}>
+              <b>{viewTitle()}</b>
+            </text>
           </box>
           {fileViewer()}
         </box>
@@ -1075,7 +1090,11 @@ function ExplorerRow(props: {
         {indicator()} {Locale.truncate(props.entry.node.name, nameWidth())}
       </text>
       <Show when={statusLabel()}>
-        <text fg={props.active ? selectedForeground(theme.theme, theme.theme.primary) : statusColor()}>
+        <text
+          fg={props.active ? selectedForeground(theme.theme, theme.theme.primary) : statusColor()}
+          wrapMode="none"
+          flexShrink={0}
+        >
           {statusLabel()}
         </text>
       </Show>
@@ -1111,7 +1130,7 @@ function GitRow(props: { entry: FileStatus; active: boolean; width: number; onSe
         <span style={{ fg: props.active ? fg() : statusColor() }}>{STATUS_LABELS[props.entry.status]}</span>{" "}
         {Locale.truncateMiddle(props.entry.path, pathWidth())}
       </text>
-      <text fg={props.active ? fg() : theme.theme.textMuted}>
+      <text fg={props.active ? fg() : theme.theme.textMuted} wrapMode="none" flexShrink={0}>
         <span style={{ fg: theme.theme.diffAdded }}>+{props.entry.added}</span>
         <span style={{ fg: theme.theme.diffRemoved }}> -{props.entry.removed}</span>
       </text>
@@ -1123,7 +1142,8 @@ function ActionButton(props: { label: string; onSelect: () => void }) {
   const theme = useTheme()
   return (
     <box
-      flexGrow={1}
+      flexGrow={0}
+      flexShrink={0}
       paddingLeft={1}
       paddingRight={1}
       backgroundColor={theme.theme.backgroundElement}
@@ -1131,7 +1151,7 @@ function ActionButton(props: { label: string; onSelect: () => void }) {
       justifyContent="center"
     >
       <text fg={theme.theme.text} wrapMode="none">
-        [{props.label}]
+        {props.label}
       </text>
     </box>
   )
@@ -1173,6 +1193,7 @@ function Tab(props: { label: string; active: boolean; onSelect: () => void }) {
   const theme = useTheme()
   return (
     <box
+      flexShrink={0}
       paddingLeft={1}
       paddingRight={1}
       backgroundColor={props.active ? theme.theme.primary : theme.theme.backgroundElement}
@@ -1181,9 +1202,14 @@ function Tab(props: { label: string; active: boolean; onSelect: () => void }) {
       gap={1}
     >
       <Show when={props.active}>
-        <text fg={selectedForeground(theme.theme, theme.theme.primary)}>•</text>
+        <text fg={selectedForeground(theme.theme, theme.theme.primary)} wrapMode="none">
+          •
+        </text>
       </Show>
-      <text fg={props.active ? selectedForeground(theme.theme, theme.theme.primary) : theme.theme.textMuted}>
+      <text
+        fg={props.active ? selectedForeground(theme.theme, theme.theme.primary) : theme.theme.textMuted}
+        wrapMode="none"
+      >
         {props.label}
       </text>
     </box>

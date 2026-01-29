@@ -7,6 +7,7 @@ import { useToast } from "@tui/ui/toast"
 import { TextAttributes } from "@opentui/core"
 import { For, Show, createSignal } from "solid-js"
 import { Locale } from "@/util/locale"
+import { useExit, EXIT_CODE_RESTART } from "../context/exit"
 
 export function DialogErrorLog() {
   const dialog = useDialog()
@@ -14,6 +15,7 @@ export function DialogErrorLog() {
   const errorLog = useErrorLog()
   const toast = useToast()
   const dimensions = useTerminalDimensions()
+  const exit = useExit()
   const [copiedId, setCopiedId] = createSignal<string | null>(null)
 
   useKeyboard((evt) => {
@@ -53,35 +55,39 @@ export function DialogErrorLog() {
 
   return (
     <box flexDirection="column" height={dimensions().height - 4}>
-      <box flexDirection="row" justifyContent="space-between" alignItems="center" paddingBottom={1}>
-        <text attributes={TextAttributes.BOLD} fg={theme.text}>
-          Error Log ({errorLog.count})
-        </text>
-        <box flexDirection="row" gap={2}>
-          <Show when={errorLog.count > 0}>
-            <box
-              backgroundColor={theme.primary}
-              paddingLeft={2}
-              paddingRight={2}
-              paddingTop={1}
-              onMouseUp={copyAllErrors}
-            >
-              <text fg={theme.selectedListItemText}>Copy All (ctrl+c)</text>
-            </box>
-            <box backgroundColor={theme.error} paddingLeft={2} paddingRight={2} paddingTop={1} onMouseUp={clearErrors}>
-              <text fg={theme.selectedListItemText}>Clear</text>
-            </box>
-          </Show>
+      <box flexDirection="row" justifyContent="flex-end" alignItems="center" paddingBottom={1} gap={2}>
+        <box backgroundColor={theme.error} paddingLeft={2} paddingRight={2} paddingTop={1} onMouseUp={() => exit(undefined, EXIT_CODE_RESTART)}>
+          <text fg={theme.selectedListItemText}>Restart</text>
+        </box>
+        <Show when={errorLog.count > 0}>
           <box
-            backgroundColor={theme.backgroundPanel}
+            backgroundColor={theme.primary}
             paddingLeft={2}
             paddingRight={2}
             paddingTop={1}
-            onMouseUp={() => dialog.clear()}
+            onMouseUp={copyAllErrors}
           >
-            <text fg={theme.text}>Close (esc)</text>
+            <text fg={theme.selectedListItemText}>Copy All (ctrl+c)</text>
           </box>
+          <box backgroundColor={theme.error} paddingLeft={2} paddingRight={2} paddingTop={1} onMouseUp={clearErrors}>
+            <text fg={theme.selectedListItemText}>Clear</text>
+          </box>
+        </Show>
+        <box
+          backgroundColor={theme.backgroundPanel}
+          paddingLeft={2}
+          paddingRight={2}
+          paddingTop={1}
+          onMouseUp={() => dialog.clear()}
+        >
+          <text fg={theme.text}>Close (esc)</text>
         </box>
+      </box>
+
+      <box paddingBottom={1}>
+        <text attributes={TextAttributes.BOLD} fg={theme.text}>
+          Error Log ({errorLog.count})
+        </text>
       </box>
 
       <Show
