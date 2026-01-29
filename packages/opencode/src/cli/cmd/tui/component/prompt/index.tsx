@@ -905,14 +905,20 @@ export function Prompt(props: PromptProps) {
     return {
       frames: createFrames({
         color,
-        style: "blocks",
+        style: "custom",
+        activeChar: "▣",
+        inactiveChar: "·",
+        trailSteps: 1,
         inactiveFactor: 0.6,
         // enableFading: false,
         minAlpha: 0.3,
       }),
       color: createColors({
         color,
-        style: "blocks",
+        style: "custom",
+        activeChar: "▣",
+        inactiveChar: "·",
+        trailSteps: 1,
         inactiveFactor: 0.6,
         // enableFading: false,
         minAlpha: 0.3,
@@ -943,6 +949,16 @@ export function Prompt(props: PromptProps) {
         promptPartTypeId={() => promptPartTypeId}
       />
       <box ref={(r) => (anchor = r)} visible={props.visible !== false}>
+        <Show when={status().type !== "idle"}>
+          <box flexDirection="row" height={1} marginLeft={1}>
+            <text fg={store.interrupt > 0 ? theme.primary : theme.text}>
+              esc{" "}
+              <span style={{ fg: store.interrupt > 0 ? theme.primary : theme.textMuted }}>
+                {store.interrupt > 0 ? "again to interrupt" : "interrupt"}
+              </span>
+            </text>
+          </box>
+        </Show>
         <box
           border={["left"]}
           borderColor={highlight()}
@@ -1202,7 +1218,6 @@ export function Prompt(props: PromptProps) {
                   </text>
                   <text fg={theme.textMuted}>{local.model.parsed().provider}</text>
                   <Show when={showVariant()}>
-                    <text fg={theme.textMuted}>·</text>
                     <text>
                       <span style={{ fg: theme.warning, bold: true }}>{local.model.variant.current()}</span>
                     </text>
@@ -1239,19 +1254,9 @@ export function Prompt(props: PromptProps) {
           />
         </box>
         <box flexDirection="row" justifyContent="space-between">
-          <Show when={status().type !== "idle"} fallback={<text />}>
-            <box
-              flexDirection="row"
-              gap={1}
-              flexGrow={1}
-              justifyContent={status().type === "retry" ? "space-between" : "flex-start"}
-            >
+          <Show when={status().type === "retry"} fallback={<text />}>
+            <box flexDirection="row" gap={1} flexGrow={1} justifyContent="space-between">
               <box flexShrink={0} flexDirection="row" gap={1}>
-                <box marginLeft={1}>
-                  <Show when={kv.get("animations_enabled", true)} fallback={<text fg={theme.textMuted}>[⋯]</text>}>
-                    <spinner color={spinnerDef().color} frames={spinnerDef().frames} interval={40} />
-                  </Show>
-                </box>
                 <box flexDirection="row" gap={1} flexShrink={0}>
                   {(() => {
                     const retry = createMemo(() => {
@@ -1311,12 +1316,6 @@ export function Prompt(props: PromptProps) {
                   })()}
                 </box>
               </box>
-              <text fg={store.interrupt > 0 ? theme.primary : theme.text}>
-                esc{" "}
-                <span style={{ fg: store.interrupt > 0 ? theme.primary : theme.textMuted }}>
-                  {store.interrupt > 0 ? "again to interrupt" : "interrupt"}
-                </span>
-              </text>
             </box>
           </Show>
           <Show when={status().type !== "retry"}>

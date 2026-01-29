@@ -28,7 +28,7 @@ That's it! You get:
 
 ### Migrating from opencode
 
-Good news: **Legacy configs are ENABLED by default!**
+Good news: **Legacy configs are always enabled.**
 
 If you're switching from opencode to jonsoc, you don't need to do anything:
 
@@ -48,12 +48,7 @@ export JONSOC_DOMAIN="mybrand.com"
 - Access to your `.opencode/` directory configs
 - Gradual migration - keep using old configs while setting up new ones
 
-⚠️ **Tip**: Legacy configs are enabled by default. Gradually create your new `jonsoc.json` configs as needed. Once fully migrated, you can opt out:
-
-```bash
-# Opt out of legacy configs (only your brand's configs)
-export JONSOC_ALLOW_LEGACY_OPENCODE_CONFIGS=false
-```
+⚠️ **Tip**: Legacy configs are always enabled. Gradually create your new `jonsoc.json` configs as needed.
 
 ### For Custom Models Infrastructure (Advanced)
 
@@ -77,7 +72,7 @@ export OPENCODE_MODELS_URL=https://your-models.com
 
 ## Legacy Config File Discovery
 
-**Legacy configs are ENABLED by default.** You don't need to set anything!
+**Legacy configs are always enabled.** You don't need to set anything!
 
 When enabled (default):
 
@@ -100,12 +95,6 @@ This means you can:
 - Never lose access to your existing settings
 
 **Config priority**: Newer files override older ones. So `jonsoc.json` takes precedence over `opencode.json` if both exist.
-
-**Opt out** (if you only want your brand's configs):
-
-```bash
-export JONSOC_ALLOW_LEGACY_OPENCODE_CONFIGS=false
-```
 
 ## What Changed?
 
@@ -153,16 +142,15 @@ export OPENCODE_MODELS_URL=https://models.coolai.com
 
 All support both `JONSOC_*` and `OPENCODE_*` prefixes.
 
-| Variable                               | What It Controls                    | Default                              |
-| -------------------------------------- | ----------------------------------- | ------------------------------------ |
-| `JONSOC_BRAND`                         | Display name                        | `jonsoc`                             |
-| `JONSOC_DOMAIN`                        | Main domain                         | `jonsoc.ai`                          |
-| `JONSOC_API_DOMAIN`                    | API subdomain                       | `api.jonsoc.ai`                      |
-| `JONSOC_DOCS_DOMAIN`                   | Docs subdomain                      | `docs.jonsoc.ai`                     |
-| `OPENCODE_MODELS_URL`                  | Models service URL                  | `https://models.dev` (opencode.ai's) |
-| `JONSOC_ALLOW_LEGACY_OPENCODE_CONFIGS` | Enable opencode.json/config support | `true` (enabled by default)          |
-| `JONSOC_REPO`                          | GitHub repo                         | `Noisemaker111/Jonsoc`               |
-| `JONSOC_NPM_PACKAGE`                   | NPM package                         | `jonsoc-ai`                          |
+| Variable              | What It Controls   | Default                              |
+| --------------------- | ------------------ | ------------------------------------ |
+| `JONSOC_BRAND`        | Display name       | `jonsoc`                             |
+| `JONSOC_DOMAIN`       | Main domain        | `jonsoc.ai`                          |
+| `JONSOC_API_DOMAIN`   | API subdomain      | `api.jonsoc.ai`                      |
+| `JONSOC_DOCS_DOMAIN`  | Docs subdomain     | `docs.jonsoc.ai`                     |
+| `OPENCODE_MODELS_URL` | Models service URL | `https://models.dev` (opencode.ai's) |
+| `JONSOC_REPO`         | GitHub repo        | `Noisemaker111/Jonsoc`               |
+| `JONSOC_NPM_PACKAGE`  | NPM package        | `jonsoc`                             |
 
 **Important**: `OPENCODE_MODELS_URL` defaults to `https://models.dev` to give you free access to opencode.ai's hosted models. Only change this if you want to build your own models infrastructure.
 
@@ -198,6 +186,6 @@ By defaulting to opencode.ai's models.dev:
 - [ ] Test: `bun dev` (your old configs work automatically!)
 - [ ] Create new `jonsoc.json` configs as needed
 - [ ] Gradually migrate configs at your own pace
-- [ ] Optionally: Set `JONSOC_ALLOW_LEGACY_OPENCODE_CONFIGS=false` once fully migrated
+- [ ] Keep `opencode.json` configs as long as needed
 
 That's it! 🚀

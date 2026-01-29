@@ -10,7 +10,7 @@
 <p align="center">The open source AI coding agent.</p>
 <p align="center">
   <a href="https://jonsoc.ai/discord"><img alt="Discord" src="https://img.shields.io/discord/1391832426048651334?style=flat-square&label=discord" /></a>
-  <a href="https://www.npmjs.com/package/jonsoc-ai"><img alt="npm" src="https://img.shields.io/npm/v/jonsoc-ai?style=flat-square" /></a>
+  <a href="https://www.npmjs.com/package/jonsoc"><img alt="npm" src="https://img.shields.io/npm/v/jonsoc?style=flat-square" /></a>
   <a href="https://github.com/anomalyco/jonsoc/actions/workflows/publish.yml"><img alt="Build status" src="https://img.shields.io/github/actions/workflow/status/anomalyco/jonsoc/publish.yml?style=flat-square&branch=dev" /></a>
 </p>
 
@@ -29,9 +29,10 @@
 ### Local `jonsoc` helper (maintainer)
 
 - `jonsoc` runs the JonsOC build from this repo, using your current directory as the project
+- From the repo root it runs `bun run dev`, elsewhere it uses the installed build
 - It auto-rebuilds when sources are newer than the last built binary
 - Use `jonsoc -build` or `jonsoc --build` to force a rebuild
-- Use `jonsoc -safe` to run the latest npm release (`jonsoc-ai@latest`) instead of the local build
+- Use `jonsoc -safe` to run the latest npm release (`jonsoc@latest`) instead of the local build
   - Set `JONSOC_SAFE_ISOLATE=1` (or pass `-safe-isolated`) to keep safe mode config/state separate
 - Use `jonsoc -check` to print `running` and exit without launching the UI
 - Use `jonsoc -restart` to relaunch and reattach to the most recent session
@@ -46,7 +47,7 @@
 curl -fsSL https://jonsoc.ai/install | bash
 
 # Package managers
-npm i -g jonsoc-ai@latest        # or bun/pnpm/yarn
+npm i -g jonsoc@latest        # or bun/pnpm/yarn
 scoop install jonsoc             # Windows
 choco install jonsoc             # Windows
 brew install anomalyco/tap/jonsoc # macOS and Linux (recommended, always up to date)

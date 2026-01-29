@@ -208,7 +208,7 @@ Complete list in `.env.example`:
 | `JONSOC_CONFIG_SCHEMA` | JSON Schema URL          | `https://jonsoc.ai/config.json`      |
 | `JONSOC_REPO`          | GitHub repo (owner/repo) | `Noisemaker111/Jonsoc`               |
 | `JONSOC_APP_NAME`      | App name for paths       | `jonsoc`                             |
-| `JONSOC_NPM_PACKAGE`   | NPM package name         | `jonsoc-ai`                          |
+| `JONSOC_NPM_PACKAGE`   | NPM package name         | `jonsoc`                             |
 | `JONSOC_HOMEBREW_TAP`  | Homebrew tap             | `sst/homebrew-tap`                   |
 | `JONSOC_CLI_NAME`      | CLI command name         | `jonsoc`                             |
 

@@ -2,6 +2,35 @@
 
 This repository is a fork of JonsOC maintained by **Noisemaker111**. Target: `Noisemaker111/jonsoc` on `dev` branch.
 
+## Question Policy
+
+**When you need to ask the user any question, always use the question tool. Do not ask questions in plain text.**
+
+- Provide at most 3 options in the question tool
+- The UI automatically adds option D as "Type your own answer"
+- Use this for yes/no questions, choices, and any clarification
+- Never ask questions in prose without using the tool
+
+## File References
+
+**When referencing files, prefix with a context keyword to make them clickable:**
+
+Keywords: `Edit`, `File`, `at`, `in`, `see`, `check`, `open`, `view`, `read`
+
+**Good (clickable):**
+
+- Edit packages/opencode/src/cli/ui.ts
+- File: packages/opencode/src/cli/ui.ts:81
+- Check packages/opencode/src/cli/ui.ts
+
+**Bad (not clickable):**
+
+- packages/opencode/src/cli/ui.ts
+- Look at packages/opencode/src/cli/ui.ts
+- The file is packages/opencode/src/cli/ui.ts
+
+**Note:** Paths with `/` or `\` separators work. Line numbers are captured after colon.
+
 ## Build & Test
 
 - Install: `bun install`
@@ -45,7 +74,7 @@ Priority: remote → global → custom → project → inline
 
 Uses `Brand.CONFIG_FILES` and `Brand.CONFIG_TARGETS` for file/directory discovery.
 
-`ALLOW_LEGACY_OPENCODE_CONFIGS=true` (default) enables opencode.json/.opencode/ support.
+Legacy opencode config support is always enabled (opencode.json/.opencode/).
 
 ### Models (`packages/opencode/src/provider/models.ts`)
 

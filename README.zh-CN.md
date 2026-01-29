@@ -10,7 +10,7 @@
 <p align="center">开源的 AI Coding Agent。</p>
 <p align="center">
   <a href="https://jonsoc.ai/discord"><img alt="Discord" src="https://img.shields.io/discord/1391832426048651334?style=flat-square&label=discord" /></a>
-  <a href="https://www.npmjs.com/package/jonsoc-ai"><img alt="npm" src="https://img.shields.io/npm/v/jonsoc-ai?style=flat-square" /></a>
+  <a href="https://www.npmjs.com/package/jonsoc"><img alt="npm" src="https://img.shields.io/npm/v/jonsoc?style=flat-square" /></a>
   <a href="https://github.com/anomalyco/jonsoc/actions/workflows/publish.yml"><img alt="Build status" src="https://img.shields.io/github/actions/workflow/status/anomalyco/jonsoc/publish.yml?style=flat-square&branch=dev" /></a>
 </p>
 
@@ -25,7 +25,7 @@
 curl -fsSL https://jonsoc.ai/install | bash
 
 # 软件包管理器
-npm i -g jonsoc-ai@latest        # 也可使用 bun/pnpm/yarn
+npm i -g jonsoc@latest        # 也可使用 bun/pnpm/yarn
 scoop install jonsoc             # Windows
 choco install jonsoc             # Windows
 brew install anomalyco/tap/jonsoc # macOS 和 Linux（推荐，始终保持最新）
@@ -42,12 +42,12 @@ nix run nixpkgs#jonsoc           # 或用 github:anomalyco/jonsoc 获取最新 d
 
 JonsOC 也提供桌面版应用。可直接从 [发布页 (releases page)](https://github.com/anomalyco/jonsoc/releases) 或 [jonsoc.ai/download](https://jonsoc.ai/download) 下载。
 
-| 平台                  | 下载文件                              |
-| --------------------- | ------------------------------------- |
+| 平台                  | 下载文件                            |
+| --------------------- | ----------------------------------- |
 | macOS (Apple Silicon) | `jonsoc-desktop-darwin-aarch64.dmg` |
 | macOS (Intel)         | `jonsoc-desktop-darwin-x64.dmg`     |
 | Windows               | `jonsoc-desktop-windows-x64.exe`    |
-| Linux                 | `.deb`、`.rpm` 或 AppImage            |
+| Linux                 | `.deb`、`.rpm` 或 AppImage          |
 
 ```bash
 # macOS (Homebrew Cask)

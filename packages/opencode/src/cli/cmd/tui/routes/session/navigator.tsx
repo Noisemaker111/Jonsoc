@@ -1,4 +1,4 @@
-import { createEffect, createMemo, createResource, createSignal, For, Match, Show, Switch } from "solid-js"
+import { createEffect, createMemo, createResource, createSignal, For, Match, on, Show, Switch, untrack } from "solid-js"
 import { createStore } from "solid-js/store"
 import path from "path"
 import type { ScrollBoxRenderable, TextareaRenderable } from "@opentui/core"
@@ -29,6 +29,7 @@ type NavigatorProps = {
   onClose: () => void
   open: boolean
   side: "left" | "right"
+  wrapMode?: "word" | "none"
   promptRef?: { focused: boolean; focus: () => void } | undefined
   onOpenFile?: (path: string, line?: number) => void
 }
@@ -104,13 +105,51 @@ export function Navigator(props: NavigatorProps) {
   const [fileLoading, setFileLoading] = createSignal(false)
   const [fileError, setFileError] = createSignal(false)
   const [cache, setCache] = createStore<Record<string, FileContent>>({})
-  const [dirty, setDirty] = createSignal(false)
   const [targetLine, setTargetLine] = createSignal<number | undefined>(undefined)
   const [openFileInfo, setOpenFileInfo] = kv.signal<{ path: string; line: number } | undefined>(
     "navigator_open_file",
     undefined,
   )
-  let editor: TextareaRenderable | undefined
+
+  // Editing state - manual save only
+  const [isDirty, setIsDirty] = createSignal(false)
+  const [saveStatus, setSaveStatus] = createSignal<"idle" | "saving" | "saved" | "error">("idle")
+  let editorRef: TextareaRenderable | undefined
+  const [currentFilePath, setCurrentFilePath] = createSignal<string | null>(null)
+
+  const saveFile = async () => {
+    const path = activePath()
+    if (!path || !editorRef || !isDirty()) return
+
+    const content = editorRef.plainText
+    setSaveStatus("saving")
+    try {
+      const response = await fetch(`${sdk.url}/file/content`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ path, content }),
+      })
+      if (response.ok) {
+        setIsDirty(false)
+        setSaveStatus("saved")
+        // Update cache with new content
+        setCache(path, { type: "text", content })
+        setFileContent({ type: "text", content })
+        setTimeout(() => setSaveStatus("idle"), 2000)
+      } else {
+        setSaveStatus("error")
+        toast.show({ variant: "error", message: "Failed to save file" })
+      }
+    } catch {
+      setSaveStatus("error")
+      toast.show({ variant: "error", message: "Failed to save file" })
+    }
+  }
+
+  const handleEditorChange = () => {
+    setIsDirty(true)
+    setSaveStatus("idle")
+  }
 
   const listWidth = createMemo(() => {
     if (!props.open) return 0
@@ -247,9 +286,6 @@ export function Navigator(props: NavigatorProps) {
     if (!resizeLeft() && !resizeRight()) return ""
     return `${resizeLeft() || ""}${resizeLeft() && resizeRight() ? "/" : ""}${resizeRight() || ""} resize`
   })
-  const saveKey = createMemo(() => keybind.print("navigator_save"))
-  const saveLabel = createMemo(() => (saveKey() ? `${saveKey()} save` : "Save"))
-  const dirtyLabel = createMemo(() => (dirty() ? "Unsaved" : "Saved"))
 
   const ensureVisible = (scroll: ScrollBoxRenderable | undefined, id: string) => {
     if (!scroll) return
@@ -315,17 +351,40 @@ export function Navigator(props: NavigatorProps) {
     }
   })
 
+  const openFilePath = (nextPath: string) => {
+    const current = activePath()
+    // Set loading state FIRST to prevent "No content" flash
+    if (current !== nextPath) {
+      setFileLoading(true)
+      setFileError(false)
+      setIsDirty(false)
+      setSaveStatus("idle")
+    }
+    setActivePath(() => nextPath)
+    setTargetLine(undefined)
+    if (!loaded()) return
+    const force = current === nextPath
+    void loadFile(nextPath, force)
+  }
+
   const openFile = (node: FileNode) => {
     if (node.type !== "file") return
-    if (activePath() === node.path) return
-    setActivePath(() => node.path)
-    setTargetLine(undefined)
+    openFilePath(node.path)
   }
 
   const openFileAtLine = async (path: string, line?: number) => {
-    if (activePath() !== path) {
+    const current = activePath()
+    if (current !== path) {
+      // Set loading state FIRST to prevent "No content" flash
+      setFileLoading(true)
+      setFileError(false)
+      setIsDirty(false)
+      setSaveStatus("idle")
       setActivePath(() => path)
-      await new Promise((resolve) => setTimeout(resolve, 100))
+    }
+    if (loaded()) {
+      const force = current === path
+      void loadFile(path, force)
     }
     if (line && line > 0) {
       setTargetLine(line)
@@ -346,65 +405,56 @@ export function Navigator(props: NavigatorProps) {
   const handleGitSelect = () => {
     const entry = selectedGitEntry()
     if (!entry) return
-    if (activePath() === entry.path) return
-    setActivePath(() => entry.path)
+    openFilePath(entry.path)
   }
 
-  const loadFile = async (file: string, force = false) => {
-    if (!force && cache[file]) {
-      setFileContent(cache[file])
-      setFileLoading(false)
-      setFileError(false)
-      setDirty(false)
-      return
-    }
+  const [currentLoadFile, setCurrentLoadFile] = createSignal<string | undefined>(undefined)
+  const [loadNonce, setLoadNonce] = createSignal(0)
 
+  const loadFile = async (file: string, force = false) => {
+    if (fileLoading() && currentLoadFile() === file) return
+
+    const nonce = loadNonce() + 1
+    setLoadNonce(nonce)
+    setCurrentLoadFile(() => file)
+
+    // Clear previous content and state immediately before loading
+    setFileContent(undefined)
     setFileLoading(true)
     setFileError(false)
+    setIsDirty(false)
+    setSaveStatus("idle")
+
+    // Clear editor content immediately
+    if (editorRef) {
+      editorRef.setText("")
+    }
+
+    if (!force) {
+      const cached = cache[file]
+      if (cached) {
+        if (loadNonce() !== nonce) return
+        setFileContent(cached)
+        setFileLoading(false)
+        setFileError(false)
+        setCurrentLoadFile(() => undefined)
+        return
+      }
+    }
+
     const result = await sdk.client.file.read({ path: file }).catch(() => undefined)
+    if (loadNonce() !== nonce) return
     if (!result?.data) {
       setFileContent(undefined)
       setFileLoading(false)
       setFileError(true)
+      setCurrentLoadFile(() => undefined)
       return
     }
     setCache(file, result.data)
     setFileContent(result.data)
     setFileLoading(false)
-    setDirty(false)
-  }
-
-  const saveFile = async () => {
-    const file = activePath()
-    const data = fileData()
-    if (!file || !data) return
-    if (!dirty()) return
-    if (data.encoding === "base64") {
-      toast.show({
-        variant: "warning",
-        message: "Binary files cannot be edited inline",
-      })
-      return
-    }
-    if (!editor) return
-
-    const base = sync.data.path.directory || process.cwd()
-    const filepath = path.isAbsolute(file) ? file : path.join(base, file)
-    if (!Filesystem.contains(base, filepath)) {
-      toast.show({
-        variant: "error",
-        message: "File path is outside the project",
-      })
-      return
-    }
-
-    await Bun.write(filepath, editor.plainText)
-    await loadFile(file, true)
-    refreshStatus()
-    toast.show({
-      variant: "success",
-      message: "Saved",
-    })
+    setCurrentLoadFile(() => undefined)
   }
 
   const adjustListWidth = (delta: number) => {
@@ -470,7 +520,6 @@ export function Navigator(props: NavigatorProps) {
       adjustListWidth(0.05)
       return
     }
-    if (editor?.focused) return
     if (promptRef.current?.focused) return
     if (evt.name === "escape") {
       evt.preventDefault()
@@ -559,59 +608,84 @@ export function Navigator(props: NavigatorProps) {
   })
 
   createEffect(() => {
-    const file = activePath()
-    const fileInfo = openFileInfo()
-    if (!file) {
-      setFileContent(undefined)
-      setFileLoading(false)
-      setFileError(false)
-      return
-    }
-    if (fileInfo?.path === file) {
-      setTargetLine(() => fileInfo.line)
-      setOpenFileInfo(() => undefined)
-    }
-    loadFile(file)
-  })
-
-  createEffect(() => {
     if (loaded()) return
     setLoaded(true)
     loadDirectory("")
   })
 
   createEffect(() => {
-    if (!loaded()) return
     const file = activePath()
+    const fileInfo = openFileInfo()
+    const isLoaded = loaded()
+
     if (!file) {
       setFileContent(undefined)
       setFileLoading(false)
       setFileError(false)
+      // Clear editor when no file is selected
+      if (editorRef) {
+        editorRef.setText("")
+      }
       return
     }
-    loadFile(file)
+
+    if (!isLoaded) return
+
+    // Skip if already loading this file
+    if (fileLoading() && currentLoadFile() === file) return
+
+    if (fileInfo?.path === file) {
+      setTargetLine(() => fileInfo.line)
+      setOpenFileInfo(() => undefined)
+    }
+
+    untrack(() => {
+      void loadFile(file)
+    })
   })
 
   createEffect(() => {
     const data = fileData()
     if (!data) return
     if (data.encoding === "base64") return
-    if (!editor) return
-    editor.setText(data.content ?? "")
+    // Clear targetLine after file data loads
     if (targetLine()) {
-      queueMicrotask(() => {
-        const line = targetLine()
-        if (!line || !editor) return
-        const lines = data.content?.split("\n") ?? []
-        if (line > lines.length) return
-        const lineIndex = line - 1
-        const linesBefore = lines.slice(0, lineIndex)
-        const charsBefore = linesBefore.join("\n").length + linesBefore.length
-        editor.cursorOffset = Math.min(charsBefore, editor.plainText.length)
-        setTargetLine(undefined)
-      })
+      setTargetLine(undefined)
     }
   })
+
+  // Initialize edit content when file data loads - only if file changed
+  createEffect(
+    on(fileData, (data) => {
+      const path = activePath()
+      if (!data || data.encoding === "base64" || !path) return
+      setCurrentFilePath(() => path)
+      setIsDirty(false)
+      setSaveStatus("idle")
+      if (editorRef && editorRef.plainText !== data.content) {
+        editorRef.setText(data.content ?? "")
+      }
+    }),
+  )
+
+  // Compute viewer state as a discriminated union for exclusive rendering
+  const viewerState = createMemo(() => {
+    const path = activePath()
+    if (!path) return { type: "empty" as const }
+    if (fileLoading()) return { type: "loading" as const }
+    if (fileError()) return { type: "error" as const }
+    const data = fileData()
+    if (!data) return { type: "no-content" as const }
+    if (data.encoding === "base64") return { type: "binary" as const, data }
+    return { type: "text" as const, data }
+  })
+
+  // Focus editor when clicking on the editor area
+  const focusEditor = () => {
+    if (viewerState().type === "text") {
+      setTimeout(() => editorRef?.focus(), 0)
+    }
+  }
 
   const fileViewer = () => (
     <scrollbox
@@ -620,88 +694,90 @@ export function Navigator(props: NavigatorProps) {
       viewportOptions={viewportOptions()}
       verticalScrollbarOptions={verticalScrollbarOptions()}
     >
-      <Show when={activePath()} fallback={<text fg={theme.theme.textMuted}>Select a file to preview</text>}>
-        <Show when={!fileLoading()} fallback={<text fg={theme.theme.textMuted}>Loading...</text>}>
-          <Switch>
-            <Match when={fileError()}>
-              <text fg={theme.theme.textMuted}>Unable to read file</text>
-            </Match>
-            <Match when={!fileData()}>
-              <text fg={theme.theme.textMuted}>No content</text>
-            </Match>
-            <Match when={fileData()?.encoding === "base64"}>
-              <BinaryPreview content={fileData()} />
-            </Match>
-            <Match when={true}>
-              <box flexDirection="column" gap={1}>
-                <box flexDirection="row">
-                  <box width={4} flexGrow={0} flexShrink={0} backgroundColor={theme.theme.background} paddingTop={1}>
-                    <For each={(fileData()?.content ?? "").split("\n")}>
-                      {(_, i) => (
-                        <text fg={theme.theme.textMuted} paddingBottom={1}>
-                          {(i() + 1).toString().padStart(3, " ")}
-                        </text>
-                      )}
-                    </For>
-                  </box>
-                  <box flexGrow={1}>
-                    <textarea
-                      ref={(val: TextareaRenderable) => {
-                        editor = val
-                      }}
-                      initialValue={fileData()?.content ?? ""}
-                      textColor={theme.theme.text}
-                      focusedTextColor={theme.theme.text}
-                      cursorColor={theme.theme.primary}
-                      minHeight={8}
-                      maxHeight={40}
-                      onContentChange={() => {
-                        const value = editor?.plainText ?? ""
-                        setDirty(value !== (fileData()?.content ?? ""))
-                      }}
-                      onKeyDown={(e) => {
-                        if (keybind.match("navigator_save", e)) {
-                          e.preventDefault()
-                          saveFile()
-                          return
-                        }
-                        if (e.name === "escape") {
-                          e.preventDefault()
-                          promptRef.current?.focus()
-                        }
-                      }}
-                    />
-                  </box>
-                </box>
-                <Show when={fileData()?.diff}>
-                  <box paddingTop={1}>
-                    <text fg={theme.theme.textMuted}>Git diff</text>
-                    <diff
-                      diff={fileData()?.diff ?? ""}
-                      view="unified"
-                      filetype={fileType(activePath())}
-                      syntaxStyle={theme.syntax()}
-                      showLineNumbers={true}
-                      width="100%"
-                      wrapMode="word"
-                      fg={theme.theme.text}
-                      addedBg={theme.theme.diffAddedBg}
-                      removedBg={theme.theme.diffRemovedBg}
-                      contextBg={theme.theme.diffContextBg}
-                      addedSignColor={theme.theme.diffHighlightAdded}
-                      removedSignColor={theme.theme.diffHighlightRemoved}
-                      lineNumberFg={theme.theme.diffLineNumber}
-                      lineNumberBg={theme.theme.diffContextBg}
-                      addedLineNumberBg={theme.theme.diffAddedLineNumberBg}
-                      removedLineNumberBg={theme.theme.diffRemovedLineNumberBg}
-                    />
-                  </box>
-                </Show>
+      <Switch>
+        <Match when={viewerState().type === "empty"}>
+          <text fg={theme.theme.textMuted}>Select a file to edit</text>
+        </Match>
+        <Match when={viewerState().type === "loading"}>
+          <text fg={theme.theme.textMuted}>Loading...</text>
+        </Match>
+        <Match when={viewerState().type === "error"}>
+          <text fg={theme.theme.textMuted}>Unable to read file</text>
+        </Match>
+        <Match when={viewerState().type === "no-content"}>
+          <text fg={theme.theme.textMuted}>No content</text>
+        </Match>
+        <Match when={viewerState().type === "binary"}>
+          <BinaryPreview content={(viewerState() as { type: "binary"; data: FileContent }).data} />
+        </Match>
+        <Match when={viewerState().type === "text"}>
+          <box flexDirection="column" flexGrow={1} onMouseUp={focusEditor}>
+            <line_number
+              fg={theme.theme.textMuted}
+              bg={theme.theme.background}
+              paddingRight={1}
+              minWidth={3}
+              showLineNumbers={true}
+              flexGrow={1}
+            >
+              <textarea
+                ref={(r: TextareaRenderable) => {
+                  editorRef = r
+                  // Set initial content when ref is assigned
+                  const state = viewerState()
+                  if (state.type === "text" && state.data.content !== undefined && r.plainText !== state.data.content) {
+                    r.setText(state.data.content ?? "")
+                  }
+                }}
+                textColor={theme.theme.text}
+                focusedTextColor={theme.theme.text}
+                cursorColor={theme.theme.text}
+                focusedBackgroundColor={theme.theme.background}
+                minHeight={10}
+                flexGrow={1}
+                wrapMode={props.wrapMode ?? "word"}
+                syntaxStyle={theme.syntax()}
+                onContentChange={handleEditorChange}
+                onKeyDown={(e: { name: string; ctrl?: boolean; meta?: boolean; preventDefault: () => void }) => {
+                  // Ctrl+S / Cmd+S to save
+                  if ((e.ctrl || e.meta) && e.name === "s") {
+                    e.preventDefault()
+                    saveFile()
+                  }
+                  // Escape to blur
+                  if (e.name === "escape") {
+                    editorRef?.blur()
+                  }
+                }}
+              />
+            </line_number>
+            <Show when={fileData()?.diff}>
+              <box paddingTop={1}>
+                <text fg={theme.theme.textMuted}>Git diff</text>
+                <diff
+                  diff={fileData()?.diff ?? ""}
+                  view="unified"
+                  filetype={fileType(activePath())}
+                  syntaxStyle={theme.syntax()}
+                  showLineNumbers={true}
+                  width="100%"
+                  wrapMode="word"
+                  fg={theme.theme.text}
+                  addedBg={theme.theme.diffAddedBg}
+                  removedBg={theme.theme.diffRemovedBg}
+                  contextBg={theme.theme.diffContextBg}
+                  addedSignColor={theme.theme.diffHighlightAdded}
+                  removedSignColor={theme.theme.diffHighlightRemoved}
+                  lineNumberFg={theme.theme.diffLineNumber}
+                  lineNumberBg={theme.theme.diffContextBg}
+                  addedLineNumberBg={theme.theme.diffAddedLineNumberBg}
+                  removedLineNumberBg={theme.theme.diffRemovedLineNumberBg}
+                />
               </box>
-            </Match>
-          </Switch>
-        </Show>
-      </Show>
+            </Show>
+          </box>
+        </Match>
+      </Switch>
     </scrollbox>
   )
 
@@ -833,7 +909,7 @@ export function Navigator(props: NavigatorProps) {
                         active={index() === selectedGit()}
                         onSelect={() => {
                           setSelectedGit(() => index())
-                          setActivePath(() => entry.path)
+                          openFilePath(entry.path)
                         }}
                       />
                     )}
@@ -873,7 +949,7 @@ export function Navigator(props: NavigatorProps) {
                             toggleDirectory(entry.node)
                             return
                           }
-                          setActivePath(() => entry.node.path)
+                          openFile(entry.node)
                         }}
                       />
                     )}
@@ -891,9 +967,11 @@ export function Navigator(props: NavigatorProps) {
           paddingTop={1}
           paddingBottom={1}
         >
-          <text fg={theme.theme.text}>
-            <b>{viewTitle()}</b>
-          </text>
+          <box justifyContent="center" paddingTop={1} paddingBottom={1}>
+            <text fg={theme.theme.text}>
+              <b>{viewTitle()}</b>
+            </text>
+          </box>
           {fileViewer()}
         </box>
       </box>
@@ -905,11 +983,17 @@ export function Navigator(props: NavigatorProps) {
         flexDirection="row"
         justifyContent="space-between"
       >
-        <text fg={theme.theme.textMuted}>Click file to edit - {dirtyLabel()}</text>
         <text fg={theme.theme.textMuted}>
-          {saveLabel()}
-          {resizeLabel() ? ` - ${resizeLabel()}` : ""} - Esc: chat
+          {(() => {
+            const status = saveStatus()
+            if (status === "saving") return "Saving..."
+            if (status === "saved") return "Saved"
+            if (status === "error") return "Save failed"
+            if (isDirty()) return "Unsaved changes"
+            return "Click to edit"
+          })()}
         </text>
+        <text fg={theme.theme.textMuted}>{resizeLabel() ? `${resizeLabel()} - ` : ""}Esc: chat</text>
       </box>
     </box>
   )

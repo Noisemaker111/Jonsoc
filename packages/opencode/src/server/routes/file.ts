@@ -193,5 +193,35 @@ export const FileRoutes = lazy(() =>
         const content = await File.status()
         return c.json(content)
       },
+    )
+    .post(
+      "/file/content",
+      describeRoute({
+        summary: "Write file",
+        description: "Write content to a specified file.",
+        operationId: "file.write",
+        responses: {
+          200: {
+            description: "Success",
+            content: {
+              "application/json": {
+                schema: resolver(z.object({ success: z.boolean() })),
+              },
+            },
+          },
+        },
+      }),
+      validator(
+        "json",
+        z.object({
+          path: z.string(),
+          content: z.string(),
+        }),
+      ),
+      async (c) => {
+        const body = c.req.valid("json")
+        await File.write(body.path, body.content)
+        return c.json({ success: true })
+      },
     ),
 )

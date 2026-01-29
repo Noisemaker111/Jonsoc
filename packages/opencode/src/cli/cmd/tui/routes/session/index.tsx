@@ -7,11 +7,14 @@ import {
   For,
   Match,
   on,
+  onCleanup,
+  onMount,
   Show,
   Switch,
   useContext,
 } from "solid-js"
 import { Dynamic } from "solid-js/web"
+import "opentui-spinner/solid"
 import path from "path"
 import { useRoute, useRouteData } from "@tui/context/route"
 import { useSync } from "@tui/context/sync"
@@ -76,6 +79,7 @@ import { PermissionPrompt } from "./permission"
 import { QuestionPrompt } from "./question"
 import { DialogExportOptions } from "../../ui/dialog-export-options"
 import { formatTranscript } from "../../util/transcript"
+import { createColors, createFrames } from "../../ui/spinner.ts"
 
 addDefaultParsers(parsers.parsers)
 
@@ -156,6 +160,7 @@ export function Session() {
   const [showAssistantMetadata, setShowAssistantMetadata] = kv.signal("assistant_metadata_visibility", true)
   const [showScrollbar, setShowScrollbar] = kv.signal("scrollbar_visible", false)
   const [diffWrapMode, setDiffWrapMode] = createSignal<"word" | "none">("word")
+  const [navigatorWrapMode, setNavigatorWrapMode] = kv.signal<"word" | "none">("navigator_wrap_mode", "none")
   const [animationsEnabled, setAnimationsEnabled] = kv.signal("animations_enabled", true)
 
   const wide = createMemo(() => dimensions().width > 120)
@@ -688,6 +693,18 @@ export function Session() {
       },
     },
     {
+      title: navigatorWrapMode() === "word" ? "Navigator: Disable line wrap" : "Navigator: Enable line wrap",
+      value: "session.toggle.navigatorwrap",
+      category: "Navigator",
+      slash: {
+        name: "navwrap",
+      },
+      onSelect: (dialog) => {
+        setNavigatorWrapMode(() => (navigatorWrapMode() === "word" ? "none" : "word"))
+        dialog.clear()
+      },
+    },
+    {
       title: showDetails() ? "Hide tool details" : "Show tool details",
       value: "session.toggle.actions",
       keybind: "tool_details",
@@ -1106,6 +1123,7 @@ export function Session() {
             onClose={closeNavigator}
             open={navigatorVisible()}
             side={navigatorSideValue()}
+            wrapMode={navigatorWrapMode()}
             promptRef={promptRef.current}
             onOpenFile={async (path: string, line?: number) => {
               const file = await sdk.client.file.read({ path }).catch(() => undefined)
@@ -1423,7 +1441,34 @@ function AssistantMessage(props: { message: AssistantMessage; parts: Part[]; las
   const local = useLocal()
   const { theme } = useTheme()
   const sync = useSync()
+  const kv = useKV()
   const messages = createMemo(() => sync.data.message[props.message.sessionID] ?? [])
+
+  const status = createMemo(() => sync.data.session_status?.[props.message.sessionID] ?? { type: "idle" })
+
+  const spinnerDef = createMemo(() => {
+    const color = local.agent.color(props.message.agent)
+    return {
+      frames: createFrames({
+        color,
+        style: "custom",
+        activeChar: "▣",
+        inactiveChar: "·",
+        trailSteps: 1,
+        inactiveFactor: 0.6,
+        minAlpha: 0.3,
+      }),
+      color: createColors({
+        color,
+        style: "custom",
+        activeChar: "▣",
+        inactiveChar: "·",
+        trailSteps: 1,
+        inactiveFactor: 0.6,
+        minAlpha: 0.3,
+      }),
+    }
+  })
 
   const final = createMemo(() => {
     return props.message.finish && !["tool-calls", "unknown"].includes(props.message.finish)
@@ -1470,18 +1515,37 @@ function AssistantMessage(props: { message: AssistantMessage; parts: Part[]; las
       </Show>
       <Switch>
         <Match when={props.last || final() || props.message.error?.name === "MessageAbortedError"}>
-          <box paddingLeft={3}>
-            <text marginTop={1}>
-              <span
-                style={{
-                  fg:
-                    props.message.error?.name === "MessageAbortedError"
-                      ? theme.textMuted
-                      : local.agent.color(props.message.agent),
-                }}
+          <box paddingLeft={3} flexDirection="row" marginTop={1}>
+            <Switch
+              fallback={
+                <text>
+                  <span
+                    style={{
+                      fg:
+                        props.message.error?.name === "MessageAbortedError"
+                          ? theme.textMuted
+                          : local.agent.color(props.message.agent),
+                    }}
+                  >
+                    ▣{" "}
+                  </span>
+                </text>
+              }
+            >
+              <Match
+                when={
+                  props.last &&
+                  status().type !== "idle" &&
+                  kv.get("animations_enabled", true) &&
+                  props.message.error?.name !== "MessageAbortedError" &&
+                  !final()
+                }
               >
-                ▣{" "}
-              </span>{" "}
+                <spinner color={spinnerDef().color} frames={spinnerDef().frames} interval={40} />
+                <text> </text>
+              </Match>
+            </Switch>
+            <text>
               <span style={{ fg: theme.text }}>{Locale.titlecase(props.message.mode)}</span>
               <span style={{ fg: theme.textMuted }}> · {props.message.modelID}</span>
               <Show when={duration()}>
@@ -1510,11 +1574,28 @@ function FileReferenceText(props: { last: boolean; part: TextPart; message: Assi
   const sdk = useSDK()
   const kv = useKV()
 
-  const fileRefRegex = /([`'"<]?)([\w\-./]+\/[\w\-./]+(?:\.[\w]+)?)(?::(\d+))?/g
+  // Context keywords that indicate a file reference (case-insensitive)
+  const FILE_REF_KEYWORDS = ["edit", "file", "at", "in", "see", "check", "open", "view", "read"]
+
+  // Regex to match file references with context keywords
+  // Supports: / and \ separators, quoted paths, optional line numbers
+  const fileRefRegex = new RegExp(
+    `(?:^|\\s)(?:${FILE_REF_KEYWORDS.join("|")})(?::)?\\s+([\`'"<]?)([^\\s\`'">:]+)(?::(\\d+))?([\`'">]?)`,
+    "gi",
+  )
+
+  // Regex to detect if something looks like a path
+  // Must contain at least one / or \ to be a path
+  const pathLikeRegex = /[\\/]/
+
   const hasFileRefs = createMemo(() => fileRefRegex.test(props.part.text.trim()))
 
+  // Cache for file existence checks (to avoid repeated validation)
+  const [fileExistsCache, setFileExistsCache] = createSignal<Map<string, boolean>>(new Map())
+
   const parseFileReferences = (text: string) => {
-    const parts: Array<{ type: "text" | "fileref"; content: string; path?: string; line?: number }> = []
+    const parts: Array<{ type: "text" | "fileref"; content: string; path?: string; line?: number; exists?: boolean }> =
+      []
     let lastIndex = 0
     let match
 
@@ -1528,11 +1609,15 @@ function FileReferenceText(props: { last: boolean; part: TextPart; message: Assi
       const filePath = match[2]
       const lineNum = match[3] ? parseInt(match[3], 10) : undefined
 
+      // Check if it looks like a path
+      const looksLikePath = pathLikeRegex.test(filePath)
+
       parts.push({
         type: "fileref",
         content: fullMatch,
         path: filePath,
         line: lineNum,
+        exists: looksLikePath ? undefined : false,
       })
 
       lastIndex = match.index + fullMatch.length
@@ -1548,10 +1633,48 @@ function FileReferenceText(props: { last: boolean; part: TextPart; message: Assi
 
   const parts = createMemo(() => parseFileReferences(props.part.text.trim()))
 
+  // Validate file existence (async, non-blocking)
+  const validateFile = async (filePath: string): Promise<boolean> => {
+    const normalizedPath = filePath.replace(/\\/g, "/")
+    const cache = fileExistsCache()
+
+    if (cache.has(normalizedPath)) {
+      return cache.get(normalizedPath)!
+    }
+
+    try {
+      const file = await sdk.client.file.read({ path: normalizedPath })
+      const exists = !!file?.data && file.data.encoding !== "base64"
+
+      // Update cache
+      const newCache = new Map(cache)
+      newCache.set(normalizedPath, exists)
+      setFileExistsCache(newCache)
+
+      return exists
+    } catch {
+      const newCache = new Map(cache)
+      newCache.set(normalizedPath, false)
+      setFileExistsCache(newCache)
+      return false
+    }
+  }
+
+  // Validate all file references on mount
+  createEffect(() => {
+    const partsList = parts()
+    partsList.forEach((part) => {
+      if (part.type === "fileref" && part.path && part.exists === undefined) {
+        validateFile(part.path)
+      }
+    })
+  })
+
   const handleFileClick = (path?: string, line?: number) => {
     if (!path) return
     void (async () => {
-      const file = await sdk.client.file.read({ path }).catch(() => undefined)
+      const normalizedPath = path.replace(/\\/g, "/")
+      const file = await sdk.client.file.read({ path: normalizedPath }).catch(() => undefined)
       if (!file?.data) return
       if (file.data.encoding === "base64") return
       const content = file.data.content ?? ""
@@ -1563,8 +1686,8 @@ function FileReferenceText(props: { last: boolean; part: TextPart; message: Assi
         charOffset = linesBefore.join("\n").length
       }
       kv.set("navigator_open", true)
-      kv.set("navigator_active_path", path)
-      kv.set("navigator_open_file", { path, line: charOffset })
+      kv.set("navigator_active_path", normalizedPath)
+      kv.set("navigator_open_file", { path: normalizedPath, line: charOffset })
     })()
   }
 
@@ -1588,12 +1711,15 @@ function FileReferenceText(props: { last: boolean; part: TextPart; message: Assi
           <For each={parts()}>
             {(part) => (
               <Switch>
-                <Match when={part.type === "fileref"}>
+                <Match when={part.type === "fileref" && (part.exists ?? true)}>
                   <text fg={theme.markdownLink} onMouseUp={() => handleFileClick(part.path!, part.line)}>
                     <span style={{ fg: theme.textMuted }}>[</span>
                     {part.content}
                     <span style={{ fg: theme.textMuted }}>]</span>
                   </text>
+                </Match>
+                <Match when={part.type === "fileref" && !part.exists}>
+                  <text fg={theme.textMuted}>{part.content}</text>
                 </Match>
                 <Match when={true}>
                   <code
@@ -1615,7 +1741,7 @@ function FileReferenceText(props: { last: boolean; part: TextPart; message: Assi
 }
 
 function ReasoningPart(props: { last: boolean; part: ReasoningPart; message: AssistantMessage }) {
-  const { theme, subtleSyntax } = useTheme()
+  const { theme } = useTheme()
   const ctx = use()
   const content = createMemo(() => {
     // Filter out redacted reasoning chunks from OpenRouter
@@ -1628,20 +1754,13 @@ function ReasoningPart(props: { last: boolean; part: ReasoningPart; message: Ass
         id={"text-" + props.part.id}
         paddingLeft={2}
         marginTop={1}
-        flexDirection="column"
         border={["left"]}
         customBorderChars={SplitBorder.customBorderChars}
         borderColor={theme.backgroundElement}
       >
-        <code
-          filetype="markdown"
-          drawUnstyledText={false}
-          streaming={true}
-          syntaxStyle={subtleSyntax()}
-          content={"_Thinking:_ " + content()}
-          conceal={ctx.conceal()}
-          fg={theme.textMuted}
-        />
+        <text fg={theme.textMuted} wrapMode="word" width="100%">
+          Thinking: {content()}
+        </text>
       </box>
     </Show>
   )

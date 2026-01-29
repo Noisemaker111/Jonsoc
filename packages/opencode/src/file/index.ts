@@ -1,4 +1,5 @@
 import { BusEvent } from "@/bus/bus-event"
+import { Bus } from "@/bus"
 import z from "zod"
 import { $ } from "bun"
 import type { BunFile } from "bun"
@@ -270,6 +271,26 @@ export namespace File {
       ...x,
       path: path.relative(Instance.directory, x.path),
     }))
+  }
+
+  export async function write(file: string, content: string): Promise<void> {
+    using _ = log.time("write", { file })
+    const full = path.join(Instance.directory, file)
+
+    // TODO: Filesystem.contains is lexical only - symlinks inside the project can escape.
+    // TODO: On Windows, cross-drive paths bypass this check. Consider realpath canonicalization.
+    if (!Instance.containsPath(full)) {
+      throw new Error(`Access denied: path escapes project directory`)
+    }
+
+    // Ensure directory exists
+    const dir = path.dirname(full)
+    await fs.promises.mkdir(dir, { recursive: true })
+
+    await Bun.write(full, content)
+
+    // Emit file edited event
+    await Bus.publish(Event.Edited, { file })
   }
 
   export async function read(file: string): Promise<Content> {

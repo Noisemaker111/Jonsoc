@@ -2,7 +2,19 @@ import { render, useKeyboard, useRenderer, useTerminalDimensions } from "@opentu
 import { Clipboard } from "@tui/util/clipboard"
 import { TextAttributes } from "@opentui/core"
 import { RouteProvider, useRoute } from "@tui/context/route"
-import { Switch, Match, createEffect, untrack, ErrorBoundary, createSignal, onMount, batch, Show, on } from "solid-js"
+import {
+  Switch,
+  Match,
+  createEffect,
+  untrack,
+  ErrorBoundary,
+  createSignal,
+  onMount,
+  batch,
+  Show,
+  on,
+  For,
+} from "solid-js"
 import { Installation } from "@/installation"
 import { Flag } from "@/flag/flag"
 import { DialogProvider, useDialog } from "@tui/ui/dialog"
@@ -28,6 +40,8 @@ import { PromptStashProvider } from "./component/prompt/stash"
 import { DialogAlert } from "./ui/dialog-alert"
 import { ToastProvider, useToast } from "./ui/toast"
 import { ExitProvider, useExit, EXIT_CODE_RESTART } from "./context/exit"
+import { ErrorLogProvider, useErrorLog, init as initErrorLog, type ErrorEntry } from "./context/error-log"
+import { DialogErrorLog } from "./component/dialog-error-log"
 import { Session as SessionApi } from "@/session"
 import { TuiEvent } from "./event"
 import { KVProvider, useKV } from "./context/kv"
@@ -107,6 +121,51 @@ export function tui(input: {
   events?: EventSource
   onExit?: () => Promise<void>
 }) {
+  const errorLog = initErrorLog()
+
+  const formatConsoleArg = (arg: unknown) => {
+    if (typeof arg === "string") return arg
+    if (arg instanceof Error) return arg.message
+    return String(arg)
+  }
+
+  // Store original console functions
+  const originalConsoleLog = console.log
+  const originalConsoleError = console.error
+
+  // Keep console errors visible for debugging
+  console.log = (...args: unknown[]) => {
+    originalConsoleLog(...args)
+    const message = args.map(formatConsoleArg).join(" ")
+    errorLog.add(message, "console")
+  }
+
+  console.error = (...args: unknown[]) => {
+    originalConsoleError(...args)
+    const error = args.find((arg) => arg instanceof Error)
+    const message = args.map(formatConsoleArg).join(" ")
+    if (error) {
+      const entry = new Error(message)
+      if (error.stack) entry.stack = error.stack
+      errorLog.add(entry, "console")
+      return
+    }
+    errorLog.add(message, "console")
+  }
+
+  // Capture unhandled exceptions (suppress console output)
+  process.on("uncaughtException", (error) => {
+    errorLog.add(error, "uncaught")
+    // Do NOT rethrow - suppress output
+  })
+
+  // Capture unhandled promise rejections (suppress console output)
+  process.on("unhandledRejection", (reason) => {
+    const error = reason instanceof Error ? reason : new Error(String(reason))
+    errorLog.add(error, "rejection")
+    // Do NOT rethrow - suppress output
+  })
+
   // promise to prevent immediate exit
   return new Promise<void>(async (resolve) => {
     const mode = await getTerminalBackgroundColor()
@@ -118,48 +177,50 @@ export function tui(input: {
     render(
       () => {
         return (
-          <ErrorBoundary
-            fallback={(error, reset) => <ErrorComponent error={error} reset={reset} onExit={onExit} mode={mode} />}
-          >
-            <ArgsProvider {...input.args}>
-              <ExitProvider onExit={onExit}>
-                <KVProvider>
-                  <ToastProvider>
-                    <RouteProvider>
-                      <SDKProvider
-                        url={input.url}
-                        directory={input.directory}
-                        fetch={input.fetch}
-                        events={input.events}
-                      >
-                        <SyncProvider>
-                          <ThemeProvider mode={mode}>
-                            <LocalProvider>
-                              <KeybindProvider>
-                                <PromptStashProvider>
-                                  <DialogProvider>
-                                    <CommandProvider>
-                                      <FrecencyProvider>
-                                        <PromptHistoryProvider>
-                                          <PromptRefProvider>
-                                            <App />
-                                          </PromptRefProvider>
-                                        </PromptHistoryProvider>
-                                      </FrecencyProvider>
-                                    </CommandProvider>
-                                  </DialogProvider>
-                                </PromptStashProvider>
-                              </KeybindProvider>
-                            </LocalProvider>
-                          </ThemeProvider>
-                        </SyncProvider>
-                      </SDKProvider>
-                    </RouteProvider>
-                  </ToastProvider>
-                </KVProvider>
-              </ExitProvider>
-            </ArgsProvider>
-          </ErrorBoundary>
+          <ErrorLogProvider value={errorLog}>
+            <ErrorBoundary
+              fallback={(error, reset) => <ErrorComponent error={error} reset={reset} onExit={onExit} mode={mode} />}
+            >
+              <ArgsProvider {...input.args}>
+                <ExitProvider onExit={onExit}>
+                  <KVProvider>
+                    <ToastProvider>
+                      <RouteProvider>
+                        <SDKProvider
+                          url={input.url}
+                          directory={input.directory}
+                          fetch={input.fetch}
+                          events={input.events}
+                        >
+                          <SyncProvider>
+                            <ThemeProvider mode={mode}>
+                              <LocalProvider>
+                                <KeybindProvider>
+                                  <PromptStashProvider>
+                                    <DialogProvider>
+                                      <CommandProvider>
+                                        <FrecencyProvider>
+                                          <PromptHistoryProvider>
+                                            <PromptRefProvider>
+                                              <App />
+                                            </PromptRefProvider>
+                                          </PromptHistoryProvider>
+                                        </FrecencyProvider>
+                                      </CommandProvider>
+                                    </DialogProvider>
+                                  </PromptStashProvider>
+                                </KeybindProvider>
+                              </LocalProvider>
+                            </ThemeProvider>
+                          </SyncProvider>
+                        </SDKProvider>
+                      </RouteProvider>
+                    </ToastProvider>
+                  </KVProvider>
+                </ExitProvider>
+              </ArgsProvider>
+            </ErrorBoundary>
+          </ErrorLogProvider>
         )
       },
       {
@@ -167,13 +228,12 @@ export function tui(input: {
         gatherStats: false,
         exitOnCtrlC: false,
         useKittyKeyboard: {},
+        // Console enabled for debugging
+        useConsole: true,
+        openConsoleOnError: true,
         consoleOptions: {
-          keyBindings: [{ name: "y", ctrl: true, action: "copy-selection" }],
-          onCopySelection: (text) => {
-            Clipboard.copy(text).catch((error) => {
-              console.error(`Failed to copy console selection to clipboard: ${error}`)
-            })
-          },
+          keyBindings: [],
+          onCopySelection: () => {},
         },
       },
     )
@@ -191,6 +251,7 @@ function App() {
   const command = useCommandDialog()
   const sdk = useSDK()
   const toast = useToast()
+  const errorLog = useErrorLog()
   const { theme, mode, setMode } = useTheme()
   const sync = useSync()
   const exit = useExit()
@@ -206,10 +267,6 @@ function App() {
     renderer.clearSelection()
   }
   const [terminalTitleEnabled, setTerminalTitleEnabled] = createSignal(kv.get("terminal_title_enabled", true))
-
-  createEffect(() => {
-    console.log(JSON.stringify(route.data))
-  })
 
   createEffect(() => {
     if (route.data.type !== "session") return
@@ -239,6 +296,20 @@ function App() {
   })
 
   const args = useArgs()
+
+  createEffect(
+    on(
+      () => errorLog.count,
+      (count, prev) => {
+        if (prev === undefined) return
+        if (count <= prev) return
+        console.error("Error count changed:", count, prev)
+        dialog.setSize("large")
+        dialog.replace(() => <DialogErrorLog />)
+      },
+    ),
+  )
+
   onMount(() => {
     batch(() => {
       if (args.agent) local.agent.set(args.agent)
@@ -534,12 +605,12 @@ function App() {
       },
     },
     {
-      title: "Toggle console",
+      title: "View error log",
       category: "System",
-      value: "app.console",
+      value: "app.error_log",
       onSelect: (dialog) => {
-        renderer.console.toggle()
-        dialog.clear()
+        dialog.setSize("large")
+        dialog.replace(() => <DialogErrorLog />)
       },
     },
     {
@@ -703,6 +774,7 @@ function ErrorComponent(props: {
 }) {
   const term = useTerminalDimensions()
   const renderer = useRenderer()
+  const errorLog = useErrorLog()
 
   const handleExit = async () => {
     renderer.setTerminalTitle("")
@@ -716,6 +788,7 @@ function ErrorComponent(props: {
     }
   })
   const [copied, setCopied] = createSignal(false)
+  const [showLog, setShowLog] = createSignal(false)
 
   const repo = (process.env.JONSOC_REPO ?? process.env.OPENCODE_REPO ?? "anomalyco/opencode").replace(
     /^https?:\/\/github\.com\//,
@@ -730,6 +803,7 @@ function ErrorComponent(props: {
     text: isLight ? "#1a1a1a" : "#eeeeee",
     muted: isLight ? "#8a8a8a" : "#808080",
     primary: isLight ? "#3b7dd8" : "#fab283",
+    error: isLight ? "#d32f2f" : "#f44336",
   }
 
   if (props.error.message) {
@@ -752,7 +826,7 @@ function ErrorComponent(props: {
   }
 
   return (
-    <box flexDirection="column" gap={1} backgroundColor={colors.bg}>
+    <box flexDirection="column" gap={1} backgroundColor={colors.bg} width={term().width} height={term().height}>
       <box flexDirection="row" gap={1} alignItems="center">
         <text attributes={TextAttributes.BOLD} fg={colors.text}>
           Please report an issue.
@@ -772,11 +846,37 @@ function ErrorComponent(props: {
         <box onMouseUp={handleExit} backgroundColor={colors.primary} padding={1}>
           <text fg={colors.bg}>Exit</text>
         </box>
+        <box onMouseUp={() => setShowLog(!showLog())} backgroundColor={colors.primary} padding={1}>
+          <text fg={colors.bg}>{showLog() ? "Show Fatal Error" : `Show Error Log (${errorLog.count})`}</text>
+        </box>
       </box>
-      <scrollbox height={Math.floor(term().height * 0.7)}>
-        <text fg={colors.muted}>{props.error.stack}</text>
-      </scrollbox>
-      <text fg={colors.text}>{props.error.message}</text>
+      <Show
+        when={showLog()}
+        fallback={
+          <>
+            <scrollbox height={Math.floor(term().height * 0.7)}>
+              <text fg={colors.muted}>{props.error.stack}</text>
+            </scrollbox>
+            <text fg={colors.text}>{props.error.message}</text>
+          </>
+        }
+      >
+        <scrollbox height={Math.floor(term().height * 0.7)}>
+          <For each={errorLog.errors}>
+            {(error: ErrorEntry) => (
+              <box flexDirection="column" border={["bottom"]} borderColor={colors.muted} paddingBottom={1} gap={1}>
+                <text fg={colors.primary}>
+                  [{error.source ?? "unknown"}] {new Date(error.timestamp).toLocaleTimeString()}
+                </text>
+                <text fg={colors.error}>{error.message}</text>
+                <Show when={error.stack}>
+                  <text fg={colors.muted}>{error.stack}</text>
+                </Show>
+              </box>
+            )}
+          </For>
+        </scrollbox>
+      </Show>
     </box>
   )
 }

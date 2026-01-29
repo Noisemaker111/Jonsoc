@@ -93,7 +93,7 @@ All configuration options support both `JONSOC_*` and `OPENCODE_*` environment v
 | `JONSOC_CONFIG_SCHEMA` | JSON Schema URL for validation | `https://jonsoc.ai/config.json`      |
 | `JONSOC_REPO`          | GitHub repo (owner/repo)       | `Noisemaker111/Jonsoc`               |
 | `JONSOC_APP_NAME`      | App name for XDG paths         | `jonsoc`                             |
-| `JONSOC_NPM_PACKAGE`   | NPM package name               | `jonsoc-ai`                          |
+| `JONSOC_NPM_PACKAGE`   | NPM package name               | `jonsoc`                             |
 | `JONSOC_HOMEBREW_TAP`  | Homebrew tap for installation  | `sst/homebrew-tap`                   |
 
 ## Legacy Compatibility
@@ -105,7 +105,7 @@ JonsOC maintains backward compatibility with original opencode.ai fork by:
 3. Loading both `jonsoc.json` and `opencode.json` config files
 4. Recognizing both brand names in model preferences
 
-When you set `JONSOC_BRAND` to something other than "jonsoc", legacy opencode support is automatically disabled.
+Legacy opencode config support is always enabled; there is no toggle.
 
 ## What Changed
 

@@ -1290,12 +1290,6 @@
 
     "jonsoc": ["jonsoc@workspace:packages/opencode"],
 
-    "jonsoc-darwin-arm64": ["jonsoc-darwin-arm64@1.1.41", "", { "os": "darwin", "cpu": "arm64", "bin": { "jonsoc": "bin/jonsoc.exe" } }, "sha512-PFOPUdBOzhFoJwVwQMwSqa7w2qCZteW0caqNPNeXOx8p9gbER79oQMhfRLdSziqtRCbyCqkXDyFML/3s92GuGQ=="],
-
-    "jonsoc-linux-x64": ["jonsoc-linux-x64@1.1.41", "", { "os": "linux", "cpu": "x64", "bin": { "jonsoc": "bin/jonsoc.exe" } }, "sha512-AESZnUHwn4wDotkJxBgVZZhMwsiNMbdLo7DyAutIz+wNzm3BWsFVRYMNA9abgxsZOASEf+GGTRnw0iyCTNXriQ=="],
-
-    "jonsoc-windows-x64": ["jonsoc-windows-x64@1.1.41", "", { "os": "win32", "cpu": "x64", "bin": { "jonsoc": "bin/jonsoc.exe" } }, "sha512-zRSXN9PTN+Bd3/06Dsl2NwoEINtkuY8kMFdN/kkxaHRJ81aP+pYMy+sS8jaYCoCgCSQFgGQbUUN+Hant1GOVqw=="],
-
     "jose": ["jose@5.2.3", "", {}, "sha512-KUXdbctm1uHVL8BYhnyHkgp3zDX5KW8ZhAKVFEfUbU2P8Alpzjb+48hHvjOdQIyPshoblhzsuqOwEEAbtHVirA=="],
 
     "jpeg-js": ["jpeg-js@0.4.4", "", {}, "sha512-WZzeDOEtTOBK4Mdsar0IqEU5sMr3vSV2RqkAIzUEV2BHnUfKGyswWFPFwK5EeDo93K3FohSHbLAjj0s1Wzd+dg=="],

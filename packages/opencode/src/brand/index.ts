@@ -38,10 +38,7 @@ export namespace Brand {
 
   export const LEGACY_CONFIG_DIR = ".opencode"
 
-  export const ALLOW_LEGACY_OPENCODE_CONFIGS =
-    (process.env.JONSOC_ALLOW_LEGACY_OPENCODE_CONFIGS ??
-      process.env.OPENCODE_ALLOW_LEGACY_OPENCODE_CONFIGS ??
-      "true") === "true"
+  export const ALLOW_LEGACY_OPENCODE_CONFIGS = true
 
   export const CONFIG_FILES: string[] = (() => {
     const files = [`${BRAND_LOWER}.jsonc`, `${BRAND_LOWER}.json`]
@@ -55,7 +52,7 @@ export namespace Brand {
 
   export const REPO = process.env.JONSOC_REPO ?? process.env.OPENCODE_REPO ?? `Noisemaker111/Jonsoc`
 
-  export const NPM_PACKAGE = process.env.JONSOC_NPM_PACKAGE ?? process.env.OPENCODE_NPM_PACKAGE ?? `${BRAND_LOWER}-ai`
+  export const NPM_PACKAGE = process.env.JONSOC_NPM_PACKAGE ?? process.env.OPENCODE_NPM_PACKAGE ?? BRAND_LOWER
 
   export const LEGACY_NPM_PACKAGE = "opencode-ai"
 

@@ -79,16 +79,38 @@ export namespace UI {
     println(Style.TEXT_DANGER_BOLD + "Error: " + Style.TEXT_NORMAL + message)
   }
 
+  // Context keywords that indicate a file reference (case-insensitive)
+  const FILE_REF_KEYWORDS = ["edit", "file", "at", "in", "see", "check", "open", "view", "read"]
+
+  // Regex to match file references with context keywords
+  // Supports: / and \ separators, quoted paths, optional line numbers
+  // Matches: "Edit packages/opencode/src/cli/ui.ts:81" or "File: src/main.rs"
+  // The path group excludes colons so line numbers are captured separately
+  // Case-insensitive matching with 'i' flag
+  const fileRefRegex = new RegExp(
+    `(?:^|\\s)(?:${FILE_REF_KEYWORDS.join("|")})(?::)?\\s+([\`'"<]?)([^\\s\`'">:]+)(?::(\\d+))?([\`'">]?)`,
+    "gi",
+  )
+
+  // Regex to detect if something looks like a path (for validation)
+  // Must contain at least one / or \ to be a path
+  const pathLikeRegex = /[\\/]/
+
   export function markdown(text: string): string {
-    const fileRefRegex = /([`'"<]?)([\w\-./]+\/[\w\-./]+(?:\.[\w]+)?)(?::(\d+))?/g
-    return text.replace(fileRefRegex, (match, quote, filePath, lineNum) => {
-      const fullPath = path.resolve(process.cwd(), filePath)
-      const normalizedPath = fullPath.replace(/\\/g, "/")
+    return text.replace(fileRefRegex, (match, quoteOpen, filePath, lineNum, quoteClose) => {
+      // Check if it looks like a path
+      if (!pathLikeRegex.test(filePath)) return match
+
+      // Normalize path separators
+      const normalizedPath = filePath.replace(/\\/g, "/")
+      const fullPath = path.resolve(process.cwd(), normalizedPath)
+      const normalizedFullPath = fullPath.replace(/\\/g, "/")
+
       let url = "file://"
-      if (/^[A-Za-z]:/.test(normalizedPath)) {
-        url += "/" + normalizedPath
+      if (/^[A-Za-z]:/.test(normalizedFullPath)) {
+        url += "/" + normalizedFullPath
       } else {
-        url += normalizedPath
+        url += normalizedFullPath
       }
       if (lineNum) url += `:${lineNum}`
       return `\x1b]8;;${url}\x1b\\${match}\x1b]8;;\x1b\\`

@@ -7,14 +7,21 @@ import type { ParsedKey, Renderable } from "@opentui/core"
 import { createStore } from "solid-js/store"
 import { useKeyboard, useRenderer } from "@opentui/solid"
 import { createSimpleContext } from "./helper"
+import { Config } from "@/config/config"
+
+// Default keybinds parsed from the Zod schema
+const defaultKeybinds = Config.Keybinds.parse({})
 
 export const { use: useKeybind, provider: KeybindProvider } = createSimpleContext({
   name: "Keybind",
   init: () => {
     const sync = useSync()
     const keybinds = createMemo(() => {
+      // Merge user keybinds with defaults - user values override defaults
+      const userKeybinds = sync.data.config.keybinds ?? {}
+      const merged = { ...defaultKeybinds, ...userKeybinds }
       return pipe(
-        sync.data.config.keybinds ?? {},
+        merged,
         mapValues((value) => Keybind.parse(value)),
       )
     })
