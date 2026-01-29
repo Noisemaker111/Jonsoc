@@ -81,7 +81,7 @@ export function Prompt(props: PromptProps) {
     const full = path.isAbsolute(filepath) ? filepath : path.resolve(filepath)
     const file = Bun.file(full)
     if (file.type === "image/svg+xml") {
-      const content = await file.text().catch(() => {})
+      const content = await file.text().catch(() => { })
       if (!content) return false
       event.preventDefault()
       pasteText(content, `[SVG: ${file.name ?? "image"}]`)
@@ -91,7 +91,7 @@ export function Prompt(props: PromptProps) {
       const content = await file
         .arrayBuffer()
         .then((buffer) => Buffer.from(buffer).toString("base64"))
-        .catch(() => {})
+        .catch(() => { })
       if (!content) return false
       event.preventDefault()
       await pasteImage({ filename: file.name, mime: file.type, content, path: full })
@@ -135,7 +135,7 @@ export function Prompt(props: PromptProps) {
     const entries: Array<{ path: string; time: number }> = []
     for await (const item of glob.scan({ cwd, absolute: true })) {
       const file = Bun.file(item)
-      const stat = await file.stat().catch(() => {})
+      const stat = await file.stat().catch(() => { })
       if (!stat?.isFile()) continue
       const time = typeof stat.mtimeMs === "number" ? stat.mtimeMs : (stat.mtime?.getTime?.() ?? 0)
       entries.push({ path: item, time })
@@ -151,7 +151,7 @@ export function Prompt(props: PromptProps) {
     const content = await file
       .arrayBuffer()
       .then((buffer) => Buffer.from(buffer).toString("base64"))
-      .catch(() => {})
+      .catch(() => { })
     if (!content) return
     return { filename: file.name, mime: file.type, content, path: latest.path }
   }
@@ -498,7 +498,7 @@ export function Prompt(props: PromptProps) {
 
   function restoreExtmarksFromParts(parts: PromptInfo["parts"]) {
     input.extmarks.clear()
-    setStore("extmarkToPartIndex", new Map())
+    const newMap = new Map<number, number>()
 
     parts.forEach((part, partIndex) => {
       let start = 0
@@ -531,13 +531,11 @@ export function Prompt(props: PromptProps) {
           styleId,
           typeId: promptPartTypeId,
         })
-        setStore("extmarkToPartIndex", (map: Map<number, number>) => {
-          const newMap = new Map(map)
-          newMap.set(extmarkId, partIndex)
-          return newMap
-        })
+        newMap.set(extmarkId, partIndex)
       }
     })
+
+    setStore("extmarkToPartIndex", newMap)
   }
 
   function syncExtmarksWithPromptParts() {
@@ -666,9 +664,9 @@ export function Prompt(props: PromptProps) {
     const sessionID = props.sessionID
       ? props.sessionID
       : await (async () => {
-          const sessionID = await sdk.client.session.create({}).then((x) => x.data!.id)
-          return sessionID
-        })()
+        const sessionID = await sdk.client.session.create({}).then((x) => x.data!.id)
+        return sessionID
+      })()
     const messageID = Identifier.ascending("message")
     let inputText = store.prompt.input
 
@@ -757,7 +755,7 @@ export function Prompt(props: PromptProps) {
             })),
           ],
         })
-        .catch(() => {})
+        .catch(() => { })
     }
     history.append({
       ...store.prompt,
@@ -1136,7 +1134,7 @@ export function Prompt(props: PromptProps) {
                           const content = await file
                             .arrayBuffer()
                             .then((buffer) => Buffer.from(buffer).toString("base64"))
-                            .catch(() => {})
+                            .catch(() => { })
                           if (content) {
                             event.preventDefault()
                             await pasteImage({ filename: file.name, mime: file.type, content })
@@ -1243,13 +1241,13 @@ export function Prompt(props: PromptProps) {
             customBorderChars={
               theme.backgroundElement.a !== 0
                 ? {
-                    ...EmptyBorder,
-                    horizontal: "▀",
-                  }
+                  ...EmptyBorder,
+                  horizontal: "▀",
+                }
                 : {
-                    ...EmptyBorder,
-                    horizontal: " ",
-                  }
+                  ...EmptyBorder,
+                  horizontal: " ",
+                }
             }
           />
         </box>

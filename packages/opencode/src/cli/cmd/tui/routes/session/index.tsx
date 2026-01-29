@@ -84,13 +84,13 @@ import { createColors, createFrames } from "../../ui/spinner.ts"
 addDefaultParsers(parsers.parsers)
 
 class CustomSpeedScroll implements ScrollAcceleration {
-  constructor(private speed: number) {}
+  constructor(private speed: number) { }
 
   tick(_now?: number): number {
     return this.speed
   }
 
-  reset(): void {}
+  reset(): void { }
 }
 
 const context = createContext<{
@@ -524,7 +524,7 @@ export function Session() {
       },
       onSelect: async (dialog) => {
         const status = sync.data.session_status?.[route.sessionID]
-        if (status?.type !== "idle") await sdk.client.session.abort({ sessionID: route.sessionID }).catch(() => {})
+        if (status?.type !== "idle") await sdk.client.session.abort({ sessionID: route.sessionID }).catch(() => { })
         const revert = session()?.revert?.messageID
         const message = messages().findLast((x) => (!revert || x.id < revert) && x.role === "user")
         if (!message) return
@@ -1451,18 +1451,14 @@ function AssistantMessage(props: { message: AssistantMessage; parts: Part[]; las
     return {
       frames: createFrames({
         color,
-        style: "custom",
-        activeChar: "▣",
-        inactiveChar: "·",
+        style: "blocks",
         trailSteps: 1,
         inactiveFactor: 0.6,
         minAlpha: 0.3,
       }),
       color: createColors({
         color,
-        style: "custom",
-        activeChar: "▣",
-        inactiveChar: "·",
+        style: "blocks",
         trailSteps: 1,
         inactiveFactor: 0.6,
         minAlpha: 0.3,
@@ -1975,7 +1971,13 @@ function InlineTool(props: {
   )
 }
 
-function BlockTool(props: { title: string; children: JSX.Element; onClick?: () => void; part?: ToolPart }) {
+function BlockTool(props: {
+  title: string
+  prefix?: JSX.Element
+  children: JSX.Element
+  onClick?: () => void
+  part?: ToolPart
+}) {
   const { theme } = useTheme()
   const renderer = useRenderer()
   const [hover, setHover] = createSignal(false)
@@ -1998,9 +2000,12 @@ function BlockTool(props: { title: string; children: JSX.Element; onClick?: () =
         props.onClick?.()
       }}
     >
-      <text paddingLeft={3} fg={theme.textMuted}>
-        {props.title}
-      </text>
+      <box flexDirection="row" paddingLeft={props.prefix ? 1 : 3} gap={1} alignItems="center">
+        <Show when={props.prefix}>
+          {props.prefix}
+        </Show>
+        <text fg={theme.textMuted}>{props.title}</text>
+      </box>
       {props.children}
       <Show when={error()}>
         <text fg={theme.error}>{error()}</text>
@@ -2190,15 +2195,52 @@ function Task(props: ToolProps<typeof TaskTool>) {
   const keybind = useKeybind()
   const { navigate } = useRoute()
   const local = useLocal()
+  const kv = useKV()
 
   const current = createMemo(() => props.metadata.summary?.findLast((x) => x.state.status !== "pending"))
   const color = createMemo(() => local.agent.color(props.input.subagent_type ?? "unknown"))
+  const spinnerDef = createMemo(() => {
+    return {
+      frames: createFrames({
+        color: color(),
+        style: "blocks",
+        trailSteps: 1,
+        inactiveFactor: 0.6,
+        minAlpha: 0.3,
+      }),
+      color: createColors({
+        color: color(),
+        style: "blocks",
+        trailSteps: 1,
+        inactiveFactor: 0.6,
+        minAlpha: 0.3,
+      }),
+    }
+  })
+
+  const running = createMemo(() => {
+    // If the tool part itself is still pending or running, the subagent is active
+    return props.part.state.status === "pending" || props.part.state.status === "running"
+  })
 
   return (
     <Switch>
       <Match when={props.metadata.summary?.length}>
         <BlockTool
           title={"# " + Locale.titlecase(props.input.subagent_type ?? "unknown") + " Task"}
+          prefix={
+            <Switch
+              fallback={
+                <text>
+                  <span style={{ fg: theme.textMuted }}>▣</span>
+                </text>
+              }
+            >
+              <Match when={running() && kv.get("animations_enabled", true)}>
+                <spinner color={spinnerDef().color} frames={spinnerDef().frames} interval={40} />
+              </Match>
+            </Switch>
+          }
           onClick={
             props.metadata.sessionId
               ? () => navigate({ type: "session", sessionID: props.metadata.sessionId! })
@@ -2235,7 +2277,7 @@ function Task(props: ToolProps<typeof TaskTool>) {
           {props.input.description}"
         </InlineTool>
       </Match>
-    </Switch>
+    </Switch >
   )
 }
 

@@ -1,4 +1,4 @@
-import { createEffect, createMemo, createResource, createSignal, For, Match, on, Show, Switch, untrack } from "solid-js"
+import { batch, createEffect, createMemo, createResource, createSignal, For, Match, on, Show, Switch, untrack } from "solid-js"
 import { createStore } from "solid-js/store"
 import path from "path"
 import type { ScrollBoxRenderable, TextareaRenderable } from "@opentui/core"
@@ -355,16 +355,21 @@ export function Navigator(props: NavigatorProps) {
     const current = activePath()
     // Set loading state FIRST to prevent "No content" flash
     if (current !== nextPath) {
-      setFileLoading(true)
-      setFileError(false)
-      setIsDirty(false)
-      setSaveStatus("idle")
+      batch(() => {
+        setFileLoading(true)
+        setFileError(false)
+        setIsDirty(false)
+        setSaveStatus("idle")
+        setActivePath(() => nextPath)
+        setTargetLine(undefined)
+      })
+      // Notify parent/sync navigation state
+      props.onOpenFile?.(nextPath)
+      // loadFile will be triggered by the effect on activePath
+    } else if (loaded()) {
+      // Force reload if path is the same
+      void loadFile(nextPath, true)
     }
-    setActivePath(() => nextPath)
-    setTargetLine(undefined)
-    if (!loaded()) return
-    const force = current === nextPath
-    void loadFile(nextPath, force)
   }
 
   const openFile = (node: FileNode) => {
@@ -375,21 +380,24 @@ export function Navigator(props: NavigatorProps) {
   const openFileAtLine = async (path: string, line?: number) => {
     const current = activePath()
     if (current !== path) {
-      // Set loading state FIRST to prevent "No content" flash
-      setFileLoading(true)
-      setFileError(false)
-      setIsDirty(false)
-      setSaveStatus("idle")
-      setActivePath(() => path)
-    }
-    if (loaded()) {
-      const force = current === path
-      void loadFile(path, force)
+      batch(() => {
+        // Set loading state FIRST to prevent "No content" flash
+        setFileLoading(true)
+        setFileError(false)
+        setIsDirty(false)
+        setSaveStatus("idle")
+        setActivePath(() => path)
+      })
+      // Notify parent/sync navigation state - this will update openFileInfo via KV
+      props.onOpenFile?.(path, line)
+      // loadFile will be triggered by the effect on activePath
+    } else if (loaded()) {
+      // Force reload if path is the same
+      void loadFile(path, true)
     }
     if (line && line > 0) {
       setTargetLine(line)
     }
-    props.onOpenFile?.(path, line)
   }
 
   const handleExplorerSelect = async () => {
@@ -412,49 +420,54 @@ export function Navigator(props: NavigatorProps) {
   const [loadNonce, setLoadNonce] = createSignal(0)
 
   const loadFile = async (file: string, force = false) => {
-    if (fileLoading() && currentLoadFile() === file) return
+    // Check loading state and path in a single untracked lookup to avoid loops
+    const alreadyLoading = untrack(() => fileLoading() && currentLoadFile() === file)
+    if (alreadyLoading) return
 
     const nonce = loadNonce() + 1
-    setLoadNonce(nonce)
-    setCurrentLoadFile(() => file)
 
-    // Clear previous content and state immediately before loading
-    setFileContent(undefined)
-    setFileLoading(true)
-    setFileError(false)
-    setIsDirty(false)
-    setSaveStatus("idle")
+    batch(() => {
+      setLoadNonce(nonce)
+      setCurrentLoadFile(() => file)
 
-    // Clear editor content immediately
-    if (editorRef) {
-      editorRef.setText("")
-    }
+      // Clear previous content and state immediately before loading
+      setFileContent(undefined)
+      setFileLoading(true)
+      setFileError(false)
+      setIsDirty(false)
+      setSaveStatus("idle")
+    })
 
     if (!force) {
       const cached = cache[file]
       if (cached) {
         if (loadNonce() !== nonce) return
-        setFileContent(cached)
-        setFileLoading(false)
-        setFileError(false)
-        setCurrentLoadFile(() => undefined)
+        batch(() => {
+          setFileContent(cached)
+          setFileLoading(false)
+          setFileError(false)
+          setCurrentLoadFile(() => undefined)
+        })
         return
       }
     }
 
     const result = await sdk.client.file.read({ path: file }).catch(() => undefined)
     if (loadNonce() !== nonce) return
-    if (!result?.data) {
-      setFileContent(undefined)
+
+    batch(() => {
+      if (!result?.data) {
+        setFileContent(undefined)
+        setFileLoading(false)
+        setFileError(true)
+        setCurrentLoadFile(() => undefined)
+        return
+      }
+      setCache(file, result.data)
+      setFileContent(result.data)
       setFileLoading(false)
-      setFileError(true)
       setCurrentLoadFile(() => undefined)
-      return
-    }
-    setCache(file, result.data)
-    setFileContent(result.data)
-    setFileLoading(false)
-    setCurrentLoadFile(() => undefined)
+    })
   }
 
   const adjustListWidth = (delta: number) => {
@@ -592,7 +605,9 @@ export function Navigator(props: NavigatorProps) {
   createEffect(() => {
     const list = explorerEntries()
     if (list.length === 0) return
-    if (selectedExplorer() < list.length) return
+    const current = selectedExplorer()
+    if (current < list.length) return
+    // Only update if out of bounds
     setSelectedExplorer(() => list.length - 1)
   })
 
@@ -603,6 +618,7 @@ export function Navigator(props: NavigatorProps) {
     const list = explorerEntries()
     const index = list.findIndex((entry) => entry.node.path === path)
     if (index === -1) return
+    // Only update if different to avoid cycle
     if (selectedExplorer() === index) return
     setSelectedExplorer(() => index)
   })
@@ -618,28 +634,33 @@ export function Navigator(props: NavigatorProps) {
     const fileInfo = openFileInfo()
     const isLoaded = loaded()
 
+    if (!isLoaded) return
+
     if (!file) {
-      setFileContent(undefined)
-      setFileLoading(false)
-      setFileError(false)
-      // Clear editor when no file is selected
-      if (editorRef) {
-        editorRef.setText("")
-      }
+      untrack(() => {
+        setFileContent(undefined)
+        setFileLoading(false)
+        setFileError(false)
+        // Clear editor when no file is selected
+        if (editorRef) {
+          editorRef.setText("")
+        }
+      })
       return
     }
 
-    if (!isLoaded) return
-
-    // Skip if already loading this file
-    if (fileLoading() && currentLoadFile() === file) return
-
-    if (fileInfo?.path === file) {
-      setTargetLine(() => fileInfo.line)
-      setOpenFileInfo(() => undefined)
-    }
-
+    // Wrap state updates and loading logic in untrack to prevent recursive loops
+    // We only want this effect to trigger on activePath, openFileInfo, or loaded changes.
     untrack(() => {
+      // Skip if already loading this file
+      if (fileLoading() && currentLoadFile() === file) return
+
+      if (fileInfo?.path === file) {
+        setTargetLine(() => fileInfo.line)
+        // Clear navigation request to avoid re-triggering this repeatedly if it fails
+        setOpenFileInfo(() => undefined)
+      }
+
       void loadFile(file)
     })
   })
