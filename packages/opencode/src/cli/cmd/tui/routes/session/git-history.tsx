@@ -72,11 +72,7 @@ function HistoryRow(props: { entry: VcsHistoryLine & { author?: string } }) {
 
   const cleanedRefs = createMemo(() => {
     if (!props.entry.refs) return []
-    const refs = props.entry.refs.map((r) => r.replace("HEAD -> ", "● "))
-    if (refs.some((r) => r.includes("origin/") && !r.includes("HEAD"))) {
-      return refs.filter((r) => !r.includes("origin/HEAD"))
-    }
-    return refs
+    return props.entry.refs.map((r) => r.replace("HEAD -> ", "● "))
   })
 
   return (
@@ -85,28 +81,30 @@ function HistoryRow(props: { entry: VcsHistoryLine & { author?: string } }) {
         {graph()}
       </text>
       <box flexDirection="row" flexGrow={1} gap={1} overflow="hidden">
-        <text wrapMode="none" fg={theme.theme.text} flexShrink={0}>
+        <text wrapMode="none" fg={theme.theme.text} flexGrow={1} flexShrink={1}>
           {props.entry.subject}
         </text>
 
-        <box flexDirection="row" gap={1} flexShrink={1} justifyContent="flex-end">
-          <For each={cleanedRefs()}>
-            {(ref) => {
-              const isHead = createMemo(() => ref.includes("● ") || ref.includes("tag: "))
-              const bg = createMemo(() => (isHead() ? theme.theme.warning : theme.theme.backgroundElement))
-              const fg = createMemo(() =>
-                isHead() ? selectedForeground(theme.theme, theme.theme.warning) : theme.theme.textMuted,
-              )
-              return (
-                <box backgroundColor={bg()} paddingLeft={1} paddingRight={1} flexShrink={0}>
-                  <text wrapMode="none" fg={fg()} attributes={isHead() ? TextAttributes.BOLD : undefined}>
-                    {ref.replace("tag: ", "🏷 ")}
-                  </text>
-                </box>
-              )
-            }}
-          </For>
-        </box>
+        <Show when={cleanedRefs().length > 0}>
+          <box flexDirection="row" gap={1} flexShrink={0} backgroundColor={theme.theme.background} paddingLeft={1}>
+            <For each={cleanedRefs()}>
+              {(ref) => {
+                const isHead = createMemo(() => ref.includes("● ") || ref.includes("tag: "))
+                const bg = createMemo(() => (isHead() ? theme.theme.warning : theme.theme.backgroundElement))
+                const fg = createMemo(() =>
+                  isHead() ? selectedForeground(theme.theme, theme.theme.warning) : theme.theme.textMuted,
+                )
+                return (
+                  <box backgroundColor={bg()} paddingLeft={1} paddingRight={1} flexShrink={0}>
+                    <text wrapMode="none" fg={fg()} attributes={isHead() ? TextAttributes.BOLD : undefined}>
+                      {ref.replace("tag: ", "🏷 ")}
+                    </text>
+                  </box>
+                )
+              }}
+            </For>
+          </box>
+        </Show>
       </box>
     </box>
   )

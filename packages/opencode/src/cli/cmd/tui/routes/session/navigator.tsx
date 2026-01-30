@@ -551,9 +551,37 @@ export function Navigator(props: NavigatorProps) {
     const msg = commitMessage().trim()
     if (!msg) return
     if (isDirty()) await saveFile()
-    runPrompt(`git add . && git commit -m "${msg.replace(/"/g, '\\"')}"`, "shell")
+
+    const directory = sync.data.path.directory
+    try {
+      const proc = Bun.spawn({
+        cmd: ["git", "add", "."],
+        cwd: directory,
+        stdout: "pipe",
+        stderr: "pipe",
+      })
+      await proc.exited
+
+      const commitProc = Bun.spawn({
+        cmd: ["git", "commit", "-m", msg],
+        cwd: directory,
+        stdout: "pipe",
+        stderr: "pipe",
+      })
+      const exitCode = await commitProc.exited
+
+      if (exitCode === 0) {
+        toast.show({ variant: "success", message: "Changes committed" })
+        refreshGit()
+      } else {
+        const stderr = await new Response(commitProc.stderr).text()
+        toast.show({ variant: "error", message: `Commit failed: ${stderr}` })
+      }
+    } catch (err: any) {
+      toast.show({ variant: "error", message: `Commit failed: ${err.message}` })
+    }
+
     setCommitMessage("")
-    // Refresh will be triggered by prompt completion or save
   }
 
   const openBranchSwitcher = async () => {
@@ -973,7 +1001,7 @@ export function Navigator(props: NavigatorProps) {
               <Show
                 when={hasGitEntries()}
                 fallback={
-                  <box paddingLeft={2} paddingRight={2} paddingTop={1}>
+                  <box paddingLeft={2} paddingRight={2} paddingTop={1} flexGrow={1}>
                     <text fg={theme.theme.textMuted}>No git changes</text>
                   </box>
                 }
