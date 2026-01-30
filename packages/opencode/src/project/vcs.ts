@@ -34,6 +34,7 @@ export namespace Vcs {
       hash: z.string().optional(),
       subject: z.string().optional(),
       refs: z.array(z.string()).optional(),
+      author: z.string().optional(),
     })
     .meta({
       ref: "VcsHistoryLine",
@@ -94,26 +95,33 @@ export namespace Vcs {
     const first = line.indexOf(HISTORY_SEPARATOR)
     const second = line.indexOf(HISTORY_SEPARATOR, first + HISTORY_SEPARATOR.length)
     if (second === -1) return { graph: line }
+    const third = line.indexOf(HISTORY_SEPARATOR, second + HISTORY_SEPARATOR.length)
+
     const prefix = line.slice(0, first)
     const hashIndex = prefix.lastIndexOf(" ")
     const graph = hashIndex >= 0 ? prefix.slice(0, hashIndex + 1) : ""
     const hash = hashIndex >= 0 ? prefix.slice(hashIndex + 1) : prefix
     const subject = line.slice(first + HISTORY_SEPARATOR.length, second)
-    const refsRaw = line.slice(second + HISTORY_SEPARATOR.length).trim()
+    const refsRaw =
+      third === -1
+        ? line.slice(second + HISTORY_SEPARATOR.length).trim()
+        : line.slice(second + HISTORY_SEPARATOR.length, third).trim()
     const refs = refsRaw.length ? refsRaw.split(", ").filter(Boolean) : undefined
+    const author = third !== -1 ? line.slice(third + HISTORY_SEPARATOR.length).trim() : undefined
 
     return {
       graph,
       hash: hash.length ? hash : undefined,
       subject: subject.length ? subject : undefined,
       refs,
+      author,
     }
   }
 
   export async function history(limit = HISTORY_LIMIT) {
     if (Instance.project.vcs !== "git") return []
     const size = Math.min(Math.max(limit, 1), 200)
-    const format = "%h%x1f%s%x1f%D"
+    const format = `%h${HISTORY_SEPARATOR}%s${HISTORY_SEPARATOR}%D${HISTORY_SEPARATOR}%an`
     const output = await $`git log --graph --decorate=short --pretty=format:${format} --all -n ${size}`
       .quiet()
       .nothrow()
@@ -125,5 +133,19 @@ export namespace Vcs {
       .split("\n")
       .map((line) => line.trimEnd())
       .map(parseHistoryLine)
+  }
+
+  export async function branches() {
+    if (Instance.project.vcs !== "git") return []
+    const output = await $`git branch -a --format='%(refname:short)'`
+      .quiet()
+      .nothrow()
+      .cwd(Instance.worktree)
+      .text()
+      .catch(() => "")
+    return output
+      .split("\n")
+      .map((x) => x.trim())
+      .filter(Boolean)
   }
 }

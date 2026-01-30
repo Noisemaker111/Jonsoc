@@ -1,7 +1,21 @@
-import { batch, createEffect, createMemo, createResource, createSignal, For, Match, on, onCleanup, Show, Switch, untrack } from "solid-js"
+import {
+  batch,
+  createEffect,
+  createMemo,
+  createResource,
+  createSignal,
+  For,
+  Match,
+  on,
+  onCleanup,
+  Show,
+  Switch,
+  untrack,
+} from "solid-js"
 import { createStore } from "solid-js/store"
 import path from "path"
-import type { ScrollBoxRenderable, TextareaRenderable } from "@opentui/core"
+import type { ScrollBoxRenderable, TextareaRenderable, InputRenderable } from "@opentui/core"
+import { TextAttributes } from "@opentui/core"
 import { useKeyboard, useTerminalDimensions } from "@opentui/solid"
 import { selectedForeground, useTheme } from "@tui/context/theme"
 import { useSDK } from "@tui/context/sdk"
@@ -9,6 +23,7 @@ import { useToast } from "@tui/ui/toast"
 import { useDialog } from "@tui/ui/dialog"
 import { DialogAlert } from "@tui/ui/dialog-alert"
 import { DialogPrompt } from "@tui/ui/dialog-prompt"
+import { DialogSelect } from "@tui/ui/dialog-select"
 import { usePromptRef } from "@tui/context/prompt"
 import { useSync } from "@tui/context/sync"
 import { SplitBorder } from "@tui/component/border"
@@ -20,6 +35,10 @@ import { Locale } from "@/util/locale"
 import { Global } from "@/global"
 import { LANGUAGE_EXTENSIONS } from "@/lsp/language"
 import type { File as FileStatus, FileContent, FileNode, VcsHistoryLine } from "@opencode-ai/sdk/v2"
+import { GitCommit } from "./git-commit"
+import { GitHistory } from "./git-history"
+import { VcsDiffViewer } from "./vcs-diff-viewer"
+import { NavigatorBorderChars, Tab, ActionButton, ExplorerRow, GitRow, fileType, BinaryPreview } from "./navigator-ui"
 
 type ExplorerEntry = {
   node: FileNode
@@ -38,15 +57,10 @@ type NavigatorProps = {
 
 type NavigatorTab = "explorer" | "git"
 
-const STATUS_LABELS: Record<FileStatus["status"], string> = {
+const STATUS_LABELS: Record<string, string> = {
   added: "A",
   deleted: "D",
   modified: "M",
-}
-
-const NavigatorBorderChars = {
-  ...SplitBorder.customBorderChars,
-  vertical: "│",
 }
 
 export function Navigator(props: NavigatorProps) {
@@ -84,6 +98,7 @@ export function Navigator(props: NavigatorProps) {
   const [expanded, setExpanded] = createStore<Record<string, boolean>>(readExpanded())
   const [explorerScroll, setExplorerScroll] = createSignal<ScrollBoxRenderable | undefined>(undefined)
   const [gitScroll, setGitScroll] = createSignal<ScrollBoxRenderable | undefined>(undefined)
+  const [commitMessage, setCommitMessage] = createSignal("")
 
   const [status, { refetch: refreshStatus }] = createResource(
     () => (loaded() ? "open" : undefined),
@@ -212,6 +227,21 @@ export function Navigator(props: NavigatorProps) {
       return a.path.localeCompare(b.path)
     })
   })
+
+  // Auto-refresh Git status periodically and on save
+  createEffect(() => {
+    if (tab() !== "git" || !props.open) return
+    const id = setInterval(refreshGit, 10000)
+    onCleanup(() => clearInterval(id))
+  })
+
+  createEffect(
+    on(saveStatus, (status) => {
+      if (status === "saved") {
+        refreshGit()
+      }
+    }),
+  )
 
   const activeStatus = createMemo(() => {
     const file = activePath()
@@ -517,6 +547,63 @@ export function Navigator(props: NavigatorProps) {
     refreshHistory()
   }
 
+  const handleCommit = async () => {
+    const msg = commitMessage().trim()
+    if (!msg) return
+    if (isDirty()) await saveFile()
+    runPrompt(`git add . && git commit -m "${msg.replace(/"/g, '\\"')}"`, "shell")
+    setCommitMessage("")
+    // Refresh will be triggered by prompt completion or save
+  }
+
+  const openBranchSwitcher = async () => {
+    const list = await fetch(`${sdk.url}/vcs/branches`)
+      .then((r) => r.json())
+      .catch(() => [])
+    if (!list || !Array.isArray(list)) return
+
+    const current = branch()
+    dialog.replace(() => (
+      <DialogSelect
+        title="Switch branch"
+        options={[
+          { title: "+ New branch...", value: "__new__" },
+          ...list.map((b: string) => ({
+            title: b,
+            value: b,
+          })),
+        ]}
+        current={current}
+        onSelect={async (opt) => {
+          if (opt.value === "__new__") {
+            dialog.replace(() => (
+              <DialogPrompt
+                title="Create branch"
+                placeholder="branch-name"
+                onConfirm={async (name) => {
+                  dialog.clear()
+                  const trimmed = name.trim()
+                  if (!trimmed) return
+                  await runShell(`git checkout -b ${trimmed}`)
+                  refreshGit()
+                }}
+                onCancel={() => openBranchSwitcher()}
+              />
+            ))
+            return
+          }
+          dialog.clear()
+          await fetch(`${sdk.url}/vcs/checkout`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ branch: opt.value }),
+          })
+          refreshGit()
+        }}
+      />
+    ))
+  }
+
   const openMergeDialog = () => {
     dialog.replace(() => (
       <DialogPrompt
@@ -794,28 +881,11 @@ export function Navigator(props: NavigatorProps) {
               />
             </line_number>
             <Show when={fileData()?.diff}>
-              <box paddingTop={1}>
-                <text fg={theme.theme.textMuted}>Git diff</text>
-                <diff
-                  diff={fileData()?.diff ?? ""}
-                  view="unified"
-                  filetype={fileType(activePath())}
-                  syntaxStyle={theme.syntax()}
-                  showLineNumbers={true}
-                  width="100%"
-                  wrapMode={props.wrapMode ?? "none"}
-                  fg={theme.theme.text}
-                  addedBg={theme.theme.diffAddedBg}
-                  removedBg={theme.theme.diffRemovedBg}
-                  contextBg={theme.theme.diffContextBg}
-                  addedSignColor={theme.theme.diffHighlightAdded}
-                  removedSignColor={theme.theme.diffHighlightRemoved}
-                  lineNumberFg={theme.theme.diffLineNumber}
-                  lineNumberBg={theme.theme.diffContextBg}
-                  addedLineNumberBg={theme.theme.diffAddedLineNumberBg}
-                  removedLineNumberBg={theme.theme.diffRemovedLineNumberBg}
-                />
-              </box>
+              <VcsDiffViewer
+                diff={() => fileData()!.diff!}
+                fileType={fileType(activePath())}
+                wrapMode={props.wrapMode ?? "none"}
+              />
             </Show>
           </box>
         </Match>
@@ -824,39 +894,14 @@ export function Navigator(props: NavigatorProps) {
   )
 
   const historyPanel = () => (
-    <box height={historyHeight()} flexShrink={0} border={["top"]} borderColor={theme.theme.border}>
-      <box
-        paddingLeft={1}
-        paddingRight={1}
-        paddingTop={1}
-        paddingBottom={1}
-        flexDirection="row"
-        justifyContent="space-between"
-        backgroundColor={theme.theme.background}
-      >
-        <text fg={theme.theme.text}>
-          <b>History</b>
-          <Show when={branch()}>
-            <span style={{ fg: theme.theme.textMuted }}> ({branch()})</span>
-          </Show>
-        </text>
-        <text fg={theme.theme.textMuted}>{historyEntries().length} commits</text>
-      </box>
-      <scrollbox
-        flexGrow={1}
-        paddingLeft={1}
-        paddingRight={1}
-        paddingBottom={1}
-        viewportOptions={viewportOptions()}
-        verticalScrollbarOptions={verticalScrollbarOptions()}
-      >
-        <Show when={historyEntries().length > 0} fallback={<text fg={theme.theme.textMuted}>No commits yet</text>}>
-          <box flexDirection="column" gap={0}>
-            <For each={historyEntries()}>{(entry) => <HistoryRow entry={entry} />}</For>
-          </box>
-        </Show>
-      </scrollbox>
-    </box>
+    <GitHistory
+      branch={branch}
+      historyEntries={historyEntries}
+      historyHeight={historyHeight}
+      onBranchSwitcher={openBranchSwitcher}
+      viewportOptions={viewportOptions()}
+      verticalScrollbarOptions={verticalScrollbarOptions()}
+    />
   )
 
   const edgeBorder = createMemo<("left" | "right")[]>(() => (props.side === "left" ? ["left"] : ["right"]))
@@ -908,22 +953,20 @@ export function Navigator(props: NavigatorProps) {
           flexDirection="column"
           backgroundColor={theme.theme.background}
         >
-          <box paddingLeft={1} paddingRight={1} paddingTop={1} paddingBottom={1} flexDirection="row" gap={1}>
+          <box
+            backgroundColor={theme.theme.background}
+            flexDirection="row"
+            justifyContent="center"
+            paddingTop={0}
+            paddingBottom={1}
+            flexShrink={0}
+          >
             <Tab label="Explorer" active={tab() === "explorer"} onSelect={() => setTab(() => "explorer")} />
             <Tab label="Git" active={tab() === "git"} onSelect={() => setTab(() => "git")} />
           </box>
+
           <Show when={tab() === "git"}>
-            <box paddingLeft={1} paddingRight={1} paddingBottom={1} gap={1}>
-              <box flexDirection="row" gap={1} flexShrink={0}>
-                <ActionButton label="Commit" onSelect={() => runCommand("commit")} />
-                <ActionButton label="Push" onSelect={() => runShell("git push")} />
-                <ActionButton label="Pull" onSelect={() => runShell("git pull --rebase")} />
-              </box>
-              <box flexDirection="row" gap={1} flexShrink={0}>
-                <ActionButton label="Merge" onSelect={openMergeDialog} />
-                <ActionButton label="Refresh" onSelect={refreshGit} />
-              </box>
-            </box>
+            <GitCommit commitMessage={commitMessage} setCommitMessage={setCommitMessage} onCommit={handleCommit} />
           </Show>
           <Switch>
             <Match when={tab() === "git"}>
@@ -1039,200 +1082,4 @@ export function Navigator(props: NavigatorProps) {
       </box>
     </box>
   )
-}
-
-function ExplorerRow(props: {
-  entry: ExplorerEntry
-  active: boolean
-  expanded: boolean
-  width: number
-  status?: FileStatus
-  onSelect: () => void
-}) {
-  const theme = useTheme()
-  const indicator = createMemo(() => {
-    if (props.entry.node.type !== "directory") return " "
-    return props.expanded ? "v" : ">"
-  })
-
-  const statusLabel = createMemo(() => {
-    if (!props.status) return ""
-    return STATUS_LABELS[props.status.status]
-  })
-
-  const statusColor = createMemo(() => {
-    const status = props.status
-    if (!status) return theme.theme.textMuted
-    if (status.status === "added") return theme.theme.diffAdded
-    if (status.status === "deleted") return theme.theme.diffRemoved
-    return theme.theme.warning
-  })
-
-  const fg = createMemo(() => {
-    if (props.active) return selectedForeground(theme.theme, theme.theme.primary)
-    if (props.entry.node.ignored) return theme.theme.textMuted
-    return theme.theme.text
-  })
-
-  const nameWidth = createMemo(() => Math.max(10, props.width - (props.entry.depth * 2 + 6)))
-
-  return (
-    <box
-      id={props.entry.node.path}
-      flexDirection="row"
-      paddingLeft={props.entry.depth * 2 + 1}
-      paddingRight={1}
-      backgroundColor={props.active ? theme.theme.primary : theme.theme.background}
-      onMouseUp={props.onSelect}
-      justifyContent="space-between"
-    >
-      <text fg={fg()} wrapMode="none">
-        {indicator()} {Locale.truncate(props.entry.node.name, nameWidth())}
-      </text>
-      <Show when={statusLabel()}>
-        <text
-          fg={props.active ? selectedForeground(theme.theme, theme.theme.primary) : statusColor()}
-          wrapMode="none"
-          flexShrink={0}
-        >
-          {statusLabel()}
-        </text>
-      </Show>
-    </box>
-  )
-}
-
-function GitRow(props: { entry: FileStatus; active: boolean; width: number; onSelect: () => void }) {
-  const theme = useTheme()
-  const fg = createMemo(() => {
-    if (props.active) return selectedForeground(theme.theme, theme.theme.primary)
-    return theme.theme.text
-  })
-  const statusColor = createMemo(() => {
-    if (props.entry.status === "added") return theme.theme.diffAdded
-    if (props.entry.status === "deleted") return theme.theme.diffRemoved
-    return theme.theme.warning
-  })
-
-  const pathWidth = createMemo(() => Math.max(10, props.width - 14))
-
-  return (
-    <box
-      id={props.entry.path}
-      flexDirection="row"
-      paddingLeft={1}
-      paddingRight={1}
-      backgroundColor={props.active ? theme.theme.primary : theme.theme.background}
-      justifyContent="space-between"
-      onMouseUp={props.onSelect}
-    >
-      <text fg={fg()} wrapMode="none">
-        <span style={{ fg: props.active ? fg() : statusColor() }}>{STATUS_LABELS[props.entry.status]}</span>{" "}
-        {Locale.truncateMiddle(props.entry.path, pathWidth())}
-      </text>
-      <text fg={props.active ? fg() : theme.theme.textMuted} wrapMode="none" flexShrink={0}>
-        <span style={{ fg: theme.theme.diffAdded }}>+{props.entry.added}</span>
-        <span style={{ fg: theme.theme.diffRemoved }}> -{props.entry.removed}</span>
-      </text>
-    </box>
-  )
-}
-
-function ActionButton(props: { label: string; onSelect: () => void }) {
-  const theme = useTheme()
-  return (
-    <box
-      flexGrow={0}
-      flexShrink={0}
-      paddingLeft={1}
-      paddingRight={1}
-      backgroundColor={theme.theme.backgroundElement}
-      onMouseUp={props.onSelect}
-      justifyContent="center"
-    >
-      <text fg={theme.theme.text} wrapMode="none">
-        {props.label}
-      </text>
-    </box>
-  )
-}
-
-function HistoryRow(props: { entry: VcsHistoryLine }) {
-  const theme = useTheme()
-  const refs = () => props.entry.refs?.join(", ")
-
-  return (
-    <box flexDirection="row" gap={1}>
-      <text wrapMode="none" fg={theme.theme.accent}>
-        {props.entry.graph}
-      </text>
-      <Show when={props.entry.hash}>
-        {(value) => (
-          <text wrapMode="none" fg={theme.theme.textMuted}>
-            {value().slice(0, 7)}
-          </text>
-        )}
-      </Show>
-      <box flexDirection="row" flexGrow={1} gap={1}>
-        <Show when={refs()}>
-          {(value) => (
-            <text wrapMode="none" fg={theme.theme.warning}>
-              ({value()})
-            </text>
-          )}
-        </Show>
-        <text wrapMode="none" fg={theme.theme.text} flexGrow={1}>
-          {props.entry.subject}
-        </text>
-      </box>
-    </box>
-  )
-}
-
-function Tab(props: { label: string; active: boolean; onSelect: () => void }) {
-  const theme = useTheme()
-  return (
-    <box
-      flexShrink={0}
-      paddingLeft={1}
-      paddingRight={1}
-      backgroundColor={props.active ? theme.theme.primary : theme.theme.backgroundElement}
-      onMouseUp={props.onSelect}
-      flexDirection="row"
-      gap={1}
-    >
-      <Show when={props.active}>
-        <text fg={selectedForeground(theme.theme, theme.theme.primary)} wrapMode="none">
-          •
-        </text>
-      </Show>
-      <text
-        fg={props.active ? selectedForeground(theme.theme, theme.theme.primary) : theme.theme.textMuted}
-        wrapMode="none"
-      >
-        {props.label}
-      </text>
-    </box>
-  )
-}
-
-function BinaryPreview(props: { content?: FileContent }) {
-  const theme = useTheme()
-  const description = createMemo(() => {
-    const data = props.content
-    if (!data) return "Binary file"
-    if (!data.mimeType) return "Binary file"
-    return `Binary file (${data.mimeType})`
-  })
-
-  return <text fg={theme.theme.textMuted}>{description()}</text>
-}
-
-function fileType(input?: string) {
-  if (!input) return "none"
-  const ext = path.extname(input)
-  const language = LANGUAGE_EXTENSIONS[ext]
-  if (!language) return "none"
-  if (["typescriptreact", "javascriptreact", "javascript"].includes(language)) return "typescript"
-  return language
 }

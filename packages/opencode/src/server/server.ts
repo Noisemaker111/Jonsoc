@@ -3,6 +3,7 @@ import { Bus } from "@/bus"
 import { Log } from "../util/log"
 import { describeRoute, generateSpecs, validator, resolver, openAPIRouteHandler } from "hono-openapi"
 import { Hono } from "hono"
+import { $ } from "bun"
 import { cors } from "hono/cors"
 import { streamSSE } from "hono/streaming"
 import { proxy } from "hono/proxy"
@@ -289,6 +290,52 @@ export namespace Server {
             const { limit } = c.req.valid("query")
             const history = await Vcs.history(limit)
             return c.json(history)
+          },
+        )
+        .get(
+          "/vcs/branches",
+          describeRoute({
+            summary: "List branches",
+            description: "Retrieve a list of all branches in the repository.",
+            operationId: "vcs.branches",
+            responses: {
+              200: {
+                description: "List of branches",
+                content: {
+                  "application/json": {
+                    schema: resolver(z.array(z.string())),
+                  },
+                },
+              },
+            },
+          }),
+          async (c) => {
+            const branches = await Vcs.branches()
+            return c.json(branches)
+          },
+        )
+        .post(
+          "/vcs/checkout",
+          describeRoute({
+            summary: "Checkout branch",
+            description: "Switch to a different branch in the repository.",
+            operationId: "vcs.checkout",
+            responses: {
+              200: {
+                description: "Success",
+                content: {
+                  "application/json": {
+                    schema: resolver(z.boolean()),
+                  },
+                },
+              },
+            },
+          }),
+          validator("json", z.object({ branch: z.string() })),
+          async (c) => {
+            const { branch } = c.req.valid("json")
+            await $`git checkout ${branch}`.quiet().nothrow().cwd(Instance.worktree)
+            return c.json(true)
           },
         )
         .get(
