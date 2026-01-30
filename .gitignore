@@ -26,3 +26,13 @@ target
 opencode-dev
 logs/
 *.bun-build
+
+# Windows reserved device names that break tooling
+nul
+NUL
+con
+CON
+prn
+PRN
+aux
+AUX

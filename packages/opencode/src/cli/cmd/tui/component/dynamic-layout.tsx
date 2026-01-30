@@ -55,11 +55,13 @@ export function DynamicLayout(props: DynamicLayoutProps) {
 
           return (
             <>
-              {/* Simple 1-char border between panels - no resize handles */}
+              {/* Thin border between panels using line character */}
               <Show
                 when={position > 0 && layout.getPanelAt((position - 1) as PanelPosition)?.visible && panel()?.visible}
               >
-                <box width={1} height="100%" backgroundColor={theme.border} />
+                <box width={1} height="100%">
+                  <text fg={theme.border}>{"│\n".repeat(safeDimensions().height)}</text>
+                </box>
               </Show>
 
               <Show when={panel()?.visible}>

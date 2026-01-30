@@ -199,8 +199,9 @@ export default function Page() {
   const comments = useComments()
   const permission = usePermission()
   const [pendingMessage, setPendingMessage] = createSignal<string | undefined>(undefined)
+  const dirKey = createMemo(() => params.dir ?? "")
   const sessionKey = createMemo(() => `${params.dir}${params.id ? "/" + params.id : ""}`)
-  const tabs = createMemo(() => layout.tabs(sessionKey))
+  const tabs = createMemo(() => layout.tabs(dirKey))
   const view = createMemo(() => layout.view(sessionKey))
 
   if (import.meta.env.DEV) {
@@ -971,9 +972,9 @@ export default function Page() {
       .filter((tab) => tab !== "context"),
   )
 
-  const mobileReview = createMemo(() => !isDesktop() && view().reviewPanel.opened() && store.mobileTab === "review")
+  const mobileReview = createMemo(() => !isDesktop() && layout.review.panelOpened() && store.mobileTab === "review")
 
-  const showTabs = createMemo(() => view().reviewPanel.opened())
+  const showTabs = createMemo(() => layout.review.panelOpened())
 
   const activeTab = createMemo(() => {
     const active = tabs().active()
@@ -998,7 +999,7 @@ export default function Page() {
     if (!id) return
     if (!hasReview()) return
 
-    const wants = isDesktop() ? view().reviewPanel.opened() && activeTab() === "review" : store.mobileTab === "review"
+    const wants = isDesktop() ? layout.review.panelOpened() && activeTab() === "review" : store.mobileTab === "review"
     if (!wants) return
     if (diffsReady()) return
 
@@ -1393,7 +1394,7 @@ export default function Page() {
       <SessionHeader />
       <div class="flex-1 min-h-0 flex flex-col md:flex-row">
         {/* Mobile tab bar - only shown on mobile when user opened review */}
-        <Show when={!isDesktop() && view().reviewPanel.opened()}>
+        <Show when={!isDesktop() && layout.review.panelOpened()}>
           <Tabs class="h-auto">
             <Tabs.List>
               <Tabs.Trigger
@@ -1430,207 +1431,220 @@ export default function Page() {
             "--prompt-height": store.promptHeight ? `${store.promptHeight}px` : undefined,
           }}
         >
-          <div class="flex-1 min-h-0 overflow-hidden">
-            <Switch>
-              <Match when={params.id}>
-                <Show when={activeMessage()}>
-                  <Show
-                    when={!mobileReview()}
-                    fallback={
-                      <div class="relative h-full overflow-hidden">
-                        <Switch>
-                          <Match when={hasReview()}>
-                            <Show
-                              when={diffsReady()}
-                              fallback={<div class="px-4 py-4 text-text-weak">Loading changes...</div>}
-                            >
-                              <SessionReviewTab
-                                diffs={diffs}
-                                view={view}
-                                diffStyle="unified"
-                                onLineComment={addCommentToContext}
-                                comments={comments.all()}
-                                focusedComment={comments.focus()}
-                                onFocusedCommentChange={comments.setFocus}
-                                onViewFile={(path) => {
-                                  const value = file.tab(path)
-                                  tabs().open(value)
-                                  file.load(path)
-                                }}
-                                classes={{
-                                  root: "pb-[calc(var(--prompt-height,8rem)+32px)]",
-                                  header: "px-4",
-                                  container: "px-4",
-                                }}
-                              />
-                            </Show>
-                          </Match>
-                          <Match when={true}>
-                            <div class="h-full px-4 pb-30 flex flex-col items-center justify-center text-center gap-6">
-                              <Mark class="w-14 opacity-10" />
-                              <div class="text-13-regular text-text-weak max-w-56">No changes in this session yet</div>
-                            </div>
-                          </Match>
-                        </Switch>
-                      </div>
-                    }
-                  >
-                    <div class="relative w-full h-full min-w-0">
-                      <div
-                        class="absolute left-1/2 -translate-x-1/2 bottom-[calc(var(--prompt-height,8rem)+32px)] z-[60] pointer-events-none transition-all duration-200 ease-out"
-                        classList={{
-                          "opacity-100 translate-y-0 scale-100": autoScroll.userScrolled(),
-                          "opacity-0 translate-y-2 scale-95 pointer-events-none": !autoScroll.userScrolled(),
+          <div class="flex-1 min-h-0 overflow-hidden relative">
+            {/* Session view - always mounted, opacity transition */}
+            <div
+              class="absolute inset-0 transition-opacity duration-200"
+              classList={{
+                "opacity-100 pointer-events-auto": !!params.id,
+                "opacity-0 pointer-events-none": !params.id,
+              }}
+            >
+              <Show when={activeMessage()}>
+                <Show
+                  when={!mobileReview()}
+                  fallback={
+                    <div class="relative h-full overflow-hidden">
+                      <Switch>
+                        <Match when={hasReview()}>
+                          <Show
+                            when={diffsReady()}
+                            fallback={<div class="px-4 py-4 text-text-weak">Loading changes...</div>}
+                          >
+                            <SessionReviewTab
+                              diffs={diffs}
+                              view={view}
+                              diffStyle="unified"
+                              onLineComment={addCommentToContext}
+                              comments={comments.all()}
+                              focusedComment={comments.focus()}
+                              onFocusedCommentChange={comments.setFocus}
+                              onViewFile={(path) => {
+                                const value = file.tab(path)
+                                tabs().open(value)
+                                file.load(path)
+                              }}
+                              classes={{
+                                root: "pb-[calc(var(--prompt-height,8rem)+32px)]",
+                                header: "px-4",
+                                container: "px-4",
+                              }}
+                            />
+                          </Show>
+                        </Match>
+                        <Match when={true}>
+                          <div class="h-full px-4 pb-30 flex flex-col items-center justify-center text-center gap-6">
+                            <Mark class="w-14 opacity-10" />
+                            <div class="text-13-regular text-text-weak max-w-56">No changes in this session yet</div>
+                          </div>
+                        </Match>
+                      </Switch>
+                    </div>
+                  }
+                >
+                  <div class="relative w-full h-full min-w-0">
+                    <div
+                      class="absolute left-1/2 -translate-x-1/2 bottom-[calc(var(--prompt-height,8rem)+32px)] z-[60] pointer-events-none transition-all duration-200 ease-out"
+                      classList={{
+                        "opacity-100 translate-y-0 scale-100": autoScroll.userScrolled(),
+                        "opacity-0 translate-y-2 scale-95 pointer-events-none": !autoScroll.userScrolled(),
+                      }}
+                    >
+                      <button
+                        class="pointer-events-auto size-8 flex items-center justify-center rounded-full bg-background-base border border-border-base shadow-sm text-text-base hover:bg-background-stronger transition-colors"
+                        onClick={() => {
+                          setStore("messageId", undefined)
+                          autoScroll.forceScrollToBottom()
+                          window.history.replaceState(null, "", window.location.href.replace(/#.*$/, ""))
                         }}
                       >
-                        <button
-                          class="pointer-events-auto size-8 flex items-center justify-center rounded-full bg-background-base border border-border-base shadow-sm text-text-base hover:bg-background-stronger transition-colors"
-                          onClick={() => {
-                            setStore("messageId", undefined)
-                            autoScroll.forceScrollToBottom()
-                            window.history.replaceState(null, "", window.location.href.replace(/#.*$/, ""))
+                        <Icon name="arrow-down-to-line" />
+                      </button>
+                    </div>
+                    <div
+                      ref={setScrollRef}
+                      onWheel={(e) => markScrollGesture(e.target)}
+                      onTouchMove={(e) => markScrollGesture(e.target)}
+                      onPointerDown={(e) => {
+                        if (e.target !== e.currentTarget) return
+                        markScrollGesture(e.target)
+                      }}
+                      onScroll={(e) => {
+                        if (!hasScrollGesture()) return
+                        markScrollGesture(e.target)
+                        autoScroll.handleScroll()
+                        if (isDesktop()) scheduleScrollSpy(e.currentTarget)
+                      }}
+                      onClick={autoScroll.handleInteraction}
+                      class="relative min-w-0 w-full h-full overflow-y-auto session-scroller"
+                      style={{ "--session-title-height": info()?.title ? "40px" : "0px" }}
+                    >
+                      <Show when={info()?.title}>
+                        <div
+                          classList={{
+                            "sticky top-0 z-30 bg-background-stronger": true,
+                            "w-full": true,
+                            "px-4 md:px-6": true,
+                            "md:max-w-200 md:mx-auto": !showTabs(),
                           }}
                         >
-                          <Icon name="arrow-down-to-line" />
-                        </button>
-                      </div>
+                          <div class="h-10 flex items-center">
+                            <h1 class="text-16-medium text-text-strong truncate">{info()?.title}</h1>
+                          </div>
+                        </div>
+                      </Show>
+
                       <div
-                        ref={setScrollRef}
-                        onWheel={(e) => markScrollGesture(e.target)}
-                        onTouchMove={(e) => markScrollGesture(e.target)}
-                        onPointerDown={(e) => {
-                          if (e.target !== e.currentTarget) return
-                          markScrollGesture(e.target)
+                        ref={autoScroll.contentRef}
+                        role="log"
+                        class="flex flex-col gap-32 items-start justify-start pb-[calc(var(--prompt-height,8rem)+64px)] md:pb-[calc(var(--prompt-height,10rem)+64px)] transition-[margin]"
+                        classList={{
+                          "w-full": true,
+                          "md:max-w-200 md:mx-auto": !showTabs(),
+                          "mt-0.5": !showTabs(),
+                          "mt-0": showTabs(),
                         }}
-                        onScroll={(e) => {
-                          if (!hasScrollGesture()) return
-                          markScrollGesture(e.target)
-                          autoScroll.handleScroll()
-                          if (isDesktop()) scheduleScrollSpy(e.currentTarget)
-                        }}
-                        onClick={autoScroll.handleInteraction}
-                        class="relative min-w-0 w-full h-full overflow-y-auto session-scroller"
-                        style={{ "--session-title-height": info()?.title ? "40px" : "0px" }}
                       >
-                        <Show when={info()?.title}>
-                          <div
-                            classList={{
-                              "sticky top-0 z-30 bg-background-stronger": true,
-                              "w-full": true,
-                              "px-4 md:px-6": true,
-                              "md:max-w-200 md:mx-auto": !showTabs(),
-                            }}
-                          >
-                            <div class="h-10 flex items-center">
-                              <h1 class="text-16-medium text-text-strong truncate">{info()?.title}</h1>
-                            </div>
+                        <Show when={store.turnStart > 0}>
+                          <div class="w-full flex justify-center">
+                            <Button
+                              variant="ghost"
+                              size="large"
+                              class="text-12-medium opacity-50"
+                              onClick={() => setStore("turnStart", 0)}
+                            >
+                              Render earlier messages
+                            </Button>
                           </div>
                         </Show>
+                        <Show when={historyMore()}>
+                          <div class="w-full flex justify-center">
+                            <Button
+                              variant="ghost"
+                              size="large"
+                              class="text-12-medium opacity-50"
+                              disabled={historyLoading()}
+                              onClick={() => {
+                                const id = params.id
+                                if (!id) return
+                                setStore("turnStart", 0)
+                                sync.session.history.loadMore(id)
+                              }}
+                            >
+                              {historyLoading() ? "Loading earlier messages..." : "Load earlier messages"}
+                            </Button>
+                          </div>
+                        </Show>
+                        <For each={renderedUserMessages()}>
+                          {(message) => {
+                            if (import.meta.env.DEV) {
+                              onMount(() => {
+                                const id = params.id
+                                if (!id) return
+                                navMark({ dir: params.dir, to: id, name: "session:first-turn-mounted" })
+                              })
+                            }
 
-                        <div
-                          ref={autoScroll.contentRef}
-                          role="log"
-                          class="flex flex-col gap-32 items-start justify-start pb-[calc(var(--prompt-height,8rem)+64px)] md:pb-[calc(var(--prompt-height,10rem)+64px)] transition-[margin]"
-                          classList={{
-                            "w-full": true,
-                            "md:max-w-200 md:mx-auto": !showTabs(),
-                            "mt-0.5": !showTabs(),
-                            "mt-0": showTabs(),
-                          }}
-                        >
-                          <Show when={store.turnStart > 0}>
-                            <div class="w-full flex justify-center">
-                              <Button
-                                variant="ghost"
-                                size="large"
-                                class="text-12-medium opacity-50"
-                                onClick={() => setStore("turnStart", 0)}
-                              >
-                                Render earlier messages
-                              </Button>
-                            </div>
-                          </Show>
-                          <Show when={historyMore()}>
-                            <div class="w-full flex justify-center">
-                              <Button
-                                variant="ghost"
-                                size="large"
-                                class="text-12-medium opacity-50"
-                                disabled={historyLoading()}
-                                onClick={() => {
-                                  const id = params.id
-                                  if (!id) return
-                                  setStore("turnStart", 0)
-                                  sync.session.history.loadMore(id)
+                            return (
+                              <div
+                                id={anchor(message.id)}
+                                data-message-id={message.id}
+                                classList={{
+                                  "min-w-0 w-full max-w-full": true,
+                                  "md:max-w-200": !showTabs(),
                                 }}
                               >
-                                {historyLoading() ? "Loading earlier messages..." : "Load earlier messages"}
-                              </Button>
-                            </div>
-                          </Show>
-                          <For each={renderedUserMessages()}>
-                            {(message) => {
-                              if (import.meta.env.DEV) {
-                                onMount(() => {
-                                  const id = params.id
-                                  if (!id) return
-                                  navMark({ dir: params.dir, to: id, name: "session:first-turn-mounted" })
-                                })
-                              }
-
-                              return (
-                                <div
-                                  id={anchor(message.id)}
-                                  data-message-id={message.id}
-                                  classList={{
-                                    "min-w-0 w-full max-w-full": true,
-                                    "md:max-w-200": !showTabs(),
+                                <SessionTurn
+                                  sessionID={params.id!}
+                                  messageID={message.id}
+                                  lastUserMessageID={lastUserMessage()?.id}
+                                  stepsExpanded={store.expanded[message.id] ?? false}
+                                  onStepsExpandedToggle={() =>
+                                    setStore("expanded", message.id, (open: boolean | undefined) => !open)
+                                  }
+                                  classes={{
+                                    root: "min-w-0 w-full relative",
+                                    content: "flex flex-col justify-between !overflow-visible",
+                                    container: "w-full px-4 md:px-6",
                                   }}
-                                >
-                                  <SessionTurn
-                                    sessionID={params.id!}
-                                    messageID={message.id}
-                                    lastUserMessageID={lastUserMessage()?.id}
-                                    stepsExpanded={store.expanded[message.id] ?? false}
-                                    onStepsExpandedToggle={() =>
-                                      setStore("expanded", message.id, (open: boolean | undefined) => !open)
-                                    }
-                                    classes={{
-                                      root: "min-w-0 w-full relative",
-                                      content: "flex flex-col justify-between !overflow-visible",
-                                      container: "w-full px-4 md:px-6",
-                                    }}
-                                  />
-                                </div>
-                              )
-                            }}
-                          </For>
-                        </div>
+                                />
+                              </div>
+                            )
+                          }}
+                        </For>
                       </div>
                     </div>
-                  </Show>
+                  </div>
                 </Show>
-              </Match>
-              <Match when={true}>
-                <NewSessionView
-                  worktree={newSessionWorktree()}
-                  onWorktreeChange={(value) => {
-                    if (value === "create") {
-                      setStore("newSessionWorktree", value)
-                      return
-                    }
+              </Show>
+            </div>
 
-                    setStore("newSessionWorktree", "main")
+            {/* New session view - always mounted, opacity transition */}
+            <div
+              class="absolute inset-0 transition-opacity duration-200"
+              classList={{
+                "opacity-100 pointer-events-auto": !params.id,
+                "opacity-0 pointer-events-none": !!params.id,
+              }}
+            >
+              <NewSessionView
+                worktree={newSessionWorktree()}
+                onWorktreeChange={(value) => {
+                  if (value === "create") {
+                    setStore("newSessionWorktree", value)
+                    return
+                  }
 
-                    const target = value === "main" ? sync.project?.worktree : value
-                    if (!target) return
-                    if (target === sync.data.path.directory) return
-                    layout.projects.open(target)
-                    navigate(`/${base64Encode(target)}/session`)
-                  }}
-                />
-              </Match>
-            </Switch>
+                  setStore("newSessionWorktree", "main")
+
+                  const target = value === "main" ? sync.project?.worktree : value
+                  if (!target) return
+                  if (target === sync.data.path.directory) return
+                  layout.projects.open(target)
+                  navigate(`/${base64Encode(target)}/session`)
+                }}
+              />
+            </div>
           </div>
 
           {/* Prompt input */}

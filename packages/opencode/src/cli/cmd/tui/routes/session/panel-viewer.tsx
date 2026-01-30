@@ -1,7 +1,7 @@
 import { batch, createEffect, createMemo, createSignal, Match, on, onCleanup, Show, Switch } from "solid-js"
 import { createStore } from "solid-js/store"
 import path from "path"
-import type { ScrollBoxRenderable, TextareaRenderable } from "@opentui/core"
+import type { ScrollBoxRenderable, TextareaRenderable, ScrollAcceleration } from "@opentui/core"
 import { TextAttributes } from "@opentui/core"
 import { useKeyboard } from "@opentui/solid"
 import { useTheme } from "@tui/context/theme"
@@ -16,6 +16,16 @@ import { LANGUAGE_EXTENSIONS } from "@/lsp/language"
 import type { FileContent } from "@opencode-ai/sdk/v2"
 import { VcsDiffViewer } from "./vcs-diff-viewer"
 import { NavigatorBorderChars, fileType, BinaryPreview } from "./navigator-ui"
+
+class CustomSpeedScroll implements ScrollAcceleration {
+  constructor(private speed: number) {}
+
+  tick(_now?: number): number {
+    return this.speed
+  }
+
+  reset(): void {}
+}
 
 interface FileViewerPanelProps {
   width: number
@@ -35,12 +45,13 @@ export function FileViewerPanel(props: FileViewerPanelProps) {
   const [fileLoading, setFileLoading] = createSignal(false)
   const [fileError, setFileError] = createSignal(false)
   const [cache, setCache] = createStore<Record<string, FileContent>>({})
-  const [showScrollbar] = kv.signal("scrollbar_visible", false)
+  const [showScrollbar] = kv.signal("scrollbar_enabled", true)
 
   // Editing state - manual save only
   const [isDirty, setIsDirty] = createSignal(false)
   const [saveStatus, setSaveStatus] = createSignal<"idle" | "saving" | "saved" | "error">("idle")
   let editorRef: TextareaRenderable | undefined
+  const [scrollRef, setScrollRef] = createSignal<ScrollBoxRenderable | undefined>(undefined)
   const [currentFilePath, setCurrentFilePath] = createSignal<string | null>(null)
 
   const [currentLoadFile, setCurrentLoadFile] = createSignal<string | undefined>(undefined)
@@ -248,15 +259,7 @@ export function FileViewerPanel(props: FileViewerPanelProps) {
   })
 
   return (
-    <box
-      width={props.width}
-      height="100%"
-      flexDirection="column"
-      backgroundColor={theme.theme.background}
-      border={["left", "right"]}
-      customBorderChars={NavigatorBorderChars}
-      borderColor={theme.theme.border}
-    >
+    <box width={props.width} height="100%" flexDirection="column" backgroundColor={theme.theme.background}>
       {/* Header with file path and status */}
       <box
         flexDirection="row"
@@ -281,10 +284,13 @@ export function FileViewerPanel(props: FileViewerPanelProps) {
 
       {/* File content viewer */}
       <scrollbox
+        ref={(r) => setScrollRef(r)}
         flexGrow={1}
+        height="100%"
         paddingTop={1}
         viewportOptions={viewportOptions()}
         verticalScrollbarOptions={verticalScrollbarOptions()}
+        scrollAcceleration={new CustomSpeedScroll(3)}
       >
         <Switch>
           <Match when={viewerState().type === "empty"}>

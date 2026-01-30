@@ -409,6 +409,14 @@ export const { use: useLayout, provider: LayoutProvider } = createSimpleContext(
           }
           setStore("review", "diffStyle", diffStyle)
         },
+        panelOpened: createMemo(() => store.review?.panelOpened ?? true),
+        setPanelOpened(opened: boolean) {
+          if (!store.review) {
+            setStore("review", { panelOpened: opened })
+            return
+          }
+          setStore("review", "panelOpened", opened)
+        },
       },
       session: {
         width: createMemo(() => store.session?.width ?? 600),

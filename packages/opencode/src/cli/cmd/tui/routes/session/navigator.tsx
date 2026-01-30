@@ -14,7 +14,7 @@ import {
 } from "solid-js"
 import { createStore } from "solid-js/store"
 import path from "path"
-import type { ScrollBoxRenderable, TextareaRenderable, InputRenderable } from "@opentui/core"
+import type { ScrollBoxRenderable, TextareaRenderable, InputRenderable, ScrollAcceleration } from "@opentui/core"
 import { TextAttributes } from "@opentui/core"
 import { useKeyboard, useTerminalDimensions } from "@opentui/solid"
 import { selectedForeground, useTheme } from "@tui/context/theme"
@@ -63,6 +63,16 @@ const STATUS_LABELS: Record<string, string> = {
   modified: "M",
 }
 
+class CustomSpeedScroll implements ScrollAcceleration {
+  constructor(private speed: number) {}
+
+  tick(_now?: number): number {
+    return this.speed
+  }
+
+  reset(): void {}
+}
+
 export function Navigator(props: NavigatorProps) {
   const theme = useTheme()
   const sdk = useSDK()
@@ -82,7 +92,7 @@ export function Navigator(props: NavigatorProps) {
   const [listRatio, setListRatio] = kv.signal<number>("navigator_list_ratio", 0.35)
   const [tree, setTree] = createStore<Record<string, FileNode[]>>({})
   const [loading, setLoading] = createStore<Record<string, boolean>>({})
-  const [showScrollbar] = kv.signal("scrollbar_visible", false)
+  const [showScrollbar] = kv.signal("scrollbar_enabled", true)
   const readExpanded = () => {
     const stored = kv.get("navigator_expanded")
     if (!stored) return {}
@@ -266,7 +276,8 @@ export function Navigator(props: NavigatorProps) {
   const historyHeight = createMemo(() => Math.max(8, Math.floor(term().height * 0.35)))
 
   const viewportOptions = createMemo(() => ({
-    paddingRight: showScrollbar() ? 1 : 0,
+    paddingLeft: 1,
+    paddingRight: showScrollbar() ? 2 : 1,
   }))
   const verticalScrollbarOptions = createMemo(() => ({
     paddingLeft: 1,
@@ -847,9 +858,11 @@ export function Navigator(props: NavigatorProps) {
   const fileViewer = () => (
     <scrollbox
       flexGrow={1}
+      height="100%"
       paddingTop={1}
       viewportOptions={viewportOptions()}
       verticalScrollbarOptions={verticalScrollbarOptions()}
+      scrollAcceleration={new CustomSpeedScroll(3)}
     >
       <Switch>
         <Match when={viewerState().type === "empty"}>
@@ -993,11 +1006,9 @@ export function Navigator(props: NavigatorProps) {
             <Tab label="Git" active={tab() === "git"} onSelect={() => setTab(() => "git")} />
           </box>
 
-          <Show when={tab() === "git"}>
-            <GitCommit commitMessage={commitMessage} setCommitMessage={setCommitMessage} onCommit={handleCommit} />
-          </Show>
           <Switch>
             <Match when={tab() === "git"}>
+              <GitCommit commitMessage={commitMessage} setCommitMessage={setCommitMessage} onCommit={handleCommit} />
               <Show
                 when={hasGitEntries()}
                 fallback={
@@ -1008,11 +1019,11 @@ export function Navigator(props: NavigatorProps) {
               >
                 <scrollbox
                   flexGrow={1}
-                  paddingLeft={1}
-                  paddingRight={1}
+                  height="100%"
                   ref={(el) => setGitScroll(el)}
                   viewportOptions={viewportOptions()}
                   verticalScrollbarOptions={verticalScrollbarOptions()}
+                  scrollAcceleration={new CustomSpeedScroll(3)}
                 >
                   <For each={gitEntries()}>
                     {(entry, index) => (
@@ -1042,11 +1053,11 @@ export function Navigator(props: NavigatorProps) {
               >
                 <scrollbox
                   flexGrow={1}
-                  paddingLeft={1}
-                  paddingRight={1}
+                  height="100%"
                   ref={(el) => setExplorerScroll(el)}
                   viewportOptions={viewportOptions()}
                   verticalScrollbarOptions={verticalScrollbarOptions()}
+                  scrollAcceleration={new CustomSpeedScroll(3)}
                 >
                   <For each={explorerEntries()}>
                     {(entry, index) => (

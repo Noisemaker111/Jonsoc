@@ -124,6 +124,47 @@ const targets = Brand.CONFIG_TARGETS // [".opencode", ".jonsoc"]
 - Third-party providers (openai, anthropic, google-vertex): External services
 - models.dev: opencode.ai's infrastructure (default)
 
+### OpenTUI Scrollbox Pattern
+
+**When scrollbox doesn't scroll (mouse or keyboard), check these 3 things:**
+
+```typescript
+// 1. Parent MUST have explicit height
+<box height="100%">
+  <scrollbox
+    flexGrow={1}
+    height="100%"  // 2. Scrollbox needs height too
+    viewportOptions={{
+      paddingLeft: 1,
+      paddingRight: showScrollbar() ? 2 : 1,
+    }}
+    verticalScrollbarOptions={{
+      paddingLeft: 1,
+      visible: showScrollbar(),
+      trackOptions: {
+        backgroundColor: theme.backgroundElement,
+        foregroundColor: theme.border,
+      },
+    }}
+    scrollAcceleration={new CustomSpeedScroll(3)}  // 3. Required for mouse wheel
+  >
+    {content}
+  </scrollbox>
+</box>
+```
+
+**Debugging approach:**
+
+1. Find a working scrollbox (e.g., chat area in `session/index.tsx`)
+2. Compare props line-by-line with broken scrollbox
+3. Apply differences systematically
+
+**Common mistakes:**
+
+- Missing `height="100%"` on scrollbox or parent
+- Using `paddingLeft`/`paddingRight` directly on scrollbox (move to `viewportOptions`)
+- Missing `scrollAcceleration` (needed for mouse wheel events)
+
 ## Important Files
 
 | File                    | Purpose                      |

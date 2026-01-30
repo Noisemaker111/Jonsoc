@@ -1,8 +1,19 @@
 import { type Accessor, createMemo, For, Show } from "solid-js"
 import { TextAttributes } from "@opentui/core"
+import type { ScrollAcceleration } from "@opentui/core"
 import { useTheme, selectedForeground } from "@tui/context/theme"
 import { Locale } from "@/util/locale"
 import type { VcsHistoryLine } from "@opencode-ai/sdk/v2"
+
+class CustomSpeedScroll implements ScrollAcceleration {
+  constructor(private speed: number) {}
+
+  tick(_now?: number): number {
+    return this.speed
+  }
+
+  reset(): void {}
+}
 
 export type GitHistoryProps = {
   branch: Accessor<string | undefined>
@@ -45,11 +56,11 @@ export function GitHistory(props: GitHistoryProps) {
       </box>
       <scrollbox
         flexGrow={1}
-        paddingLeft={1}
-        paddingRight={1}
+        height="100%"
         paddingBottom={1}
         viewportOptions={props.viewportOptions}
         verticalScrollbarOptions={props.verticalScrollbarOptions}
+        scrollAcceleration={new CustomSpeedScroll(3)}
       >
         <Show
           when={props.historyEntries().length > 0}

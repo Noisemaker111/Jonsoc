@@ -1,6 +1,7 @@
 import { useSync } from "@tui/context/sync"
 import { createEffect, createMemo, For, Show, Switch, Match } from "solid-js"
 import { createStore } from "solid-js/store"
+import type { ScrollAcceleration } from "@opentui/core"
 import { useTheme } from "../../context/theme"
 import { Locale } from "@/util/locale"
 import path from "path"
@@ -12,6 +13,16 @@ import { useDirectory } from "../../context/directory"
 import { useKV } from "../../context/kv"
 import { TodoItem } from "../../component/todo-item"
 
+class CustomSpeedScroll implements ScrollAcceleration {
+  constructor(private speed: number) {}
+
+  tick(_now?: number): number {
+    return this.speed
+  }
+
+  reset(): void {}
+}
+
 export function Sidebar(props: { sessionID: string; overlay?: boolean }) {
   const sync = useSync()
   const { theme } = useTheme()
@@ -21,7 +32,7 @@ export function Sidebar(props: { sessionID: string; overlay?: boolean }) {
   const messages = createMemo(() => sync.data.message[props.sessionID] ?? [])
 
   const kv = useKV()
-  const [showScrollbar] = kv.signal("scrollbar_visible", false)
+  const [showScrollbar] = kv.signal("scrollbar_enabled", true)
   const readExpanded = () => {
     const stored = kv.get("session_sidebar_expanded")
     if (!stored || typeof stored !== "object" || Array.isArray(stored)) {
@@ -77,7 +88,8 @@ export function Sidebar(props: { sessionID: string; overlay?: boolean }) {
   const directory = useDirectory()
 
   const viewportOptions = createMemo(() => ({
-    paddingRight: showScrollbar() ? 1 : 0,
+    paddingLeft: 1,
+    paddingRight: showScrollbar() ? 2 : 1,
   }))
   const verticalScrollbarOptions = createMemo(() => ({
     paddingLeft: 1,
@@ -116,8 +128,10 @@ export function Sidebar(props: { sessionID: string; overlay?: boolean }) {
       >
         <scrollbox
           flexGrow={1}
+          height="100%"
           viewportOptions={viewportOptions()}
           verticalScrollbarOptions={verticalScrollbarOptions()}
+          scrollAcceleration={new CustomSpeedScroll(3)}
         >
           <box flexShrink={0} gap={1} paddingRight={1}>
             <box paddingRight={1}>

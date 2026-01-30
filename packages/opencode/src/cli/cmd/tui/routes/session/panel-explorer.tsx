@@ -11,7 +11,7 @@ import {
   Switch,
 } from "solid-js"
 import { createStore } from "solid-js/store"
-import type { ScrollBoxRenderable } from "@opentui/core"
+import type { ScrollBoxRenderable, ScrollAcceleration } from "@opentui/core"
 import { TextAttributes } from "@opentui/core"
 import { useKeyboard, useTerminalDimensions } from "@opentui/solid"
 import { useTheme } from "@tui/context/theme"
@@ -27,6 +27,16 @@ import type { File as FileStatus, FileNode } from "@opencode-ai/sdk/v2"
 import { GitCommit } from "./git-commit"
 import { GitHistory } from "./git-history"
 import { NavigatorBorderChars, Tab, ExplorerRow, GitRow } from "./navigator-ui"
+
+class CustomSpeedScroll implements ScrollAcceleration {
+  constructor(private speed: number) {}
+
+  tick(_now?: number): number {
+    return this.speed
+  }
+
+  reset(): void {}
+}
 
 type ExplorerEntry = {
   node: FileNode
@@ -54,7 +64,7 @@ export function ExplorerPanel(props: ExplorerPanelProps) {
   const [selectedGit, setSelectedGit] = kv.signal("panel_git_index", 0)
   const [tree, setTree] = createStore<Record<string, FileNode[]>>({})
   const [loading, setLoading] = createStore<Record<string, boolean>>({})
-  const [showScrollbar] = kv.signal("scrollbar_visible", false)
+  const [showScrollbar] = kv.signal("scrollbar_enabled", true)
 
   const readExpanded = () => {
     const stored = kv.get("panel_explorer_expanded")
@@ -143,11 +153,13 @@ export function ExplorerPanel(props: ExplorerPanelProps) {
 
   const hasExplorerEntries = createMemo(() => explorerEntries().length > 0)
   const hasGitEntries = createMemo(() => gitEntries().length > 0)
+
   const historyEntries = createMemo(() => history() ?? [])
   const historyHeight = createMemo(() => Math.max(8, Math.floor(term().height * 0.35)))
 
   const viewportOptions = createMemo(() => ({
-    paddingRight: showScrollbar() ? 1 : 0,
+    paddingLeft: 1,
+    paddingRight: showScrollbar() ? 2 : 1,
   }))
 
   const verticalScrollbarOptions = createMemo(() => ({
@@ -420,14 +432,7 @@ export function ExplorerPanel(props: ExplorerPanelProps) {
   })
 
   return (
-    <box
-      width={props.width}
-      border={["right"]}
-      customBorderChars={NavigatorBorderChars}
-      borderColor={theme.theme.border}
-      flexDirection="column"
-      backgroundColor={theme.theme.background}
-    >
+    <box width={props.width} height="100%" flexDirection="column" backgroundColor={theme.theme.background}>
       <box
         paddingLeft={2}
         paddingRight={2}
@@ -475,11 +480,11 @@ export function ExplorerPanel(props: ExplorerPanelProps) {
           >
             <scrollbox
               flexGrow={1}
-              paddingLeft={1}
-              paddingRight={1}
+              height="100%"
               ref={(el) => setGitScroll(el)}
               viewportOptions={viewportOptions()}
               verticalScrollbarOptions={verticalScrollbarOptions()}
+              scrollAcceleration={new CustomSpeedScroll(3)}
             >
               <For each={gitEntries()}>
                 {(entry, index) => (
@@ -517,11 +522,11 @@ export function ExplorerPanel(props: ExplorerPanelProps) {
           >
             <scrollbox
               flexGrow={1}
-              paddingLeft={1}
-              paddingRight={1}
+              height="100%"
               ref={(el) => setExplorerScroll(el)}
               viewportOptions={viewportOptions()}
               verticalScrollbarOptions={verticalScrollbarOptions()}
+              scrollAcceleration={new CustomSpeedScroll(3)}
             >
               <For each={explorerEntries()}>
                 {(entry, index) => (

@@ -17,6 +17,7 @@ import { PermissionNext } from "@/permission/next"
 import { mergeDeep, pipe, sortBy, values } from "remeda"
 import { Global } from "@/global"
 import path from "path"
+import os from "os"
 
 export namespace Agent {
   export const Info = z
@@ -55,6 +56,19 @@ export namespace Agent {
         "*": "ask",
         [Truncate.DIR]: "allow",
         [Truncate.GLOB]: "allow",
+        // Allow access to skills directories without permission prompts
+        [path.join(Global.Path.config, "skills", "*")]: "allow",
+        [path.join(Global.Path.config, "commands", "*")]: "allow",
+        [path.join(os.homedir(), ".config", "opencode", "skills", "*")]: "allow",
+        [path.join(os.homedir(), ".config", "opencode", "commands", "*")]: "allow",
+        [path.join(os.homedir(), ".jonsoc", "skills", "*")]: "allow",
+        [path.join(os.homedir(), ".jonsoc", "commands", "*")]: "allow",
+        [path.join(os.homedir(), ".opencode", "skills", "*")]: "allow",
+        [path.join(os.homedir(), ".opencode", "commands", "*")]: "allow",
+        [".jonsoc/skills/*"]: "allow",
+        [".jonsoc/commands/*"]: "allow",
+        [".opencode/skills/*"]: "allow",
+        [".opencode/commands/*"]: "allow",
       },
       question: "deny",
       plan_enter: "deny",
