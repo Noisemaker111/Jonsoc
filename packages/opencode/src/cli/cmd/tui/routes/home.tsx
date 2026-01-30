@@ -16,7 +16,11 @@ import { usePromptRef } from "../context/prompt"
 import { Installation } from "@/installation"
 import { useKV } from "../context/kv"
 import { useCommandDialog } from "../component/dialog-command"
-import { Navigator } from "./session/navigator"
+import { ExplorerPanel } from "./session/panel-explorer"
+import { FileViewerPanel } from "./session/panel-viewer"
+import { DynamicLayout } from "@tui/component/dynamic-layout"
+import { useLayout } from "@tui/context/layout"
+import { useCommandRegistry } from "../hooks/use-command-registry"
 
 // TODO: what is the best way to do this?
 let once = false
@@ -29,6 +33,8 @@ export function Home() {
   const promptRef = usePromptRef()
   const command = useCommandDialog()
   const toast = useToast()
+  const layout = useLayout()
+  const [selectedFilePath, setSelectedFilePath] = createSignal<string | null>(null)
   const mcp = createMemo(() => Object.keys(sync.data.mcp).length > 0)
   const mcpError = createMemo(() => {
     return Object.values(sync.data.mcp).some((x) => x.status === "failed")
@@ -47,158 +53,29 @@ export function Home() {
   })
 
   const dimensions = useTerminalDimensions()
-  type NavigatorState = "open" | "closed"
-  const [navigatorState, setNavigatorState] = createSignal<NavigatorState>(
-    kv.get("navigator_open", false) ? "open" : "closed",
-  )
-  const [navigatorPinned, setNavigatorPinned] = kv.signal("navigator_pinned", false)
-  const [navigatorAlwaysOpen, setNavigatorAlwaysOpen] = kv.signal("navigator_always_open", false)
-  const [navigatorTab, setNavigatorTab] = kv.signal<"explorer" | "git">("navigator_tab", "explorer")
-  const [navigatorSide, setNavigatorSide] = kv.signal<"left" | "right">("navigator_side", "left")
-  const [navigatorRatio, setNavigatorRatio] = kv.signal("navigator_width_ratio", 0.45)
-  const navigatorWidth = createMemo(() => {
-    const min = 36
-    const max = Math.min(96, Math.floor(dimensions().width * 0.6))
-    const next = Math.floor(dimensions().width * navigatorRatio())
-    return Math.min(max, Math.max(min, next))
-  })
-  const navigatorOpen = createMemo(() => navigatorState() === "open")
-  const navigatorVisible = createMemo(() => navigatorOpen() || navigatorPinned() || navigatorAlwaysOpen())
-  const navigatorSideValue = createMemo<"left" | "right">(() => (navigatorSide() === "right" ? "right" : "left"))
-  const navigatorSideNext = createMemo(() => (navigatorSideValue() === "left" ? "right" : "left"))
-  const navigatorRowDirection = createMemo<"row" | "row-reverse">(() =>
-    navigatorSideValue() === "left" ? "row" : "row-reverse",
-  )
-  const navigatorDisplayWidth = createMemo(() => (navigatorVisible() ? navigatorWidth() : 0))
-  const [navigatorDragging, setNavigatorDragging] = createSignal(false)
-  const clampRatio = (value: number) => Math.min(0.6, Math.max(0.2, value))
-  const updateNavigatorRatio = (event: MouseEvent) => {
-    if (!navigatorDragging()) return
-    const width = dimensions().width
-    if (width <= 0) return
-    const ratio = navigatorSideValue() === "left" ? event.x / width : (width - event.x) / width
-    const next = clampRatio(ratio)
-    setNavigatorRatio(() => next)
-  }
-
-  createEffect(() => {
-    if (navigatorAlwaysOpen()) {
-      if (navigatorState() !== "open") setNavigatorState("open")
-      return
-    }
-    if (!navigatorPinned()) return
-    if (navigatorOpen()) return
-    setNavigatorState("open")
-  })
-
-  createEffect(() => {
-    const side = navigatorSide()
-    if (side === "left") return
-    if (side === "right") return
-    setNavigatorSide(() => "left")
-  })
 
   const closeNavigator = () => {
-    if (navigatorAlwaysOpen()) return
-    batch(() => {
-      if (navigatorPinned()) setNavigatorPinned(() => false)
-      setNavigatorState("closed")
-    })
+    // Just focus the prompt, layout controls visibility now
     promptRef.current?.focus()
   }
 
-  const toggleNavigator = () => {
-    if (navigatorVisible()) {
-      closeNavigator()
-      return
-    }
-    const focused = promptRef.current?.focused
-    setNavigatorState("open")
-    if (focused) queueMicrotask(() => promptRef.current?.focus())
-  }
-
-  const toggleNavigatorPinned = () => {
-    if (navigatorPinned()) {
-      setNavigatorPinned(() => false)
-      return
-    }
-    const focused = promptRef.current?.focused
-    setNavigatorPinned(() => true)
-    setNavigatorState("open")
-    if (focused) queueMicrotask(() => promptRef.current?.focus())
-  }
-
-  const toggleNavigatorTab = () => {
-    setNavigatorTab((prev) => (prev === "git" ? "explorer" : "git"))
-  }
-
-  const toggleNavigatorSide = () => {
-    setNavigatorSide(() => navigatorSideNext())
-  }
-
-  command.register(() => [
-    {
-      title: tipsHidden() ? "Show tips" : "Hide tips",
-      value: "tips.toggle",
-      keybind: "tips_toggle",
-      category: "System",
-      onSelect: (dialog) => {
-        kv.set("tips_hidden", !tipsHidden())
-        dialog.clear()
+  // Register commands through centralized registry
+  useCommandRegistry({
+    groups: ["layout"], // Always include layout commands (/ui, toggle panels)
+    returnTo: { type: "home" },
+    additionalCommands: [
+      {
+        title: tipsHidden() ? "Show tips" : "Hide tips",
+        value: "tips.toggle",
+        keybind: "tips_toggle",
+        category: "System",
+        onSelect: (dialog) => {
+          kv.set("tips_hidden", !tipsHidden())
+          dialog.clear()
+        },
       },
-    },
-    {
-      title: navigatorVisible() ? "Hide navigator" : "Show navigator",
-      value: "session.navigator.toggle",
-      keybind: "navigator_toggle",
-      category: "Session",
-      onSelect: (dialog) => {
-        toggleNavigator()
-        dialog.clear()
-      },
-    },
-    {
-      title: navigatorPinned() ? "Unpin file viewer" : "Pin file viewer open",
-      value: "session.navigator.pin",
-      category: "Session",
-      onSelect: (dialog) => {
-        toggleNavigatorPinned()
-        dialog.clear()
-      },
-    },
-    {
-      title: navigatorTab() === "git" ? "Keep file explorer on" : "Keep git controls on",
-      value: "session.navigator.git.toggle",
-      category: "Session",
-      onSelect: (dialog) => {
-        toggleNavigatorTab()
-        dialog.clear()
-      },
-    },
-    {
-      title: navigatorSideNext() === "right" ? "Move navigator to right" : "Move navigator to left",
-      value: "session.navigator.side",
-      category: "Session",
-      onSelect: (dialog) => {
-        toggleNavigatorSide()
-        dialog.clear()
-      },
-    },
-    {
-      title: navigatorAlwaysOpen() ? "Navigator: Always on" : "Navigator: Normal mode",
-      value: "session.navigator.always_open",
-      category: "Session",
-      onSelect: (dialog) => {
-        const value = !navigatorAlwaysOpen()
-        setNavigatorAlwaysOpen(() => value)
-        toast.show({
-          message: value ? "Navigator always on" : "Navigator normal mode",
-          variant: "success",
-        })
-        dialog.clear()
-      },
-    },
-  ])
+    ],
+  })
 
   const Hint = (
     <Show when={connectedMcpCount() > 0}>
@@ -236,81 +113,86 @@ export function Home() {
 
   const keybind = useKeybind()
 
+  // Reactive panel widths that update when layout store changes
+  const explorerWidth = createMemo(() => {
+    const panel = layout.getPanelByType("explorer")
+    if (!panel?.visible) return 0
+    return Math.floor(dimensions().width * ((panel.width || 20) / 100))
+  })
+
+  const viewerWidth = createMemo(() => {
+    const panel = layout.getPanelByType("viewer")
+    if (!panel?.visible) return 0
+    return Math.floor(dimensions().width * ((panel.width || 30) / 100))
+  })
+
   return (
-    <box
-      height="100%"
-      flexDirection={navigatorRowDirection()}
-      onMouseMove={updateNavigatorRatio}
-      onMouseUp={() => setNavigatorDragging(false)}
-    >
-      <Navigator
-        width={navigatorDisplayWidth()}
-        onClose={closeNavigator}
-        open={navigatorVisible()}
-        side={navigatorSideValue()}
-        promptRef={promptRef.current}
-      />
-      <box
-        width={navigatorVisible() ? 1 : 0}
-        backgroundColor={theme.border}
-        onMouseDown={(event) => {
-          setNavigatorDragging(true)
-          updateNavigatorRatio(event)
-        }}
-        onMouseUp={() => setNavigatorDragging(false)}
-      />
-      <box flexGrow={1} flexDirection="column" onMouseUp={() => promptRef.current?.focus()}>
-        <box flexGrow={1} justifyContent="center" alignItems="center" paddingLeft={2} paddingRight={2} gap={1}>
-          <box height={3} />
-          <Logo />
-          <box width="100%" maxWidth={75} zIndex={1000} paddingTop={1}>
-            <Prompt
-              ref={(r) => {
-                prompt = r
-                promptRef.set(r)
-              }}
-              hint={Hint}
-            />
+    <DynamicLayout
+      explorer={
+        <ExplorerPanel
+          width={explorerWidth()}
+          onSelect={(path, type) => {
+            if (type === "file") {
+              setSelectedFilePath(path)
+            }
+          }}
+        />
+      }
+      chat={
+        <box height="100%" flexDirection="column" onMouseUp={() => promptRef.current?.focus()}>
+          <box flexGrow={1} justifyContent="center" alignItems="center" paddingLeft={2} paddingRight={2} gap={1}>
+            <box height={3} />
+            <Logo />
+            <box width="100%" maxWidth={75} zIndex={1000} paddingTop={1}>
+              <Prompt
+                ref={(r) => {
+                  prompt = r
+                  promptRef.set(r)
+                }}
+                hint={Hint}
+              />
+            </box>
+            <box height={3} width="100%" maxWidth={75} alignItems="center" paddingTop={2}>
+              <Show when={showTips()}>
+                <Tips />
+              </Show>
+            </box>
+            <Toast />
           </box>
-          <box height={3} width="100%" maxWidth={75} alignItems="center" paddingTop={2}>
-            <Show when={showTips()}>
-              <Tips />
-            </Show>
-          </box>
-          <Toast />
-        </box>
-        <box
-          paddingTop={1}
-          paddingBottom={1}
-          paddingLeft={2}
-          paddingRight={2}
-          flexDirection="row"
-          flexShrink={0}
-          gap={2}
-        >
-          <text fg={theme.textMuted}>{directory()}</text>
-          <box gap={1} flexDirection="row" flexShrink={0}>
-            <Show when={mcp()}>
-              <text fg={theme.text}>
-                <Switch>
-                  <Match when={mcpError()}>
-                    <span style={{ fg: theme.error }}>⊙ </span>
-                  </Match>
-                  <Match when={true}>
-                    <span style={{ fg: connectedMcpCount() > 0 ? theme.success : theme.textMuted }}>⊙ </span>
-                  </Match>
-                </Switch>
-                {connectedMcpCount()} MCP
-              </text>
-              <text fg={theme.textMuted}>/status</text>
-            </Show>
-          </box>
-          <box flexGrow={1} />
-          <box flexShrink={0}>
-            <text fg={theme.textMuted}>{Installation.VERSION}</text>
+          <box
+            paddingTop={1}
+            paddingBottom={1}
+            paddingLeft={2}
+            paddingRight={2}
+            flexDirection="row"
+            flexShrink={0}
+            gap={2}
+          >
+            <text fg={theme.textMuted}>{directory()}</text>
+            <box gap={1} flexDirection="row" flexShrink={0}>
+              <Show when={mcp()}>
+                <text fg={theme.text}>
+                  <Switch>
+                    <Match when={mcpError()}>
+                      <span style={{ fg: theme.error }}>⊙ </span>
+                    </Match>
+                    <Match when={true}>
+                      <span style={{ fg: connectedMcpCount() > 0 ? theme.success : theme.textMuted }}>⊙ </span>
+                    </Match>
+                  </Switch>
+                  {connectedMcpCount()} MCP
+                </text>
+                <text fg={theme.textMuted}>/status</text>
+              </Show>
+            </box>
+            <box flexGrow={1} />
+            <box flexShrink={0}>
+              <text fg={theme.textMuted}>{Installation.VERSION}</text>
+            </box>
           </box>
         </box>
-      </box>
-    </box>
+      }
+      viewer={<FileViewerPanel width={viewerWidth()} filePath={selectedFilePath()} />}
+    />
   )
 }

@@ -122,6 +122,9 @@ function init() {
     setSize(size: "medium" | "large") {
       setStore("size", size)
     },
+    isOpen() {
+      return store.stack.length > 0
+    },
   }
 }
 

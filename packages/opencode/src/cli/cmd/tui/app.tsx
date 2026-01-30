@@ -34,6 +34,8 @@ import { KeybindProvider } from "@tui/context/keybind"
 import { ThemeProvider, useTheme } from "@tui/context/theme"
 import { Home } from "@tui/routes/home"
 import { Session } from "@tui/routes/session"
+import { UISettings } from "@tui/routes/ui-settings"
+import { LayoutProvider } from "@tui/context/layout"
 import { PromptHistoryProvider } from "./component/prompt/history"
 import { FrecencyProvider } from "./component/prompt/frecency"
 import { PromptStashProvider } from "./component/prompt/stash"
@@ -184,38 +186,40 @@ export function tui(input: {
               <ArgsProvider {...input.args}>
                 <ExitProvider onExit={onExit}>
                   <KVProvider>
-                    <ToastProvider>
-                      <RouteProvider>
-                        <SDKProvider
-                          url={input.url}
-                          directory={input.directory}
-                          fetch={input.fetch}
-                          events={input.events}
-                        >
-                          <SyncProvider>
-                            <ThemeProvider mode={mode}>
-                              <LocalProvider>
-                                <KeybindProvider>
-                                  <PromptStashProvider>
-                                    <DialogProvider>
-                                      <CommandProvider>
-                                        <FrecencyProvider>
-                                          <PromptHistoryProvider>
-                                            <PromptRefProvider>
-                                              <App />
-                                            </PromptRefProvider>
-                                          </PromptHistoryProvider>
-                                        </FrecencyProvider>
-                                      </CommandProvider>
-                                    </DialogProvider>
-                                  </PromptStashProvider>
-                                </KeybindProvider>
-                              </LocalProvider>
-                            </ThemeProvider>
-                          </SyncProvider>
-                        </SDKProvider>
-                      </RouteProvider>
-                    </ToastProvider>
+                    <LayoutProvider>
+                      <ToastProvider>
+                        <RouteProvider>
+                          <SDKProvider
+                            url={input.url}
+                            directory={input.directory}
+                            fetch={input.fetch}
+                            events={input.events}
+                          >
+                            <SyncProvider>
+                              <ThemeProvider mode={mode}>
+                                <LocalProvider>
+                                  <KeybindProvider>
+                                    <PromptStashProvider>
+                                      <DialogProvider>
+                                        <CommandProvider>
+                                          <FrecencyProvider>
+                                            <PromptHistoryProvider>
+                                              <PromptRefProvider>
+                                                <App />
+                                              </PromptRefProvider>
+                                            </PromptHistoryProvider>
+                                          </FrecencyProvider>
+                                        </CommandProvider>
+                                      </DialogProvider>
+                                    </PromptStashProvider>
+                                  </KeybindProvider>
+                                </LocalProvider>
+                              </ThemeProvider>
+                            </SyncProvider>
+                          </SDKProvider>
+                        </RouteProvider>
+                      </ToastProvider>
+                    </LayoutProvider>
                   </KVProvider>
                 </ExitProvider>
               </ArgsProvider>
@@ -760,6 +764,9 @@ function App() {
         </Match>
         <Match when={route.data.type === "session"}>
           <Session />
+        </Match>
+        <Match when={route.data.type === "ui-settings"}>
+          <UISettings />
         </Match>
       </Switch>
     </box>

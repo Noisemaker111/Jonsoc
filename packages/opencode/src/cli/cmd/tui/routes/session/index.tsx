@@ -61,8 +61,11 @@ import { DialogConfirm } from "@tui/ui/dialog-confirm"
 import { DialogTimeline } from "./dialog-timeline"
 import { DialogForkFromTimeline } from "./dialog-fork-from-timeline"
 import { DialogSessionRename } from "../../component/dialog-session-rename"
-import { Sidebar } from "./sidebar"
-import { Navigator } from "./navigator"
+import { ExplorerPanel } from "./panel-explorer"
+import { FileViewerPanel } from "./panel-viewer"
+import { DynamicLayout } from "@tui/component/dynamic-layout"
+import { useLayout } from "@tui/context/layout"
+import { useCommandRegistry } from "../../hooks/use-command-registry"
 import { LANGUAGE_EXTENSIONS } from "@/lsp/language"
 import parsers from "../../../../../../parsers-config.ts"
 import { Clipboard } from "../../util/clipboard"
@@ -84,13 +87,13 @@ import { createColors, createFrames } from "../../ui/spinner.ts"
 addDefaultParsers(parsers.parsers)
 
 class CustomSpeedScroll implements ScrollAcceleration {
-  constructor(private speed: number) { }
+  constructor(private speed: number) {}
 
   tick(_now?: number): number {
     return this.speed
   }
 
-  reset(): void { }
+  reset(): void {}
 }
 
 const context = createContext<{
@@ -117,6 +120,28 @@ export function Session() {
   const kv = useKV()
   const { theme } = useTheme()
   const promptRef = usePromptRef()
+  const layout = useLayout()
+  const [selectedFilePath, setSelectedFilePath] = createSignal<string | null>(null)
+
+  // Initialize dimensions hook BEFORE any memos that depend on it
+  const dimensions = useTerminalDimensions()
+
+  // Reactive panel widths that update when layout store changes
+  const explorerWidth = createMemo(() => {
+    const panel = layout.getPanelByType("explorer")
+    if (!panel?.visible) return 0
+    const dims = dimensions()
+    if (!dims?.width) return 0
+    return Math.floor(dims.width * ((panel.width || 20) / 100))
+  })
+
+  const viewerWidth = createMemo(() => {
+    const panel = layout.getPanelByType("viewer")
+    if (!panel?.visible) return 0
+    const dims = dimensions()
+    if (!dims?.width) return 0
+    return Math.floor(dims.width * ((panel.width || 30) / 100))
+  })
   const session = createMemo(() => sync.session.get(route.sessionID))
   const children = createMemo(() => {
     const parentID = session()?.parentID ?? session()?.id
@@ -141,18 +166,7 @@ export function Session() {
   const lastAssistant = createMemo(() => {
     return messages().findLast((x) => x.role === "assistant")
   })
-
-  const dimensions = useTerminalDimensions()
-  const [sidebar, setSidebar] = kv.signal<"auto" | "hide">("sidebar", "hide")
-  const [sidebarOpen, setSidebarOpen] = createSignal(false)
-  type NavigatorState = "open" | "closed"
-  const [navigatorState, setNavigatorState] = createSignal<NavigatorState>(
-    kv.get("navigator_open", false) ? "open" : "closed",
-  )
-  const [navigatorPinned, setNavigatorPinned] = kv.signal("navigator_pinned", false)
-  const [navigatorAlwaysOpen, setNavigatorAlwaysOpen] = kv.signal("navigator_always_open", false)
   const [navigatorTab, setNavigatorTab] = kv.signal<"explorer" | "git">("navigator_tab", "explorer")
-  const [navigatorSide, setNavigatorSide] = kv.signal<"left" | "right">("navigator_side", "left")
   const [conceal, setConceal] = createSignal(true)
   const [showThinking, setShowThinking] = kv.signal("thinking_visibility", true)
   const [timestamps, setTimestamps] = kv.signal<"hide" | "show">("timestamps", "hide")
@@ -163,58 +177,11 @@ export function Session() {
   const [navigatorWrapMode, setNavigatorWrapMode] = kv.signal<"word" | "none">("navigator_wrap_mode", "none")
   const [animationsEnabled, setAnimationsEnabled] = kv.signal("animations_enabled", true)
 
-  const wide = createMemo(() => dimensions().width > 120)
-  const [navigatorRatio, setNavigatorRatio] = kv.signal("navigator_width_ratio", 0.45)
-  const navigatorWidth = createMemo(() => {
-    const min = 36
-    const max = Math.min(96, Math.floor(dimensions().width * 0.6))
-    const next = Math.floor(dimensions().width * navigatorRatio())
-    return Math.min(max, Math.max(min, next))
-  })
-  const navigatorOpen = createMemo(() => navigatorState() === "open")
-  const navigatorVisible = createMemo(() => navigatorOpen() || navigatorPinned() || navigatorAlwaysOpen())
-  const navigatorSideValue = createMemo<"left" | "right">(() => (navigatorSide() === "right" ? "right" : "left"))
-  const navigatorSideNext = createMemo(() => (navigatorSideValue() === "left" ? "right" : "left"))
-  const navigatorRowDirection = createMemo<"row" | "row-reverse">(() =>
-    navigatorSideValue() === "left" ? "row" : "row-reverse",
-  )
-  const navigatorDisplayWidth = createMemo(() => (navigatorVisible() ? navigatorWidth() : 0))
-  const sidebarVisible = createMemo(() => {
-    if (session()?.parentID) return false
-    if (sidebarOpen()) return true
-    if (sidebar() === "auto" && wide()) return true
-    return false
+  const wide = createMemo(() => {
+    const dims = dimensions()
+    return dims?.width > 120
   })
   const showTimestamps = createMemo(() => timestamps() === "show")
-  const navigatorSpace = createMemo(() => navigatorDisplayWidth())
-  const contentWidth = createMemo(() => dimensions().width - (sidebarVisible() ? 42 : 0) - navigatorSpace() - 4)
-  const [navigatorDragging, setNavigatorDragging] = createSignal(false)
-  const clampRatio = (value: number) => Math.min(0.6, Math.max(0.2, value))
-  const updateNavigatorRatio = (event: MouseEvent) => {
-    if (!navigatorDragging()) return
-    const width = dimensions().width
-    if (width <= 0) return
-    const ratio = navigatorSideValue() === "left" ? event.x / width : (width - event.x) / width
-    const next = clampRatio(ratio)
-    setNavigatorRatio(() => next)
-  }
-
-  createEffect(() => {
-    if (navigatorAlwaysOpen()) {
-      if (navigatorState() !== "open") setNavigatorState("open")
-      return
-    }
-    if (!navigatorPinned()) return
-    if (navigatorOpen()) return
-    setNavigatorState("open")
-  })
-
-  createEffect(() => {
-    const side = navigatorSide()
-    if (side === "left") return
-    if (side === "right") return
-    setNavigatorSide(() => "left")
-  })
 
   const scrollAcceleration = createMemo(() => {
     const tui = sync.data.config.tui
@@ -277,7 +244,9 @@ export function Session() {
 
   // Allow exit when in child session (prompt is hidden)
   const exit = useExit()
+  const dialog = useDialog()
   useKeyboard((evt) => {
+    if (dialog.isOpen()) return
     if (!session()?.parentID) return
     if (keybind.match("app_exit", evt)) {
       exit()
@@ -352,39 +321,19 @@ export function Session() {
   }
 
   const command = useCommandDialog()
+
   const closeNavigator = () => {
-    if (navigatorAlwaysOpen()) return
-    batch(() => {
-      if (navigatorPinned()) setNavigatorPinned(() => false)
-      setNavigatorState("closed")
-    })
+    // Just focus the prompt, layout controls visibility now
     promptRef.current?.focus()
   }
 
-  const toggleNavigator = () => {
-    if (navigatorVisible()) {
-      closeNavigator()
-      return
-    }
-    setNavigatorState("open")
-  }
+  // Register layout commands through centralized registry
+  const layoutHelpers = useCommandRegistry({
+    groups: ["layout"],
+    returnTo: { type: "session", sessionID: route.sessionID },
+  })
 
-  const toggleNavigatorPinned = () => {
-    if (navigatorPinned()) {
-      setNavigatorPinned(() => false)
-      return
-    }
-    setNavigatorPinned(() => true)
-    setNavigatorState("open")
-  }
-
-  const toggleNavigatorTab = () => {
-    setNavigatorTab((prev) => (prev === "git" ? "explorer" : "git"))
-  }
-
-  const toggleNavigatorSide = () => {
-    setNavigatorSide(() => navigatorSideNext())
-  }
+  // Session-specific commands (should eventually be moved to registry)
   command.register(() => [
     {
       title: "Share session",
@@ -524,7 +473,7 @@ export function Session() {
       },
       onSelect: async (dialog) => {
         const status = sync.data.session_status?.[route.sessionID]
-        if (status?.type !== "idle") await sdk.client.session.abort({ sessionID: route.sessionID }).catch(() => { })
+        if (status?.type !== "idle") await sdk.client.session.abort({ sessionID: route.sessionID }).catch(() => {})
         const revert = session()?.revert?.messageID
         const message = messages().findLast((x) => (!revert || x.id < revert) && x.role === "user")
         if (!message) return
@@ -577,71 +526,6 @@ export function Session() {
           sessionID: route.sessionID,
           messageID: message.id,
         })
-      },
-    },
-    {
-      title: sidebarVisible() ? "Hide sidebar" : "Show sidebar",
-      value: "session.sidebar.toggle",
-      keybind: "sidebar_toggle",
-      category: "Session",
-      onSelect: (dialog) => {
-        batch(() => {
-          const isVisible = sidebarVisible()
-          setSidebar(() => (isVisible ? "hide" : "auto"))
-          setSidebarOpen(!isVisible)
-        })
-        dialog.clear()
-      },
-    },
-    {
-      title: navigatorVisible() ? "Hide navigator" : "Show navigator",
-      value: "session.navigator.toggle",
-      keybind: "navigator_toggle",
-      category: "Session",
-      onSelect: (dialog) => {
-        toggleNavigator()
-        dialog.clear()
-      },
-    },
-    {
-      title: navigatorPinned() ? "Unpin file viewer" : "Pin file viewer open",
-      value: "session.navigator.pin",
-      category: "Session",
-      onSelect: (dialog) => {
-        toggleNavigatorPinned()
-        dialog.clear()
-      },
-    },
-    {
-      title: navigatorTab() === "git" ? "Keep file explorer on" : "Keep git controls on",
-      value: "session.navigator.git.toggle",
-      category: "Session",
-      onSelect: (dialog) => {
-        toggleNavigatorTab()
-        dialog.clear()
-      },
-    },
-    {
-      title: navigatorSideNext() === "right" ? "Move navigator to right" : "Move navigator to left",
-      value: "session.navigator.side",
-      category: "Session",
-      onSelect: (dialog) => {
-        toggleNavigatorSide()
-        dialog.clear()
-      },
-    },
-    {
-      title: navigatorAlwaysOpen() ? "Navigator: Always on" : "Navigator: Normal mode",
-      value: "session.navigator.always_open",
-      category: "Session",
-      onSelect: (dialog) => {
-        const value = !navigatorAlwaysOpen()
-        setNavigatorAlwaysOpen(() => value)
-        toast.show({
-          message: value ? "Navigator always on" : "Navigator normal mode",
-          variant: "success",
-        })
-        dialog.clear()
       },
     },
     {
@@ -1090,7 +974,6 @@ export function Session() {
     }
   })
 
-  const dialog = useDialog()
   const renderer = useRenderer()
 
   // snap to bottom when session changes
@@ -1100,7 +983,11 @@ export function Session() {
     <context.Provider
       value={{
         get width() {
-          return contentWidth()
+          const chatPanel = layout.getPanelByType("chat")
+          const dims = dimensions()
+          if (!dims?.width) return 80
+          if (!chatPanel?.visible) return dims.width - 4
+          return Math.floor(dims.width * (chatPanel.width / 100))
         },
         sessionID: route.sessionID,
         conceal,
@@ -1111,47 +998,20 @@ export function Session() {
         sync,
       }}
     >
-      <box
-        height="100%"
-        flexDirection="row"
-        onMouseMove={updateNavigatorRatio}
-        onMouseUp={() => setNavigatorDragging(false)}
-      >
-        <box flexGrow={1} flexDirection={navigatorRowDirection()}>
-          <Navigator
-            width={navigatorDisplayWidth()}
-            onClose={closeNavigator}
-            open={navigatorVisible()}
-            side={navigatorSideValue()}
-            wrapMode={navigatorWrapMode()}
-            promptRef={promptRef.current}
-            onOpenFile={async (path: string, line?: number) => {
-              const file = await sdk.client.file.read({ path }).catch(() => undefined)
-              if (!file?.data) return
-              if (file.data.encoding === "base64") return
-              const content = file.data.content ?? ""
-              const lines = content.split("\n")
-              if (line && line > 0 && line <= lines.length) {
-                const lineIndex = line - 1
-                const linesBefore = lines.slice(0, lineIndex)
-                const charsBefore = linesBefore.join("\n").length + linesBefore.length
-                kv.set("navigator_open_file", { path, line: charsBefore })
-              } else {
-                kv.set("navigator_open_file", { path, line: 0 })
+      <DynamicLayout
+        explorer={
+          <ExplorerPanel
+            width={explorerWidth()}
+            onSelect={(path, type) => {
+              if (type === "file") {
+                setSelectedFilePath(path)
               }
             }}
           />
+        }
+        chat={
           <box
-            width={navigatorVisible() ? 1 : 0}
-            backgroundColor={theme.border}
-            onMouseDown={(event) => {
-              setNavigatorDragging(true)
-              updateNavigatorRatio(event)
-            }}
-            onMouseUp={() => setNavigatorDragging(false)}
-          />
-          <box
-            flexGrow={1}
+            height="100%"
             paddingBottom={1}
             paddingTop={1}
             paddingLeft={2}
@@ -1160,11 +1020,11 @@ export function Session() {
             onMouseUp={() => promptRef.current?.focus()}
           >
             <Show when={session()}>
-              <Show when={!sidebarVisible() || !wide()}>
+              <Show when={!(layout.getPanelByType("viewer")?.visible && wide())}>
                 <Header
-                  navigatorOpen={navigatorVisible()}
+                  navigatorOpen={layout.getPanelByType("explorer")?.visible ?? false}
                   navigatorKeybind={keybind.print("navigator_toggle")}
-                  onNavigatorToggle={toggleNavigator}
+                  onNavigatorToggle={layoutHelpers.toggleNavigator}
                 />
               </Show>
               <scrollbox
@@ -1290,7 +1150,6 @@ export function Session() {
                   ref={(r) => {
                     prompt = r
                     promptRef.set(r)
-                    // Apply initial prompt when prompt component mounts (e.g., from fork)
                     if (route.initialPrompt) {
                       r.set(route.initialPrompt)
                     }
@@ -1305,28 +1164,9 @@ export function Session() {
             </Show>
             <Toast />
           </box>
-        </box>
-        <Show when={sidebarVisible()}>
-          <Switch>
-            <Match when={wide()}>
-              <Sidebar sessionID={route.sessionID} />
-            </Match>
-            <Match when={!wide()}>
-              <box
-                position="absolute"
-                top={0}
-                left={0}
-                right={0}
-                bottom={0}
-                alignItems="flex-end"
-                backgroundColor={RGBA.fromInts(0, 0, 0, 70)}
-              >
-                <Sidebar sessionID={route.sessionID} />
-              </box>
-            </Match>
-          </Switch>
-        </Show>
-      </box>
+        }
+        viewer={<FileViewerPanel width={viewerWidth()} filePath={selectedFilePath()} wrapMode={navigatorWrapMode()} />}
+      />
     </context.Provider>
   )
 }
@@ -2001,9 +1841,7 @@ function BlockTool(props: {
       }}
     >
       <box flexDirection="row" paddingLeft={props.prefix ? 1 : 3} gap={1} alignItems="center">
-        <Show when={props.prefix}>
-          {props.prefix}
-        </Show>
+        <Show when={props.prefix}>{props.prefix}</Show>
         <text fg={theme.textMuted}>{props.title}</text>
       </box>
       {props.children}
@@ -2277,7 +2115,7 @@ function Task(props: ToolProps<typeof TaskTool>) {
           {props.input.description}"
         </InlineTool>
       </Match>
-    </Switch >
+    </Switch>
   )
 }
 

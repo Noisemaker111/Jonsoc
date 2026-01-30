@@ -71,6 +71,8 @@ function init() {
     }
   })
 
+  const isOpen = () => dialog.stack.length > 0
+
   const result = {
     trigger(name: string) {
       for (const option of entries()) {
@@ -85,22 +87,34 @@ function init() {
       return visibleOptions().flatMap((option) => {
         const slash = option.slash
         if (!slash) return []
-        return {
-          display: "/" + slash.name,
-          description: option.description ?? option.title,
-          aliases: slash.aliases?.map((alias) => "/" + alias),
-          onSelect: () => result.trigger(option.value),
-        }
+        return [
+          {
+            display: "/" + slash.name,
+            description: option.description ?? option.title,
+            aliases: slash.aliases?.map((alias) => "/" + alias),
+            onSelect: () => result.trigger(option.value),
+          },
+        ]
       })
     },
     keybinds(enabled: boolean) {
       setSuspendCount((count) => count + (enabled ? -1 : 1))
     },
     suspended,
+    isOpen,
     show() {
       dialog.replace(() => <DialogCommand options={visibleOptions()} suggestedOptions={suggestedOptions()} />)
     },
-    register(cb: () => CommandOption[]) {
+    register(cb: () => CommandOption[], _source?: string) {
+      // Warn if commands are registered outside the registry system
+      if (!_source || !_source.includes("use-command-registry")) {
+        const stack = new Error().stack
+        const caller = stack?.split("\n")[3] || "unknown"
+        console.warn(
+          `[CommandDialog] Direct command registration detected from: ${caller}\n` +
+            `Consider using useCommandRegistry() for better command organization.`,
+        )
+      }
       const results = createMemo(cb)
       setRegistrations((arr) => [results, ...arr])
       onCleanup(() => {
