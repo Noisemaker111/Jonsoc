@@ -44,7 +44,12 @@ export namespace BunProc {
       stderr,
     })
     if (code !== 0) {
-      throw new Error(`Command failed with exit code ${result.exitCode}`)
+      log.error("Command failed", {
+        code,
+        stdout,
+        stderr,
+      })
+      throw new Error(`Command failed with exit code ${result.exitCode}: ${stderr}`)
     }
     return result
   }

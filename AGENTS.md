@@ -2,6 +2,10 @@
 
 This repository is a fork of JonsOC maintained by **Noisemaker111**. Target: `Noisemaker111/jonsoc` on `dev` branch.
 
+## Project Context
+
+**JonsOC** is a VSCode-like editor being built on top of an OpenCode fork. It includes a custom TUI (Terminal User Interface) built with OpenTUI and SolidJS. The project aims to provide an integrated development environment with AI assistance.
+
 ## Question Policy
 
 **When you need to ask the user any question, always use the question tool. Do not ask questions in plain text.**

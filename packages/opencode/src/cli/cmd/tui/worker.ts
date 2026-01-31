@@ -12,7 +12,7 @@ import type { BunWebSocketData } from "hono/bun"
 import { Flag } from "@/flag/flag"
 
 await Log.init({
-  print: process.argv.includes("--print-logs"),
+  print: process.argv.includes("--print-logs") || process.env.PRINT_LOGS === "1",
   dev: Installation.isLocal(),
   level: (() => {
     if (Installation.isLocal()) return "DEBUG"

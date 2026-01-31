@@ -17,6 +17,7 @@ export function GitCommit(props: GitCommitProps) {
     <box
       paddingLeft={1}
       paddingRight={1}
+      paddingTop={1}
       paddingBottom={1}
       flexDirection="row"
       gap={1}

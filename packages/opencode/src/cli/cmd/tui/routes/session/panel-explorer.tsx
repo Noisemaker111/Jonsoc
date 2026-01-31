@@ -160,6 +160,8 @@ export function ExplorerPanel(props: ExplorerPanelProps) {
   const viewportOptions = createMemo(() => ({
     paddingLeft: 1,
     paddingRight: showScrollbar() ? 2 : 1,
+    paddingTop: 0,
+    paddingBottom: 0,
   }))
 
   const verticalScrollbarOptions = createMemo(() => ({
@@ -445,9 +447,6 @@ export function ExplorerPanel(props: ExplorerPanelProps) {
         customBorderChars={NavigatorBorderChars}
       >
         <box flexDirection="column">
-          <text fg={theme.theme.text}>
-            <b>Explorer</b>
-          </text>
           <text fg={theme.theme.textMuted}>{displayRoot()}</text>
         </box>
       </box>
@@ -464,12 +463,9 @@ export function ExplorerPanel(props: ExplorerPanelProps) {
         <Tab label="Git" active={tab() === "git"} onSelect={() => setTab(() => "git")} />
       </box>
 
-      <Show when={tab() === "git"}>
-        <GitCommit commitMessage={commitMessage} setCommitMessage={setCommitMessage} onCommit={handleCommit} />
-      </Show>
-
       <Switch>
         <Match when={tab() === "git"}>
+          <GitCommit commitMessage={commitMessage} setCommitMessage={setCommitMessage} onCommit={handleCommit} />
           <Show
             when={hasGitEntries()}
             fallback={

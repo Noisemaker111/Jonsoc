@@ -1,3 +1,4 @@
+import fs from "fs"
 import { render, useKeyboard, useRenderer, useTerminalDimensions } from "@opentui/solid"
 import { Clipboard } from "@tui/util/clipboard"
 import { TextAttributes } from "@opentui/core"
@@ -47,6 +48,8 @@ import { DialogErrorLog } from "./component/dialog-error-log"
 import { Session as SessionApi } from "@/session"
 import { TuiEvent } from "./event"
 import { KVProvider, useKV } from "./context/kv"
+import { InspectorProvider } from "./context/inspector"
+import { InspectorOverlay } from "./component/inspector-overlay"
 import { Provider } from "@/provider/provider"
 import { ArgsProvider, useArgs, type Args } from "./context/args"
 import open from "open"
@@ -168,7 +171,6 @@ export function tui(input: {
     // Do NOT rethrow - suppress output
   })
 
-  // promise to prevent immediate exit
   return new Promise<void>(async (resolve) => {
     const mode = await getTerminalBackgroundColor()
     const onExit = async () => {
@@ -197,23 +199,25 @@ export function tui(input: {
                           >
                             <SyncProvider>
                               <ThemeProvider mode={mode}>
-                                <LocalProvider>
-                                  <KeybindProvider>
-                                    <PromptStashProvider>
-                                      <DialogProvider>
-                                        <CommandProvider>
-                                          <FrecencyProvider>
-                                            <PromptHistoryProvider>
-                                              <PromptRefProvider>
-                                                <App />
-                                              </PromptRefProvider>
-                                            </PromptHistoryProvider>
-                                          </FrecencyProvider>
-                                        </CommandProvider>
-                                      </DialogProvider>
-                                    </PromptStashProvider>
-                                  </KeybindProvider>
-                                </LocalProvider>
+                                <InspectorProvider>
+                                  <LocalProvider>
+                                    <KeybindProvider>
+                                      <PromptStashProvider>
+                                        <DialogProvider>
+                                          <CommandProvider>
+                                            <FrecencyProvider>
+                                              <PromptHistoryProvider>
+                                                <PromptRefProvider>
+                                                  <App />
+                                                </PromptRefProvider>
+                                              </PromptHistoryProvider>
+                                            </FrecencyProvider>
+                                          </CommandProvider>
+                                        </DialogProvider>
+                                      </PromptStashProvider>
+                                    </KeybindProvider>
+                                  </LocalProvider>
+                                </InspectorProvider>
                               </ThemeProvider>
                             </SyncProvider>
                           </SDKProvider>
@@ -769,6 +773,7 @@ function App() {
           <UISettings />
         </Match>
       </Switch>
+      <InspectorOverlay />
     </box>
   )
 }
@@ -779,21 +784,47 @@ function ErrorComponent(props: {
   onExit: () => Promise<void>
   mode?: "dark" | "light"
 }) {
-  const term = useTerminalDimensions()
-  const renderer = useRenderer()
   const errorLog = useErrorLog()
 
+  let term: ReturnType<typeof useTerminalDimensions> | null = null
+  let renderer: ReturnType<typeof useRenderer> | null = null
+  let hasRendererContext = false
+
+  try {
+    term = useTerminalDimensions()
+    renderer = useRenderer()
+    hasRendererContext = true
+  } catch {
+    // Renderer context not available - will use console fallback
+  }
+
+  // If no renderer context, log to file and exit
+  if (!hasRendererContext) {
+    const logEntry = `[${new Date().toISOString()}] Fatal error (renderer unavailable):\nMessage: ${props.error.message}\nStack: ${props.error.stack}\n\n`
+    fs.appendFileSync("jonsoc-fatal.log", logEntry)
+    console.error("Fatal error (renderer unavailable):")
+    console.error(props.error.message)
+    console.error(props.error.stack)
+    return null
+  }
+
   const handleExit = async () => {
-    renderer.setTerminalTitle("")
-    renderer.destroy()
+    if (renderer) {
+      renderer.setTerminalTitle("")
+      renderer.destroy()
+    }
     props.onExit()
   }
 
-  useKeyboard((evt) => {
-    if (evt.ctrl && evt.name === "c") {
-      handleExit()
-    }
-  })
+  try {
+    useKeyboard((evt) => {
+      if (evt.ctrl && evt.name === "c") {
+        handleExit()
+      }
+    })
+  } catch {
+    // Keyboard context not available - will exit without handler
+  }
   const [copied, setCopied] = createSignal(false)
   const [showLog, setShowLog] = createSignal(false)
 
@@ -832,8 +863,11 @@ function ErrorComponent(props: {
     })
   }
 
+  const termWidth = term?.().width ?? 80
+  const termHeight = term?.().height ?? 24
+
   return (
-    <box flexDirection="column" gap={1} backgroundColor={colors.bg} width={term().width} height={term().height}>
+    <box flexDirection="column" gap={1} backgroundColor={colors.bg} width={termWidth} height={termHeight}>
       <box flexDirection="row" gap={1} alignItems="center">
         <text attributes={TextAttributes.BOLD} fg={colors.text}>
           Please report an issue.
@@ -861,14 +895,14 @@ function ErrorComponent(props: {
         when={showLog()}
         fallback={
           <>
-            <scrollbox height={Math.floor(term().height * 0.7)}>
+            <scrollbox height={Math.floor(termHeight * 0.7)}>
               <text fg={colors.muted}>{props.error.stack}</text>
             </scrollbox>
             <text fg={colors.text}>{props.error.message}</text>
           </>
         }
       >
-        <scrollbox height={Math.floor(term().height * 0.7)}>
+        <scrollbox height={Math.floor(termHeight * 0.7)}>
           <For each={errorLog.errors}>
             {(error: ErrorEntry) => (
               <box flexDirection="column" border={["bottom"]} borderColor={colors.muted} paddingBottom={1} gap={1}>

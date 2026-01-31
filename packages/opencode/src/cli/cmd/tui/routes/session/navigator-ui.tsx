@@ -176,10 +176,14 @@ export function GitRow(props: { entry: FileStatus; active: boolean; width: numbe
       justifyContent="space-between"
       onMouseUp={props.onSelect}
     >
-      <text fg={fg()} wrapMode="none">
-        <span style={{ fg: props.active ? fg() : statusColor() }}>{STATUS_LABELS[props.entry.status]}</span>{" "}
-        {Locale.truncateMiddle(props.entry.path, pathWidth())}
-      </text>
+      <box flexDirection="row" gap={1}>
+        <text fg={props.active ? fg() : statusColor()} wrapMode="none">
+          {STATUS_LABELS[props.entry.status]}
+        </text>
+        <text fg={fg()} wrapMode="none">
+          {Locale.truncateMiddle(props.entry.path, pathWidth())}
+        </text>
+      </box>
       <text fg={props.active ? fg() : theme.theme.textMuted} wrapMode="none" flexShrink={0}>
         <span style={{ fg: theme.theme.diffAdded }}>+{props.entry.added}</span>
         <span style={{ fg: theme.theme.diffRemoved }}> -{props.entry.removed}</span>

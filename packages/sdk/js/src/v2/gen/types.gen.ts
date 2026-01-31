@@ -450,19 +450,19 @@ export type CompactionPart = {
 export type Part =
   | TextPart
   | {
-    id: string
-    sessionID: string
-    messageID: string
-    type: "subtask"
-    prompt: string
-    description: string
-    agent: string
-    model?: {
-      providerID: string
-      modelID: string
+      id: string
+      sessionID: string
+      messageID: string
+      type: "subtask"
+      prompt: string
+      description: string
+      agent: string
+      model?: {
+        providerID: string
+        modelID: string
+      }
+      command?: string
     }
-    command?: string
-  }
   | ReasoningPart
   | FilePart
   | ToolPart
@@ -522,17 +522,17 @@ export type EventPermissionReplied = {
 
 export type SessionStatus =
   | {
-    type: "idle"
-  }
+      type: "idle"
+    }
   | {
-    type: "retry"
-    attempt: number
-    message: string
-    next: number
-  }
+      type: "retry"
+      attempt: number
+      message: string
+      next: number
+    }
   | {
-    type: "busy"
-  }
+      type: "busy"
+    }
 
 export type EventSessionStatus = {
   type: "session.status"
@@ -673,23 +673,23 @@ export type EventTuiCommandExecute = {
   type: "tui.command.execute"
   properties: {
     command:
-    | "session.list"
-    | "session.new"
-    | "session.share"
-    | "session.interrupt"
-    | "session.compact"
-    | "session.page.up"
-    | "session.page.down"
-    | "session.line.up"
-    | "session.line.down"
-    | "session.half.page.up"
-    | "session.half.page.down"
-    | "session.first"
-    | "session.last"
-    | "prompt.clear"
-    | "prompt.submit"
-    | "agent.cycle"
-    | string
+      | "session.list"
+      | "session.new"
+      | "session.share"
+      | "session.interrupt"
+      | "session.compact"
+      | "session.page.up"
+      | "session.page.down"
+      | "session.line.up"
+      | "session.line.down"
+      | "session.half.page.up"
+      | "session.half.page.down"
+      | "session.first"
+      | "session.last"
+      | "prompt.clear"
+      | "prompt.submit"
+      | "agent.cycle"
+      | string
   }
 }
 
@@ -1349,6 +1349,10 @@ export type KeybindsConfig = {
    * Toggle tips on home screen
    */
   tips_toggle?: string
+  /**
+   * Toggle element inspector
+   */
+  inspector_toggle?: string
 }
 
 /**
@@ -1357,7 +1361,7 @@ export type KeybindsConfig = {
 export type LogLevel = "DEBUG" | "INFO" | "WARN" | "ERROR"
 
 /**
- * Server configuration for opencode serve and web commands
+ * Server configuration for jonsoc serve and web commands
  */
 export type ServerConfig = {
   /**
@@ -1388,25 +1392,25 @@ export type PermissionRuleConfig = PermissionActionConfig | PermissionObjectConf
 
 export type PermissionConfig =
   | {
-    __originalKeys?: Array<string>
-    read?: PermissionRuleConfig
-    edit?: PermissionRuleConfig
-    glob?: PermissionRuleConfig
-    grep?: PermissionRuleConfig
-    list?: PermissionRuleConfig
-    bash?: PermissionRuleConfig
-    task?: PermissionRuleConfig
-    external_directory?: PermissionRuleConfig
-    todowrite?: PermissionActionConfig
-    todoread?: PermissionActionConfig
-    question?: PermissionActionConfig
-    webfetch?: PermissionActionConfig
-    websearch?: PermissionActionConfig
-    codesearch?: PermissionActionConfig
-    lsp?: PermissionRuleConfig
-    doom_loop?: PermissionActionConfig
-    [key: string]: PermissionRuleConfig | Array<string> | PermissionActionConfig | undefined
-  }
+      __originalKeys?: Array<string>
+      read?: PermissionRuleConfig
+      edit?: PermissionRuleConfig
+      glob?: PermissionRuleConfig
+      grep?: PermissionRuleConfig
+      list?: PermissionRuleConfig
+      bash?: PermissionRuleConfig
+      task?: PermissionRuleConfig
+      external_directory?: PermissionRuleConfig
+      todowrite?: PermissionActionConfig
+      todoread?: PermissionActionConfig
+      question?: PermissionActionConfig
+      webfetch?: PermissionActionConfig
+      websearch?: PermissionActionConfig
+      codesearch?: PermissionActionConfig
+      lsp?: PermissionRuleConfig
+      doom_loop?: PermissionActionConfig
+      [key: string]: PermissionRuleConfig | Array<string> | PermissionActionConfig | undefined
+    }
   | PermissionActionConfig
 
 export type AgentConfig = {
@@ -1447,23 +1451,23 @@ export type AgentConfig = {
   maxSteps?: number
   permission?: PermissionConfig
   [key: string]:
-  | unknown
-  | string
-  | number
-  | {
-    [key: string]: boolean
-  }
-  | boolean
-  | "subagent"
-  | "primary"
-  | "all"
-  | {
-    [key: string]: unknown
-  }
-  | string
-  | number
-  | PermissionConfig
-  | undefined
+    | unknown
+    | string
+    | number
+    | {
+        [key: string]: boolean
+      }
+    | boolean
+    | "subagent"
+    | "primary"
+    | "all"
+    | {
+        [key: string]: unknown
+      }
+    | string
+    | number
+    | PermissionConfig
+    | undefined
 }
 
 export type ProviderConfig = {
@@ -1483,10 +1487,10 @@ export type ProviderConfig = {
       temperature?: boolean
       tool_call?: boolean
       interleaved?:
-      | true
-      | {
-        field: "reasoning_content" | "reasoning_details"
-      }
+        | true
+        | {
+            field: "reasoning_content" | "reasoning_details"
+          }
       cost?: {
         input: number
         output: number
@@ -1663,7 +1667,7 @@ export type Config = {
   }
   server?: ServerConfig
   /**
-   * Command configuration, see https://jonsoc.ai/docs/commands
+   * Command configuration, see https://docs.jonsoc.ai/docs/commands
    */
   command?: {
     [key: string]: {
@@ -1724,7 +1728,7 @@ export type Config = {
     [key: string]: AgentConfig | undefined
   }
   /**
-   * Agent configuration, see https://jonsoc.ai/docs/agents
+   * Agent configuration, see https://docs.jonsoc.ai/docs/agents
    */
   agent?: {
     plan?: AgentConfig
@@ -1747,43 +1751,43 @@ export type Config = {
    */
   mcp?: {
     [key: string]:
-    | McpLocalConfig
-    | McpRemoteConfig
-    | {
-      enabled: boolean
-    }
+      | McpLocalConfig
+      | McpRemoteConfig
+      | {
+          enabled: boolean
+        }
   }
   formatter?:
-  | false
-  | {
-    [key: string]: {
-      disabled?: boolean
-      command?: Array<string>
-      environment?: {
-        [key: string]: string
+    | false
+    | {
+        [key: string]: {
+          disabled?: boolean
+          command?: Array<string>
+          environment?: {
+            [key: string]: string
+          }
+          extensions?: Array<string>
+        }
       }
-      extensions?: Array<string>
-    }
-  }
   lsp?:
-  | false
-  | {
-    [key: string]:
+    | false
     | {
-      disabled: true
-    }
-    | {
-      command: Array<string>
-      extensions?: Array<string>
-      disabled?: boolean
-      env?: {
-        [key: string]: string
+        [key: string]:
+          | {
+              disabled: true
+            }
+          | {
+              command: Array<string>
+              extensions?: Array<string>
+              disabled?: boolean
+              env?: {
+                [key: string]: string
+              }
+              initialization?: {
+                [key: string]: unknown
+              }
+            }
       }
-      initialization?: {
-        [key: string]: unknown
-      }
-    }
-  }
   /**
    * Additional instruction files or patterns to include
    */
@@ -1888,10 +1892,10 @@ export type Model = {
       pdf: boolean
     }
     interleaved:
-    | boolean
-    | {
-      field: "reasoning_content" | "reasoning_details"
-    }
+      | boolean
+      | {
+          field: "reasoning_content" | "reasoning_details"
+        }
   }
   cost: {
     input: number
@@ -2134,6 +2138,7 @@ export type VcsHistoryLine = {
   hash?: string
   subject?: string
   refs?: Array<string>
+  author?: string
 }
 
 export type Command = {
@@ -3903,10 +3908,10 @@ export type ProviderListResponses = {
           temperature: boolean
           tool_call: boolean
           interleaved?:
-          | true
-          | {
-            field: "reasoning_content" | "reasoning_details"
-          }
+            | true
+            | {
+                field: "reasoning_content" | "reasoning_details"
+              }
           cost?: {
             input: number
             output: number
@@ -4167,6 +4172,29 @@ export type FileReadResponses = {
 }
 
 export type FileReadResponse = FileReadResponses[keyof FileReadResponses]
+
+export type FileWriteData = {
+  body?: {
+    path: string
+    content: string
+  }
+  path?: never
+  query?: {
+    directory?: string
+  }
+  url: "/file/content"
+}
+
+export type FileWriteResponses = {
+  /**
+   * Success
+   */
+  200: {
+    success: boolean
+  }
+}
+
+export type FileWriteResponse = FileWriteResponses[keyof FileWriteResponses]
 
 export type FileStatusData = {
   body?: never
@@ -4784,6 +4812,44 @@ export type VcsHistoryResponses = {
 }
 
 export type VcsHistoryResponse = VcsHistoryResponses[keyof VcsHistoryResponses]
+
+export type VcsBranchesData = {
+  body?: never
+  path?: never
+  query?: {
+    directory?: string
+  }
+  url: "/vcs/branches"
+}
+
+export type VcsBranchesResponses = {
+  /**
+   * List of branches
+   */
+  200: Array<string>
+}
+
+export type VcsBranchesResponse = VcsBranchesResponses[keyof VcsBranchesResponses]
+
+export type VcsCheckoutData = {
+  body?: {
+    branch: string
+  }
+  path?: never
+  query?: {
+    directory?: string
+  }
+  url: "/vcs/checkout"
+}
+
+export type VcsCheckoutResponses = {
+  /**
+   * Success
+   */
+  200: boolean
+}
+
+export type VcsCheckoutResponse = VcsCheckoutResponses[keyof VcsCheckoutResponses]
 
 export type CommandListData = {
   body?: never

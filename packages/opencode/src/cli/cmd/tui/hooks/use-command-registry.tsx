@@ -7,6 +7,7 @@ import { useTheme } from "../context/theme"
 import { useToast } from "../ui/toast"
 import { useLocal } from "../context/local"
 import { useSDK } from "../context/sdk"
+import { useInspector } from "../context/inspector"
 import type { Route } from "../context/route"
 
 // Define all command groups
@@ -79,7 +80,16 @@ const COMMAND_DEFINITIONS: Record<CommandGroup, (ctx: CommandContext) => Command
   ],
 
   system: (ctx) => [
-    // System commands go here
+    {
+      title: ctx.inspector?.enabled() ? "Disable element inspector" : "Enable element inspector",
+      value: "app.inspector.toggle",
+      keybind: "inspector_toggle",
+      category: "System",
+      onSelect: (dialog) => {
+        ctx.inspector?.setEnabled((prev) => !prev)
+        dialog.clear()
+      },
+    },
   ],
 }
 
@@ -90,6 +100,7 @@ interface CommandContext {
   returnTo: Route
   navigatorTab: () => "explorer" | "git"
   toggleNavigatorTab: () => void
+  inspector?: ReturnType<typeof useInspector>
   sync?: ReturnType<typeof useSync>
   theme?: ReturnType<typeof useTheme>
   toast?: ReturnType<typeof useToast>
@@ -119,6 +130,8 @@ export function useCommandRegistry(options: {
     setNavigatorTab((prev) => (prev === "git" ? "explorer" : "git"))
   }
 
+  const inspector = useInspector()
+
   const ctx: CommandContext = {
     layout,
     kv,
@@ -126,6 +139,7 @@ export function useCommandRegistry(options: {
     returnTo: options.returnTo,
     navigatorTab: () => navigatorTab(),
     toggleNavigatorTab,
+    inspector,
   }
 
   // Build command list from groups

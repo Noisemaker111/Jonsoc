@@ -244,7 +244,7 @@ export const { use: useSync, provider: SyncProvider } = createSimpleContext({
             }),
           )
           const updated = store.message[event.properties.info.sessionID]
-          if (updated.length > 100) {
+          if (updated && updated.length > 100) {
             const oldest = updated[0]
             batch(() => {
               setStore(
@@ -266,6 +266,7 @@ export const { use: useSync, provider: SyncProvider } = createSimpleContext({
         }
         case "message.removed": {
           const messages = store.message[event.properties.sessionID]
+          if (!messages) break
           const result = Binary.search(messages, event.properties.messageID, (m) => m.id)
           if (result.found) {
             setStore(
@@ -301,6 +302,7 @@ export const { use: useSync, provider: SyncProvider } = createSimpleContext({
 
         case "message.part.removed": {
           const parts = store.part[event.properties.messageID]
+          if (!parts) break
           const result = Binary.search(parts, event.properties.partID, (p) => p.id)
           if (result.found)
             setStore(
@@ -371,14 +373,16 @@ export const { use: useSync, provider: SyncProvider } = createSimpleContext({
             sdk.client.vcs.get().then((x) => setStore("vcs", reconcile(x.data))),
             sdk.client.path.get().then((x) => setStore("path", reconcile(x.data!))),
           ]).then(() => {
+            console.log("Sync complete")
             setStore("status", "complete")
           })
         })
         .catch(async (e) => {
           Log.Default.error("tui bootstrap failed", {
-            error: e instanceof Error ? e.message : String(e),
+            error: e instanceof Error ? e.message : JSON.stringify(e),
             name: e instanceof Error ? e.name : undefined,
             stack: e instanceof Error ? e.stack : undefined,
+            raw: e,
           })
           await exit(e)
         })

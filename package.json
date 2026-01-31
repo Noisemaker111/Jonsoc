@@ -78,7 +78,9 @@
     "@opencode-ai/plugin": "workspace:*",
     "@opencode-ai/script": "workspace:*",
     "@opencode-ai/sdk": "workspace:*",
-    "typescript": "catalog:"
+    "opencode-antigravity-auth": "1.4.3",
+    "typescript": "catalog:",
+    "zig": "0.3.0"
   },
   "repository": {
     "type": "git",

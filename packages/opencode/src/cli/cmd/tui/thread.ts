@@ -95,9 +95,12 @@ export const TuiThreadCommand = cmd({
     }
 
     const worker = new Worker(workerPath, {
-      env: Object.fromEntries(
-        Object.entries(process.env).filter((entry): entry is [string, string] => entry[1] !== undefined),
-      ),
+      env: {
+        ...Object.fromEntries(
+          Object.entries(process.env).filter((entry): entry is [string, string] => entry[1] !== undefined),
+        ),
+        PRINT_LOGS: process.argv.includes("--print-logs") ? "1" : "0",
+      },
     })
     worker.onerror = (e) => {
       Log.Default.error(e)

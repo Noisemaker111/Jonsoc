@@ -61,7 +61,7 @@ export function Home() {
 
   // Register commands through centralized registry
   useCommandRegistry({
-    groups: ["layout"], // Always include layout commands (/ui, toggle panels)
+    groups: ["layout", "system"], // Include layout and system commands
     returnTo: { type: "home" },
     additionalCommands: [
       {

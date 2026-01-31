@@ -305,7 +305,8 @@ export function Session() {
 
   function toBottom() {
     setTimeout(() => {
-      if (scroll) scroll()!.scrollTo(scroll()!.scrollHeight)
+      const s = scroll()
+      if (s) s.scrollTo(s.scrollHeight)
     }, 50)
   }
 
@@ -333,7 +334,7 @@ export function Session() {
 
   // Register layout commands through centralized registry
   const layoutHelpers = useCommandRegistry({
-    groups: ["layout"],
+    groups: ["layout", "system"],
     returnTo: { type: "session", sessionID: route.sessionID },
   })
 
@@ -698,7 +699,8 @@ export function Session() {
       category: "Session",
       hidden: true,
       onSelect: (dialog) => {
-        scroll()!.scrollTo(0)
+        const s = scroll()
+        if (s) s.scrollTo(0)
         dialog.clear()
       },
     },
@@ -709,7 +711,8 @@ export function Session() {
       category: "Session",
       hidden: true,
       onSelect: (dialog) => {
-        scroll()!.scrollTo(scroll()!.scrollHeight)
+        const s = scroll()
+        if (s) s.scrollTo(s.scrollHeight)
         dialog.clear()
       },
     },
