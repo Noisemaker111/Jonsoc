@@ -1,6 +1,6 @@
 import { createSignal, createMemo, For, Show } from "solid-js"
 import { useRoute, useRouteData } from "@tui/context/route"
-import { useLayout, type PanelType, type PanelPosition } from "@tui/context/layout"
+import { useLayout, type PanelType } from "@tui/context/layout"
 import { useTheme } from "@tui/context/theme"
 import { useTerminalDimensions } from "@opentui/solid"
 import { TextAttributes, RGBA } from "@opentui/core"
@@ -42,12 +42,6 @@ export function UISettings() {
   // Width adjustment step
   const WIDTH_STEP = 5
 
-  // Calculate remaining percentage
-  const remainingPercent = createMemo(() => {
-    const used = layout.panels.reduce((sum, p) => sum + (p.visible ? p.width : 0), 0)
-    return 100 - used
-  })
-
   const safeDimensions = createMemo(() => {
     const dims = dimensions()
     return {
@@ -56,12 +50,45 @@ export function UISettings() {
     }
   })
 
-  const totalWidth = createMemo(() => safeDimensions().width - 4)
+  // Preview dimensions: match terminal aspect ratio exactly
+  const previewDimensions = createMemo(() => {
+    const termWidth = safeDimensions().width - 4 // Account for padding
+    const termHeight = safeDimensions().height - 8 // Account for header/footer
 
-  const getPanelWidth = (position: PanelPosition) => {
-    const panel = layout.getPanelAt(position)
-    if (!panel || !panel.visible) return 0
-    return Math.floor((totalWidth() * panel.width) / 100)
+    // Use 60% of available space for preview to leave room for controls
+    const maxWidth = Math.floor(termWidth * 0.6)
+    const maxHeight = Math.floor(termHeight * 0.6)
+
+    // Calculate aspect ratio of terminal
+    const aspectRatio = termWidth / termHeight
+
+    // Calculate preview dimensions maintaining exact aspect ratio
+    let previewWidth = maxWidth
+    let previewHeight = Math.floor(previewWidth / aspectRatio)
+
+    // If height exceeds max, scale down proportionally
+    if (previewHeight > maxHeight) {
+      previewHeight = maxHeight
+      previewWidth = Math.floor(previewHeight * aspectRatio)
+    }
+
+    // Ensure minimum dimensions
+    previewWidth = Math.max(30, previewWidth)
+    previewHeight = Math.max(8, previewHeight)
+
+    return { width: previewWidth, height: previewHeight }
+  })
+
+  // Get visible panels sorted by position for layout preview
+  const visiblePanels = createMemo(() => layout.panels.filter((p) => p.visible).sort((a, b) => a.position - b.position))
+
+  // Calculate proportional width for each visible panel in the preview
+  const getPanelPreviewWidth = (panel: { visible: boolean; width: number }) => {
+    if (!panel.visible) return 0
+    const totalVisibleWidth = visiblePanels().reduce((sum, p) => sum + p.width, 0)
+    if (totalVisibleWidth === 0) return 0
+    // Proportional width based on visible panels only
+    return Math.floor((previewDimensions().width * panel.width) / totalVisibleWidth)
   }
 
   // Handle click-to-swap panel selection
@@ -85,55 +112,54 @@ export function UISettings() {
     }
   }
 
-  // Handle width adjustment with +/- buttons
+  // Handle width adjustment with +/- buttons - transfers width between adjacent panels
   const adjustWidth = (type: PanelType, direction: "minus" | "plus") => {
     const panel = layout.getPanelByType(type)
     if (!panel || !panel.visible) return
 
-    const visiblePanels = layout.panels.filter((p) => p.visible && p.type !== type)
-    if (visiblePanels.length === 0) return
+    // Find adjacent visible panels
+    const sortedVisible = layout.panels.filter((p) => p.visible).sort((a, b) => a.position - b.position)
+    const panelIndex = sortedVisible.findIndex((p) => p.type === type)
+
+    if (panelIndex === -1) return
 
     if (direction === "minus") {
-      // Decrease this panel by STEP, distribute to others
-      const newWidth = Math.max(5, panel.width - WIDTH_STEP)
-      const released = panel.width - newWidth
+      // Decreasing: give space to the panel on the right (if exists), otherwise left
+      const recipientIndex = panelIndex < sortedVisible.length - 1 ? panelIndex + 1 : panelIndex - 1
+      if (recipientIndex < 0 || recipientIndex >= sortedVisible.length) return
 
-      if (released > 0) {
-        layout.setPanelWidth(type, newWidth)
-        // Distribute released width evenly among other visible panels
-        const perPanel = released / visiblePanels.length
-        visiblePanels.forEach((p) => {
-          layout.setPanelWidth(p.type, Math.min(90, p.width + perPanel))
-        })
+      const recipient = sortedVisible[recipientIndex]
+      const canDecrease = panel.width - 5 >= WIDTH_STEP
+      const canReceive = recipient.width + WIDTH_STEP <= 90
+
+      if (canDecrease && canReceive) {
+        layout.setPanelWidth(type, panel.width - WIDTH_STEP)
+        layout.setPanelWidth(recipient.type, recipient.width + WIDTH_STEP)
       }
     } else {
-      // Increase this panel by STEP, take from others
-      const needed = WIDTH_STEP
-      const available = visiblePanels.reduce((sum, p) => sum + (p.width - 5), 0)
+      // Increasing: take space from the panel on the right (if exists), otherwise left
+      const donorIndex = panelIndex < sortedVisible.length - 1 ? panelIndex + 1 : panelIndex - 1
+      if (donorIndex < 0 || donorIndex >= sortedVisible.length) return
 
-      if (available >= needed) {
-        const newWidth = Math.min(90, panel.width + needed)
-        const taken = newWidth - panel.width
+      const donor = sortedVisible[donorIndex]
+      const canIncrease = panel.width + WIDTH_STEP <= 90
+      const canGive = donor.width - 5 >= WIDTH_STEP
 
-        layout.setPanelWidth(type, newWidth)
-
-        // Take from other panels proportionally
-        let remainingToTake = taken
-        visiblePanels.forEach((p, idx) => {
-          if (remainingToTake <= 0) return
-          const canTake = p.width - 5
-          const takeAmount =
-            idx === visiblePanels.length - 1
-              ? remainingToTake
-              : Math.min(canTake, (p.width / visiblePanels.reduce((s, vp) => s + vp.width, 0)) * taken)
-          layout.setPanelWidth(p.type, Math.max(5, p.width - takeAmount))
-          remainingToTake -= takeAmount
-        })
+      if (canIncrease && canGive) {
+        layout.setPanelWidth(type, panel.width + WIDTH_STEP)
+        layout.setPanelWidth(donor.type, donor.width - WIDTH_STEP)
       }
     }
   }
 
+  const totalPercent = createMemo(() => layout.panels.reduce((sum, p) => sum + (p.visible ? p.width : 0), 0))
+
+  const isLayoutValid = createMemo(() => totalPercent() === 100)
+
   const handleReturn = () => {
+    // Only allow exit if layout totals exactly 100%
+    if (!isLayoutValid()) return
+
     if (route.returnTo) {
       navigate(route.returnTo)
     } else {
@@ -185,8 +211,12 @@ export function UISettings() {
           <text fg={theme.textMuted} onMouseUp={handleReset}>
             [Reset]
           </text>
-          <text fg={theme.primary} attributes={TextAttributes.BOLD} onMouseUp={handleReturn}>
-            [Done]
+          <text
+            fg={isLayoutValid() ? theme.primary : theme.textMuted}
+            attributes={isLayoutValid() ? TextAttributes.BOLD : undefined}
+            onMouseUp={handleReturn}
+          >
+            {isLayoutValid() ? "[Done]" : "[Done] (needs 100%)"}
           </text>
         </box>
       </box>
@@ -201,228 +231,199 @@ export function UISettings() {
         backgroundColor={theme.backgroundPanel}
       >
         <text fg={theme.textMuted}>
-          Drag or click panels to reposition. Click a panel to select, click another to swap. Use +/- to adjust widths.
-          ESC to cancel.
+          Click panels to select and swap positions. Use +/- to adjust widths. Toggle visibility below.
         </text>
       </box>
 
       {/* Layout Preview */}
       <box
-        flexGrow={1}
-        paddingTop={2}
-        paddingBottom={2}
+        flexShrink={0}
+        paddingTop={1}
+        paddingBottom={1}
         paddingLeft={2}
         paddingRight={2}
         flexDirection="column"
         gap={1}
       >
         <box
-          flexGrow={1}
+          width={previewDimensions().width}
+          height={previewDimensions().height}
           flexDirection="row"
           border={["left", "right", "top", "bottom"]}
           borderColor={theme.border}
           padding={0}
           gap={0}
         >
-          <For each={[0, 1, 2]}>
-            {(position) => {
-              const panel = createMemo(() => layout.getPanelAt(position as PanelPosition))
-              const width = createMemo(() => getPanelWidth(position as PanelPosition))
-              const isSelected = createMemo(() => selectedPanel() === panel()?.type)
+          <For each={visiblePanels()}>
+            {(panel) => {
+              const isSelected = createMemo(() => selectedPanel() === panel.type)
               const canSwapHere = createMemo(() => {
                 const selected = selectedPanel()
                 if (!selected) return false
                 const selectedPanelObj = layout.getPanelByType(selected)
-                return selectedPanelObj && selectedPanelObj.position !== position
+                return selectedPanelObj && selectedPanelObj.position !== panel.position
               })
+              const width = createMemo(() => getPanelPreviewWidth(panel))
 
               return (
-                <>
-                  {/* Panel */}
-                  <Show
-                    when={panel()?.visible}
-                    fallback={
-                      <box
-                        width={width()}
-                        height="100%"
-                        backgroundColor={isSelected() ? theme.backgroundPanel : theme.backgroundElement}
-                        flexDirection="column"
-                        justifyContent="center"
-                        alignItems="center"
-                        gap={1}
-                        onMouseUp={() => {
-                          // Clicking hidden panel while another is selected just deselects
-                          if (selectedPanel()) {
-                            setSelectedPanel(null)
-                          }
-                        }}
-                      >
-                        <text fg={theme.textMuted} attributes={TextAttributes.BOLD}>
-                          {PANEL_NAMES[panel()?.type ?? "chat"]}
-                        </text>
-                        <text fg={theme.textMuted}>{panel()?.width ?? 0}%</text>
-                        <Show when={isSelected()}>
-                          <box marginTop={1} paddingLeft={1} paddingRight={1} backgroundColor={theme.warning}>
-                            <text fg={theme.background} attributes={TextAttributes.BOLD}>
-                              Can't swap with hidden
-                            </text>
-                          </box>
-                        </Show>
-                        <box
-                          marginTop={1}
-                          paddingLeft={2}
-                          paddingRight={2}
-                          paddingTop={0}
-                          paddingBottom={0}
-                          backgroundColor={theme.success}
-                          onMouseUp={(e) => {
-                            e.stopPropagation()
-                            const type = panel()?.type
-                            if (type) layout.togglePanel(type)
-                          }}
-                        >
-                          <text fg={theme.background}>[Show]</text>
-                        </box>
-                      </box>
-                    }
+                <box
+                  width={width()}
+                  height="100%"
+                  backgroundColor={getPanelColor(panel.type, isSelected() ? 0.7 : 1.0)}
+                  border={
+                    isSelected()
+                      ? ["left", "right", "top", "bottom"]
+                      : canSwapHere()
+                        ? ["left", "right", "top", "bottom"]
+                        : []
+                  }
+                  borderColor={isSelected() ? theme.warning : canSwapHere() ? theme.success : theme.border}
+                  flexDirection="column"
+                  justifyContent="center"
+                  alignItems="center"
+                  gap={1}
+                  onMouseUp={() => handlePanelClick(panel.type)}
+                >
+                  {/* Panel Header */}
+                  <box
+                    paddingLeft={1}
+                    paddingRight={1}
+                    paddingTop={0}
+                    paddingBottom={0}
+                    backgroundColor={theme.background}
                   >
-                    <box
-                      width={width()}
-                      height="100%"
-                      backgroundColor={getPanelColor(panel()?.type ?? "chat", isSelected() ? 0.7 : 1.0)}
-                      border={
-                        isSelected()
-                          ? ["left", "right", "top", "bottom"]
-                          : canSwapHere()
-                            ? ["left", "right", "top", "bottom"]
-                            : []
-                      }
-                      borderColor={isSelected() ? theme.warning : canSwapHere() ? theme.success : theme.border}
-                      flexDirection="column"
-                      justifyContent="center"
-                      alignItems="center"
-                      gap={1}
-                      onMouseUp={() => {
-                        const type = panel()?.type
-                        if (type) handlePanelClick(type)
-                      }}
-                    >
-                      {/* Panel Header */}
-                      <box
-                        paddingLeft={1}
-                        paddingRight={1}
-                        paddingTop={0}
-                        paddingBottom={0}
-                        backgroundColor={theme.background}
-                      >
-                        <text fg={getPanelColor(panel()?.type ?? "chat", 1.0)} attributes={TextAttributes.BOLD}>
-                          {PANEL_NAMES[panel()?.type ?? "chat"]}
-                        </text>
-                      </box>
+                    <text fg={getPanelColor(panel.type, 1.0)} attributes={TextAttributes.BOLD}>
+                      {PANEL_NAMES[panel.type]}
+                    </text>
+                  </box>
 
-                      {/* Description */}
-                      <text fg={theme.text}>{PANEL_DESC[panel()?.type ?? "chat"]}</text>
+                  {/* Description */}
+                  <text fg={theme.text}>{PANEL_DESC[panel.type]}</text>
 
-                      {/* Width */}
-                      <text fg={theme.textMuted}>{panel()?.width ?? 0}% width</text>
-
-                      {/* Position indicator */}
-                      <text fg={theme.textMuted}>Position {position + 1}</text>
-
-                      {/* Selected indicator */}
-                      <Show when={isSelected()}>
-                        <box marginTop={1} paddingLeft={1} paddingRight={1} backgroundColor={theme.warning}>
-                          <text fg={theme.background} attributes={TextAttributes.BOLD}>
-                            Selected (click another to swap)
-                          </text>
-                        </box>
-                      </Show>
-
-                      {/* Swap hint */}
-                      <Show when={canSwapHere() && !isSelected()}>
-                        <box marginTop={1} paddingLeft={1} paddingRight={1} backgroundColor={theme.success}>
-                          <text fg={theme.background} attributes={TextAttributes.BOLD}>
-                            Click to swap
-                          </text>
-                        </box>
-                      </Show>
-
-                      {/* Controls */}
-                      <box flexDirection="row" gap={2} marginTop={2}>
-                        <box
-                          paddingLeft={1}
-                          paddingRight={1}
-                          backgroundColor={theme.backgroundElement}
-                          onMouseUp={(e) => {
-                            e.stopPropagation()
-                            const type = panel()?.type
-                            if (type) layout.togglePanel(type)
-                          }}
-                        >
-                          <text fg={theme.textMuted}>[Hide]</text>
-                        </box>
-                      </box>
+                  {/* Selected indicator */}
+                  <Show when={isSelected()}>
+                    <box marginTop={1} paddingLeft={1} paddingRight={1} backgroundColor={theme.warning}>
+                      <text fg={theme.background} attributes={TextAttributes.BOLD}>
+                        Selected (click another to swap)
+                      </text>
                     </box>
                   </Show>
-                </>
+
+                  {/* Swap hint */}
+                  <Show when={canSwapHere() && !isSelected()}>
+                    <box marginTop={1} paddingLeft={1} paddingRight={1} backgroundColor={theme.success}>
+                      <text fg={theme.background} attributes={TextAttributes.BOLD}>
+                        Click to swap
+                      </text>
+                    </box>
+                  </Show>
+
+                  {/* Hide button */}
+                  <box
+                    marginTop={2}
+                    paddingLeft={2}
+                    paddingRight={2}
+                    paddingTop={0}
+                    paddingBottom={0}
+                    backgroundColor={theme.backgroundElement}
+                    onMouseUp={(e) => {
+                      e.stopPropagation()
+                      layout.togglePanel(panel.type)
+                    }}
+                  >
+                    <text fg={theme.textMuted}>[Hide]</text>
+                  </box>
+                </box>
+              )
+            }}
+          </For>
+
+          {/* Show hidden panels as thin collapsed strips */}
+          <For each={layout.panels.filter((p) => !p.visible)}>
+            {(panel) => {
+              const isSelected = createMemo(() => selectedPanel() === panel.type)
+
+              return (
+                <box
+                  width={3}
+                  height="100%"
+                  backgroundColor={theme.backgroundElement}
+                  border={isSelected() ? ["left", "right", "top", "bottom"] : ["left"]}
+                  borderColor={isSelected() ? theme.warning : theme.border}
+                  flexDirection="column"
+                  justifyContent="center"
+                  alignItems="center"
+                  onMouseUp={() => {
+                    // Clicking hidden panel while another is selected just deselects
+                    if (selectedPanel()) {
+                      setSelectedPanel(null)
+                    }
+                  }}
+                >
+                  {/* Vertical text for hidden panel */}
+                  <text fg={theme.textMuted} attributes={TextAttributes.BOLD}>
+                    {PANEL_NAMES[panel.type][0]}
+                  </text>
+                  <Show when={isSelected()}>
+                    <box marginTop={1} backgroundColor={theme.warning}>
+                      <text fg={theme.background}>!</text>
+                    </box>
+                  </Show>
+                </box>
               )
             }}
           </For>
         </box>
 
-        {/* Legend with +/- Controls */}
-        <box flexDirection="row" gap={4} paddingTop={1} paddingLeft={1} alignItems="center">
+        {/* Legend with Visibility Toggles - One panel per line */}
+        <box flexDirection="column" gap={1} paddingTop={1} paddingLeft={1} paddingRight={1}>
           <For each={layout.panels}>
             {(panel) => (
-              <box flexDirection="row" gap={1} alignItems="center">
-                <box width={3} height={1} backgroundColor={getPanelColor(panel.type, 1.0)} />
-                <text fg={theme.text}>{PANEL_NAMES[panel.type]}</text>
-                <text fg={panel.visible ? theme.success : theme.error}>{panel.visible ? "●" : "○"}</text>
+              <box flexDirection="row" gap={2} alignItems="center">
+                {/* Panel header */}
+                <box flexDirection="row" gap={1} alignItems="center" width={16}>
+                  <box width={3} height={1} backgroundColor={getPanelColor(panel.type, 1.0)} />
+                  <text fg={theme.text}>{PANEL_NAMES[panel.type]}</text>
+                </box>
 
+                {/* Visibility toggle */}
+                <box
+                  paddingLeft={1}
+                  paddingRight={1}
+                  backgroundColor={panel.visible ? theme.success : theme.backgroundElement}
+                  onMouseUp={() => layout.togglePanel(panel.type)}
+                >
+                  <text fg={panel.visible ? theme.background : theme.textMuted}>
+                    {panel.visible ? "[show]" : "[hide]"}
+                  </text>
+                </box>
+
+                {/* Width controls with +/- (only for visible panels) */}
                 <Show when={panel.visible}>
-                  <box flexDirection="row" gap={0}>
-                    <box
-                      paddingLeft={1}
-                      paddingRight={1}
-                      backgroundColor={theme.backgroundElement}
+                  <box flexDirection="row" gap={1} alignItems="center">
+                    <text
+                      fg={theme.primary}
                       onMouseUp={(e) => {
                         e.stopPropagation()
                         adjustWidth(panel.type, "minus")
                       }}
                     >
-                      <text fg={theme.textMuted}>[-]</text>
-                    </box>
-                    <text fg={theme.textMuted} paddingLeft={1} paddingRight={1}>
-                      {panel.width}%
+                      [-]
                     </text>
-                    <box
-                      paddingLeft={1}
-                      paddingRight={1}
-                      backgroundColor={theme.backgroundElement}
+                    <text
+                      fg={theme.primary}
                       onMouseUp={(e) => {
                         e.stopPropagation()
                         adjustWidth(panel.type, "plus")
                       }}
                     >
-                      <text fg={theme.textMuted}>[+]</text>
-                    </box>
+                      [+]
+                    </text>
                   </box>
-                </Show>
-                <Show when={!panel.visible}>
-                  <text fg={theme.textMuted}>{panel.width}%</text>
                 </Show>
               </box>
             )}
           </For>
-
-          {/* Remaining percentage indicator */}
-          <box flexDirection="row" gap={1} alignItems="center" marginLeft={2}>
-            <text fg={theme.textMuted}>|</text>
-            <text fg={remainingPercent() === 0 ? theme.success : theme.warning}>
-              {remainingPercent() === 0 ? "✓" : "⚠"}
-            </text>
-            <text fg={theme.textMuted}>Remaining: {remainingPercent()}%</text>
-          </box>
         </box>
       </box>
 
@@ -438,8 +439,10 @@ export function UISettings() {
         flexDirection="row"
         justifyContent="space-between"
       >
-        <text fg={theme.textMuted}>Drag or click panels to swap. [Done] to apply. ESC to cancel.</text>
-        <text fg={theme.textMuted}>Total: {layout.panels.reduce((sum, p) => sum + (p.visible ? p.width : 0), 0)}%</text>
+        <text fg={theme.textMuted}>Click panels to swap. [Done] to apply. ESC to cancel.</text>
+        <text fg={theme.textMuted}>
+          Total: {Math.round(layout.panels.reduce((sum, p) => sum + (p.visible ? p.width : 0), 0))}%
+        </text>
       </box>
     </box>
   )

@@ -24,7 +24,15 @@ export function DynamicLayout(props: DynamicLayoutProps) {
     const panel = layout.getPanelAt(position)
     if (!panel || !panel.visible) return 0
     const total = totalWidth()
-    return Math.floor((total * panel.width) / 100)
+
+    // Calculate total width of all visible panels for normalization
+    const visiblePanels = layout.panels.filter((p) => p.visible)
+    const totalVisibleWidth = visiblePanels.reduce((sum, p) => sum + p.width, 0)
+
+    // Normalize width so visible panels fill 100% of available space
+    if (totalVisibleWidth === 0) return 0
+    const normalizedWidth = (panel.width / totalVisibleWidth) * 100
+    return Math.floor((total * normalizedWidth) / 100)
   }
 
   const getPanelContent = (type: PanelType) => {

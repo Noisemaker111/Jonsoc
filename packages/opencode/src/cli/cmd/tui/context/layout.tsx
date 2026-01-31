@@ -18,6 +18,11 @@ export interface LayoutConfig {
   version: number
 }
 
+// Round width to nearest 5% increment
+const roundToFive = (width: number): number => {
+  return Math.round(width / 5) * 5
+}
+
 const DEFAULT_LAYOUT: LayoutConfig = {
   version: 1,
   panels: [
@@ -48,9 +53,15 @@ export function validateLayout(layout: any): LayoutConfig {
   const positions = new Set(validPanels.map((p: PanelConfig) => p.position))
   if (positions.size !== 3) return DEFAULT_LAYOUT
 
+  // Round all widths to nearest 5%
+  const roundedPanels = validPanels.map((p: PanelConfig) => ({
+    ...p,
+    width: roundToFive(Math.max(5, Math.min(90, p.width))),
+  }))
+
   return {
     version: LAYOUT_VERSION,
-    panels: validPanels.sort((a: PanelConfig, b: PanelConfig) => a.position - b.position),
+    panels: roundedPanels.sort((a: PanelConfig, b: PanelConfig) => a.position - b.position),
   }
 }
 
@@ -103,17 +114,88 @@ export function createLayoutStore() {
   }
 
   const setPanelWidth = (type: PanelType, width: number) => {
-    const clamped = Math.max(5, Math.min(90, width))
-    console.log("[Layout] setPanelWidth - type:", type, "width:", width, "clamped:", clamped)
+    const rounded = roundToFive(width)
+    const clamped = Math.max(5, Math.min(90, rounded))
+    console.log("[Layout] setPanelWidth - type:", type, "width:", width, "rounded:", rounded, "clamped:", clamped)
     updatePanel(type, { width: clamped })
+  }
+
+  const batchUpdateWidths = (updates: Array<{ type: PanelType; width: number }>) => {
+    console.log("[Layout] batchUpdateWidths - updates:", updates)
+
+    // Apply all updates to a copy of the panels
+    const updatedPanels = store.panels.map((panel) => {
+      const update = updates.find((u) => u.type === panel.type)
+      if (update) {
+        const rounded = roundToFive(update.width)
+        const clamped = Math.max(5, Math.min(90, rounded))
+        return { ...panel, width: clamped }
+      }
+      return panel
+    })
+
+    // Update the store with all changes at once
+    setStore("panels", updatedPanels)
+    save()
   }
 
   const togglePanel = (type: PanelType) => {
     const panel = store.panels.find((p) => p.type === type)
-    if (panel) {
-      console.log("[Layout] togglePanel - type:", type, "visible:", !panel.visible)
-      updatePanel(type, { visible: !panel.visible })
+    if (!panel) return
+
+    const newVisible = !panel.visible
+    console.log("[Layout] togglePanel - type:", type, "visible:", newVisible)
+
+    const updates: Array<{ type: PanelType; width: number }> = []
+
+    if (!newVisible) {
+      // Hiding panel: redistribute its width equally to other visible panels
+      const otherVisible = store.panels.filter((p) => p.type !== type && p.visible)
+      if (otherVisible.length > 0) {
+        const widthToDistribute = panel.width
+        const perPanel = widthToDistribute / otherVisible.length
+
+        otherVisible.forEach((p, idx) => {
+          // Last panel gets the remainder to ensure exact distribution
+          const additionalWidth =
+            idx === otherVisible.length - 1 ? widthToDistribute - perPanel * (otherVisible.length - 1) : perPanel
+          const newWidth = roundToFive(Math.min(90, p.width + additionalWidth))
+          updates.push({ type: p.type, width: newWidth })
+        })
+      }
+    } else {
+      // Showing panel: take width equally from other visible panels
+      const otherVisible = store.panels.filter((p) => p.type !== type && p.visible)
+      if (otherVisible.length > 0) {
+        const widthNeeded = panel.width
+        const availableWidth = otherVisible.reduce((sum, p) => sum + (p.width - 5), 0)
+
+        if (availableWidth >= widthNeeded) {
+          const perPanel = widthNeeded / otherVisible.length
+          let remainingToTake = widthNeeded
+
+          otherVisible.forEach((p, idx) => {
+            if (remainingToTake <= 0) return
+            const canTake = p.width - 5
+            // Last panel takes the remainder
+            const takeAmount = idx === otherVisible.length - 1 ? remainingToTake : Math.min(canTake, perPanel)
+            const newWidth = roundToFive(Math.max(5, p.width - takeAmount))
+            updates.push({ type: p.type, width: newWidth })
+            remainingToTake -= takeAmount
+          })
+        } else {
+          // Not enough space available, reduce this panel's width
+          updates.push({ type, width: roundToFive(Math.max(5, Math.min(90, availableWidth))) })
+        }
+      }
     }
+
+    // Apply all width updates atomically
+    if (updates.length > 0) {
+      batchUpdateWidths(updates)
+    }
+
+    updatePanel(type, { visible: newVisible })
   }
 
   const getPanelAt = (position: PanelPosition) => {
@@ -144,6 +226,7 @@ export function createLayoutStore() {
     movePanel,
     swapPanels,
     setPanelWidth,
+    batchUpdateWidths,
     togglePanel,
     getPanelAt,
     getPanelByType,
