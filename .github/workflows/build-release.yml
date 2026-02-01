@@ -34,7 +34,7 @@ jobs:
       - name: Build binary
         working-directory: packages/jonsoc
         run: |
-          bun build --target=bun-linux-x64 --outfile=jonsoc-linux-x64 src/index.ts
+          bun build --compile --outfile=jonsoc-linux-x64 ./src/index.ts
           tar -czf jonsoc-linux-x64.tar.gz jonsoc-linux-x64
 
       - name: Upload artifact
@@ -59,7 +59,7 @@ jobs:
       - name: Build binary
         working-directory: packages/jonsoc
         run: |
-          bun build --target=bun-darwin-arm64 --outfile=jonsoc-darwin-arm64 src/index.ts
+          bun build --compile --outfile=jonsoc-darwin-arm64 ./src/index.ts
           zip -j jonsoc-darwin-arm64.zip jonsoc-darwin-arm64
 
       - name: Upload artifact
@@ -71,6 +71,11 @@ jobs:
   build-windows:
     runs-on: windows-latest
     steps:
+      - name: Configure Git for Windows
+        run: |
+          git config --global core.longpaths true
+          git config --global core.symlinks false
+
       - uses: actions/checkout@v4
 
       - name: Setup Bun
@@ -84,7 +89,7 @@ jobs:
       - name: Build binary
         working-directory: packages/jonsoc
         run: |
-          bun build --target=bun-windows-x64 --outfile=jonsoc-windows-x64.exe src/index.ts
+          bun build --compile --outfile=jonsoc-windows-x64.exe ./src/index.ts
           Compress-Archive -Path jonsoc-windows-x64.exe -DestinationPath jonsoc-windows-x64.zip
 
       - name: Upload artifact
