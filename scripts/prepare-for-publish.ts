@@ -19,10 +19,10 @@ const catalog = rootPkg.workspaces.catalog
 // Map of replacements
 const replacements: Record<string, string> = {
   // Workspace packages - use current version
-  "@jonsoc/plugin": "1.1.43",
-  "@jonsoc/script": "1.1.43",
-  "@jonsoc/sdk": "1.1.43",
-  "@jonsoc/util": "1.1.43",
+  "@jonsoc/plugin": "1.1.45",
+  "@jonsoc/script": "1.1.45",
+  "@jonsoc/sdk": "1.1.45",
+  "@jonsoc/util": "1.1.45",
   // Catalog dependencies
   "@hono/zod-validator": catalog["@hono/zod-validator"],
   "@octokit/rest": catalog["@octokit/rest"],
