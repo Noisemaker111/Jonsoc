@@ -1,0 +1,279 @@
+#!/usr/bin/env node
+
+import { spawnSync } from "child_process"
+import { existsSync, mkdirSync, readFileSync, realpathSync, writeFileSync } from "fs"
+import { dirname, join } from "path"
+import { platform as osPlatform, arch as osArch, homedir } from "os"
+import { fileURLToPath } from "url"
+import { xdgData, xdgState } from "xdg-basedir"
+
+/** Exit code 75 signals a restart request from the TUI */
+const EXIT_CODE_RESTART = 75
+
+const __filename = fileURLToPath(import.meta.url)
+const __dirname = dirname(__filename)
+const cwd = process.cwd()
+const env = {
+  ...process.env,
+  JONSOC_WORKDIR: process.env.JONSOC_WORKDIR ?? process.env.JOC_WORKDIR ?? cwd,
+  JONSOC_CLI: "1",
+}
+
+function run(target, args, options = {}) {
+  const result = spawnSync(target, args || process.argv.slice(2), {
+    stdio: "inherit",
+    shell: osPlatform() === "win32",
+    cwd: options.cwd,
+    env: options.env,
+  })
+  if (result.error) {
+    console.error(result.error.message)
+    process.exit(1)
+  }
+  return typeof result.status === "number" ? result.status : 0
+}
+
+const rawArgs = process.argv.slice(2)
+const hasFlag = (value) => rawArgs.includes(value)
+const safe = hasFlag("-safe") || hasFlag("--safe")
+const restart = hasFlag("-restart") || hasFlag("--restart") || hasFlag("-return") || hasFlag("--return")
+const autoReturn = hasFlag("-auto-return") || hasFlag("--auto-return")
+const check = hasFlag("-check") || hasFlag("--check")
+const safeIsolated =
+  hasFlag("-safe-isolated") ||
+  hasFlag("--safe-isolated") ||
+  process.env.JONSOC_SAFE_ISOLATE === "1" ||
+  process.env.OPENCODE_SAFE_ISOLATE === "1"
+const flagSet = new Set([
+  "-safe",
+  "--safe",
+  "-restart",
+  "--restart",
+  "-return",
+  "--return",
+  "-auto-return",
+  "--auto-return",
+  "-check",
+  "--check",
+  "-safe-isolated",
+  "--safe-isolated",
+])
+const baseArgs = rawArgs.filter((arg) => !flagSet.has(arg))
+const appName = process.env.JONSOC_APP_NAME ?? process.env.OPENCODE_APP_NAME ?? "jonsoc"
+const stateAppName = safe && safeIsolated ? `${appName}-safe` : appName
+
+const stateDir = () => {
+  const root = xdgState ?? join(homedir(), ".local", "state")
+  return join(root, stateAppName)
+}
+
+const lastSession = () => {
+  const filePath = join(stateDir(), "kv.json")
+  if (!existsSync(filePath)) return
+  const raw = readFileSync(filePath, "utf8")
+  if (!raw) return
+  try {
+    const data = JSON.parse(raw)
+    const session = data?.session_last
+    if (typeof session !== "string") return
+    return session
+  } catch {
+    return
+  }
+}
+
+const restartArgs = (() => {
+  if (!restart) return baseArgs
+  if (baseArgs.includes("--session") || baseArgs.includes("-s")) return baseArgs
+  const sessionID = lastSession()
+  if (!sessionID) {
+    console.error("No recent session found to restart.")
+    process.exit(1)
+  }
+  return ["--session", sessionID, ...baseArgs]
+})()
+
+if (check) {
+  console.log("running")
+  process.exit(0)
+}
+
+/** Build args for restart - add --session if we have a last session */
+function buildRestartArgs() {
+  if (baseArgs.includes("--session") || baseArgs.includes("-s")) return baseArgs
+  const sessionID = lastSession()
+  if (!sessionID) return baseArgs
+  return ["--session", sessionID, ...baseArgs]
+}
+
+/** Run the CLI and handle restart exit code */
+function runWithRestart(target, prefix, trailingArgs, options = {}) {
+  let args = [...prefix, ...trailingArgs]
+  for (;;) {
+    const code = run(target, args, options)
+
+    // Clean exit (user typed /exit, /quit, or Ctrl+C handled cleanly)
+    if (code === 0) {
+      process.exit(0)
+    }
+
+    // Requested restart (code 75) or Crash/Error (code != 0)
+    // We always attempt to return to the session on any failure.
+    if (code !== 0) {
+      if (code !== EXIT_CODE_RESTART) {
+        console.error(`\n[jonsoc] unexpected exit (${code}). recovering session...`)
+        // 1s throttle only on actual crashes to prevent cpu pinning if there's a persistent boot error
+        spawnSync("node", ["-e", "setTimeout(() => {}, 1000)"], { stdio: "inherit" })
+      }
+      args = [...prefix, ...buildRestartArgs()]
+      continue
+    }
+
+    process.exit(code)
+  }
+}
+
+if (safe) {
+  const safeEnv = {
+    ...env,
+    ...(safeIsolated ? { JONSOC_APP_NAME: `${appName}-safe` } : {}),
+    JONSOC_SAFE_MODE: "1",
+  }
+  runWithRestart("npx", ["--yes", "jonsoc@latest"], restartArgs, { env: safeEnv })
+}
+
+const envPath = process.env.JONSOC_BIN_PATH || process.env.JOC_BIN_PATH || process.env.OPENCODE_BIN_PATH
+if (envPath) {
+  runWithRestart(envPath, [], restartArgs, { env })
+}
+
+const scriptPath = realpathSync(__filename)
+const scriptDir = dirname(scriptPath)
+const pkgDir = dirname(scriptDir)
+
+// Development mode: run TypeScript source directly with bun when inside repo
+function repoRoot(dir) {
+  const entry = join(dir, "packages", "jonsoc", "src", "index.ts")
+  if (existsSync(entry)) return dir
+  const parent = dirname(dir)
+  if (parent === dir) return
+  return repoRoot(parent)
+}
+
+const root = repoRoot(cwd)
+if (root) {
+  const workdir = join(root, "packages", "jonsoc")
+  runWithRestart("bun", ["run", "--conditions=browser", "src/index.ts"], restartArgs, { cwd: workdir, env })
+}
+
+
+// Production mode: fetch compiled binary into XDG data dir
+const platformMap = {
+  darwin: "darwin",
+  linux: "linux",
+  win32: "windows",
+}
+const archMap = {
+  x64: "x64",
+  arm64: "arm64",
+  arm: "arm",
+}
+
+let platform = platformMap[osPlatform()]
+if (!platform) {
+  platform = osPlatform()
+}
+let arch = archMap[osArch()]
+if (!arch) {
+  arch = osArch()
+}
+const base = "jonsoc-" + platform + "-" + arch
+const binary = platform === "windows" ? "jonsoc.exe" : "jonsoc"
+
+const supported = new Set(["darwin-arm64", "linux-x64", "windows-x64"])
+if (!supported.has(`${platform}-${arch}`)) {
+  console.error(`[jonsoc] Unsupported platform: ${platform}-${arch}. Supported: ${Array.from(supported).join(", ")}`)
+  process.exit(1)
+}
+
+const pkgJsonPath = join(pkgDir, "package.json")
+const version = (() => {
+  if (!existsSync(pkgJsonPath)) return "latest"
+  const raw = readFileSync(pkgJsonPath, "utf8")
+  const data = JSON.parse(raw)
+  return typeof data.version === "string" ? data.version : "latest"
+})()
+
+const repo = (process.env.JONSOC_REPO ?? process.env.OPENCODE_REPO ?? "Noisemaker111/JonsOpencode").replace(
+  /^https?:\/\/github\.com\//,
+  "",
+)
+const dataRoot = xdgData ?? join(homedir(), ".local", "share")
+const dataDir = join(dataRoot, appName)
+const binDir = join(dataDir, "bin")
+const versionFile = join(binDir, "version")
+const binaryPath = join(binDir, binary)
+
+function ensureDir(dir) {
+  if (existsSync(dir)) return
+  mkdirSync(dir, { recursive: true })
+}
+
+function versionMatch() {
+  if (!existsSync(binaryPath)) return false
+  if (!existsSync(versionFile)) return false
+  const stored = readFileSync(versionFile, "utf8").trim()
+  return stored === version
+}
+
+function releaseUrl() {
+  const asset = platform === "linux" ? `${base}.tar.gz` : `${base}.zip`
+  const releasePath = version === "latest" ? "latest/download" : `download/v${version}`
+  return {
+    asset,
+    url: `https://github.com/${repo}/releases/${releasePath}/${asset}`,
+  }
+}
+
+function extractArchive(archivePath) {
+  if (platform === "linux") {
+    const code = run("tar", ["-xzf", archivePath, "-C", binDir], { env })
+    if (code !== 0) process.exit(code)
+    return
+  }
+
+  if (platform === "windows") {
+    const cmd = `Expand-Archive -Path "${archivePath}" -DestinationPath "${binDir}" -Force`
+    const code = run("powershell", ["-NoProfile", "-Command", cmd], { env })
+    if (code !== 0) process.exit(code)
+    return
+  }
+
+  const code = run("unzip", ["-o", archivePath, "-d", binDir], { env })
+  if (code !== 0) process.exit(code)
+}
+
+function ensureBinary() {
+  if (versionMatch()) return binaryPath
+  ensureDir(binDir)
+  const { asset, url } = releaseUrl()
+  const archivePath = join(dataDir, asset)
+  const code = run("curl", ["-fL", "-o", archivePath, url], { env })
+  if (code !== 0) {
+    console.error(`[jonsoc] Failed to download ${url}`)
+    process.exit(code)
+  }
+  extractArchive(archivePath)
+  if (platform !== "windows") {
+    run("chmod", ["+x", binaryPath], { env })
+  }
+  if (!existsSync(binaryPath)) {
+    console.error(`[jonsoc] Expected binary not found at ${binaryPath}`)
+    process.exit(1)
+  }
+  writeFileSync(versionFile, version)
+  return binaryPath
+}
+
+const resolved = ensureBinary()
+runWithRestart(resolved, [], restartArgs, { env })

@@ -1,0 +1,11 @@
+{
+  "name": "jonsoc",
+  "version": "0.0.0",
+  "description": "AI-powered development tool",
+  "license": "MIT",
+  "author": "Jon",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Noisemaker111/Jonsoc"
+  }
+}
