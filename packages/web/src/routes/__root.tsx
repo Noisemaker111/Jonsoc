@@ -37,10 +37,12 @@ function RootComponent() {
       <ThemeProvider attribute="class" defaultTheme="dark" disableTransitionOnChange storageKey="vite-ui-theme">
         <div className="grid grid-rows-[auto_1fr] h-svh">
           <Header />
+          {/* @ts-ignore - React 19 type incompatibility */}
           <Outlet />
         </div>
         <Toaster richColors />
       </ThemeProvider>
+      {/* @ts-ignore - React 19 type incompatibility */}
       <TanStackRouterDevtools position="bottom-left" />
     </>
   )

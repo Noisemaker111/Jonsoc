@@ -7,12 +7,13 @@ import { MessageV2 } from "@/session/message-v2"
 import { Storage } from "@/storage/storage"
 import { Log } from "@/util/log"
 import type * as SDK from "@jonsoc/sdk/v2"
+import { Brand } from "@/brand"
 
 export namespace ShareNext {
   const log = Log.create({ service: "share-next" })
 
   async function url() {
-    return Config.get().then((x) => x.enterprise?.url ?? "https://joc.ai")
+    return Config.get().then((x) => x.enterprise?.url ?? Brand.DOMAIN_WITH_PROTOCOL)
   }
 
   const disabled =

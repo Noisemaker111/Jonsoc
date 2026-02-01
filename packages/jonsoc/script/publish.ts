@@ -2,10 +2,11 @@
 import { $ } from "bun"
 import pkg from "../package.json"
 import { Script } from "@jonsoc/script"
+import { existsSync } from "fs"
 import { fileURLToPath } from "url"
 import path, { dirname, join } from "path"
 
-const dir = fileURLToPath(new URL("..", import.meta.url))
+const dir = dirname(dirname(fileURLToPath(import.meta.url)))
 process.chdir(dir)
 
 const { binaries } = await import("./build.ts")
@@ -24,6 +25,11 @@ if (process.platform === "win32") {
 } else {
   await $`mkdir -p ./dist/${pkg.name}/bin`
   await $`cp -r ./bin ./dist/${pkg.name}/bin`
+}
+
+const postinstallPath = join(dir, "postinstall.mjs")
+if (existsSync(postinstallPath)) {
+  await Bun.write(join("dist", pkg.name, "postinstall.mjs"), Bun.file(postinstallPath))
 }
 
 await Bun.file(`./dist/${pkg.name}/package.json`).write(
@@ -45,6 +51,10 @@ await Bun.file(`./dist/${pkg.name}/package.json`).write(
 )
 
 const tags = [Script.channel]
+const skipDocker = process.env.JONSOC_SKIP_DOCKER === "1" || process.env.OPENCODE_SKIP_DOCKER === "1"
+const skipArchive =
+  process.env.JONSOC_SKIP_ARCHIVE === "1" || process.env.OPENCODE_SKIP_ARCHIVE === "1" || process.platform === "win32"
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
 const otp = process.argv.find((arg) => arg.startsWith("--otp="))?.split("=")[1]
 const tokenFlag = process.argv.find((arg) => arg.startsWith("--token="))?.split("=")[1]
 const npmToken = tokenFlag || process.env.NPM_TOKEN
@@ -64,14 +74,23 @@ for (const [name] of Object.entries(binaries)) {
   await $`bun pm pack`.cwd(targetDir)
   const otpArg = otp ? `--otp=${otp}` : ""
   for (const tag of tags) {
-    try {
-      await $`npm publish *.tgz --access public --tag ${tag} ${otpArg}`.cwd(targetDir)
-    } catch (e: any) {
-      if (e.stderr?.toString().includes("previously published versions")) {
-        console.log(`  Already published ${name}. Skipping...`)
-        continue
+    for (const attempt of [1, 2, 3]) {
+      try {
+        await $`npm publish *.tgz --access public --tag ${tag} ${otpArg}`.cwd(targetDir)
+        break
+      } catch (e: any) {
+        const stderr = e.stderr?.toString() ?? ""
+        if (stderr.includes("previously published versions")) {
+          console.log(`  Already published ${name}. Skipping...`)
+          break
+        }
+        if (stderr.includes("E409") && attempt < 3) {
+          console.log(`  npm publish conflict for ${name}. Retrying...`)
+          await sleep(5000)
+          continue
+        }
+        throw e
       }
-      throw e
     }
   }
 }
@@ -85,24 +104,44 @@ for (const tag of tags) {
   }
 
   const otpArg = otp ? `--otp=${otp}` : ""
-  await $`cd ${mainPkgDir} && bun pm pack && npm publish *.tgz --access public --tag ${tag} ${otpArg}`
+  await $`bun pm pack`.cwd(mainPkgDir)
+  for (const attempt of [1, 2, 3]) {
+    try {
+      await $`npm publish *.tgz --access public --tag ${tag} ${otpArg}`.cwd(mainPkgDir)
+      break
+    } catch (e: any) {
+      const stderr = e.stderr?.toString() ?? ""
+      if (stderr.includes("previously published versions")) {
+        console.log(`  Already published ${pkg.name}. Skipping...`)
+        break
+      }
+      if (stderr.includes("E409") && attempt < 3) {
+        console.log(`  npm publish conflict for ${pkg.name}. Retrying...`)
+        await sleep(5000)
+        continue
+      }
+      throw e
+    }
+  }
 }
 
-if (!Script.preview) {
+if (!Script.preview && !skipArchive) {
   // Create archives for GitHub release
   for (const key of Object.keys(binaries)) {
     if (key.includes("linux")) {
       await $`tar -czf ../../${key}.tar.gz *`.cwd(`dist/${key}/bin`)
-    } else {
-      await $`zip -r ../../${key}.zip *`.cwd(`dist/${key}/bin`)
+      continue
     }
+    await $`zip -r ../../${key}.zip *`.cwd(`dist/${key}/bin`)
   }
+}
 
-  const repo = (process.env.JOC_REPO ?? process.env.OPENCODE_REPO ?? "Noisemaker111/Jonsoc").replace(
+if (!Script.preview && !skipDocker) {
+  const repo = (process.env.JONSOC_REPO ?? process.env.OPENCODE_REPO ?? "Noisemaker111/Jonsoc").replace(
     /^https?:\/\/github\.com\//,
     "",
   )
-  const image = process.env.JOC_IMAGE ?? `ghcr.io/${repo}`
+  const image = process.env.JONSOC_IMAGE ?? `ghcr.io/${repo}`
   const platforms = "linux/amd64,linux/arm64"
   const tags = [`${image}:${Script.version}`, `${image}:latest`]
   const tagFlags = tags.flatMap((t) => ["-t", t])

@@ -17,14 +17,14 @@ if (!semver.satisfies(process.versions.bun, expectedBunVersionRange)) {
 }
 
 const env = {
-  OPENCODE_CHANNEL: process.env["OPENCODE_CHANNEL"] || "latest",
-  OPENCODE_BUMP: process.env["OPENCODE_BUMP"],
-  OPENCODE_VERSION: process.env["OPENCODE_VERSION"],
+  JONSOC_CHANNEL: process.env["JONSOC_CHANNEL"] || process.env["OPENCODE_CHANNEL"] || "latest",
+  JONSOC_BUMP: process.env["JONSOC_BUMP"] || process.env["OPENCODE_BUMP"],
+  JONSOC_VERSION: process.env["JONSOC_VERSION"] || process.env["OPENCODE_VERSION"],
 }
 const CHANNEL = await (async () => {
-  if (env.OPENCODE_CHANNEL !== "latest") return env.OPENCODE_CHANNEL
-  if (env.OPENCODE_BUMP) return "latest"
-  if (env.OPENCODE_VERSION && !env.OPENCODE_VERSION.startsWith("0.0.0-")) return "latest"
+  if (env.JONSOC_CHANNEL !== "latest") return env.JONSOC_CHANNEL
+  if (env.JONSOC_BUMP) return "latest"
+  if (env.JONSOC_VERSION && !env.JONSOC_VERSION.startsWith("0.0.0-")) return "latest"
   return "latest"
 })()
 const IS_PREVIEW = CHANNEL !== "latest"
@@ -32,9 +32,10 @@ const IS_PREVIEW = CHANNEL !== "latest"
 const VERSION = await (async () => {
   if (IS_PREVIEW) return `0.0.0-${CHANNEL}-${new Date().toISOString().slice(0, 16).replace(/[-:T]/g, "")}`
 
-  const raw = env.OPENCODE_VERSION ?? ""
-  const base = raw.trim() ? raw.trim() : "1.1.41"
-  const bump = env.OPENCODE_BUMP
+  const raw = env.JONSOC_VERSION ?? ""
+  const fallback = typeof rootPkg.version === "string" ? rootPkg.version : "1.1.41"
+  const base = raw.trim() ? raw.trim() : fallback
+  const bump = env.JONSOC_BUMP
   if (!bump) return base
 
   const match = base.match(/^(\d+)\.(\d+)\.(\d+)/)

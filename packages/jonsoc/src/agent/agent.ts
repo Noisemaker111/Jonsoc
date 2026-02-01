@@ -67,8 +67,6 @@ export namespace Agent {
         [path.join(os.homedir(), ".jonsoc", "commands", "*")]: "allow",
         [".jonsoc/skills/*"]: "allow",
         [".jonsoc/commands/*"]: "allow",
-        [".jonsoc/skills/*"]: "allow",
-        [".jonsoc/commands/*"]: "allow",
       },
       question: "deny",
       plan_enter: "deny",

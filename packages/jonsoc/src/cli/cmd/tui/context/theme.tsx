@@ -161,7 +161,6 @@ export const DEFAULT_THEMES: Record<string, ThemeJson> = {
   ["one-dark"]: onedark,
   ["osaka-jade"]: osakaJade,
   jonsoc,
-  jonsoc: jonsoc,
   orng,
   ["lucent-orng"]: lucentOrng,
   palenight,

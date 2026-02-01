@@ -32,15 +32,15 @@ export const ImportCommand = cmd({
       const isUrl = args.file.startsWith("http://") || args.file.startsWith("https://")
 
       if (isUrl) {
-        const urlMatch = args.file.match(/https?:\/\/opncd\.ai\/share\/([a-zA-Z0-9_-]+)/)
+        const urlMatch = args.file.match(new RegExp(`https?://${Brand.DOMAIN}/share/([a-zA-Z0-9_-]+)`))
         if (!urlMatch) {
-          process.stdout.write(`Invalid URL format. Expected: https://joc.ai/share/<slug>`)
+          process.stdout.write(`Invalid URL format. Expected: ${Brand.DOMAIN_WITH_PROTOCOL}/share/<slug>`)
           process.stdout.write(EOL)
           return
         }
 
         const slug = urlMatch[1]
-        const response = await fetch(`https://joc.ai/api/share/${slug}`)
+        const response = await fetch(`${Brand.DOMAIN_WITH_PROTOCOL}/api/share/${slug}`)
 
         if (!response.ok) {
           process.stdout.write(`Failed to fetch share data: ${response.statusText}`)

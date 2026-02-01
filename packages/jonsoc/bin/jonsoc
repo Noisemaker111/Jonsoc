@@ -204,7 +204,7 @@ const version = (() => {
   return typeof data.version === "string" ? data.version : "latest"
 })()
 
-const repo = (process.env.JONSOC_REPO ?? process.env.OPENCODE_REPO ?? "Noisemaker111/JonsOpencode").replace(
+const repo = (process.env.JONSOC_REPO ?? process.env.OPENCODE_REPO ?? "Noisemaker111/Jonsoc").replace(
   /^https?:\/\/github\.com\//,
   "",
 )
@@ -253,7 +253,15 @@ function extractArchive(archivePath) {
   if (code !== 0) process.exit(code)
 }
 
+function bundledBinary() {
+  const bundle = join(pkgDir, "..", base, "bin", binary)
+  if (!existsSync(bundle)) return
+  return bundle
+}
+
 function ensureBinary() {
+  const bundle = bundledBinary()
+  if (bundle) return bundle
   if (versionMatch()) return binaryPath
   ensureDir(binDir)
   const { asset, url } = releaseUrl()
