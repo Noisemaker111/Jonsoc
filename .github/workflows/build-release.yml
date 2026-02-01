@@ -34,8 +34,9 @@ jobs:
       - name: Build binary
         working-directory: packages/jonsoc
         run: |
-          bun build --compile --outfile=jonsoc-linux-x64 ./src/index.ts
-          tar -czf jonsoc-linux-x64.tar.gz jonsoc-linux-x64
+          bun run script/build.ts --single
+          cd dist/jonsoc-linux-x64/bin
+          tar -czf ../../../jonsoc-linux-x64.tar.gz jonsoc
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
@@ -59,8 +60,9 @@ jobs:
       - name: Build binary
         working-directory: packages/jonsoc
         run: |
-          bun build --compile --outfile=jonsoc-darwin-arm64 ./src/index.ts
-          zip -j jonsoc-darwin-arm64.zip jonsoc-darwin-arm64
+          bun run script/build.ts --single
+          cd dist/jonsoc-darwin-arm64/bin
+          zip -j ../../../jonsoc-darwin-arm64.zip jonsoc
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
@@ -89,8 +91,8 @@ jobs:
       - name: Build binary
         working-directory: packages/jonsoc
         run: |
-          bun build --compile --outfile=jonsoc-windows-x64.exe ./src/index.ts
-          Compress-Archive -Path jonsoc-windows-x64.exe -DestinationPath jonsoc-windows-x64.zip
+          bun run script/build.ts --single
+          Compress-Archive -Path dist/jonsoc-windows-x64/bin/jonsoc.exe -DestinationPath jonsoc-windows-x64.zip
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
