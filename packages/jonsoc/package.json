@@ -1,6 +1,6 @@
 {
   "$schema": "https://json.schemastore.org/package.json",
-  "version": "1.1.46",
+  "version": "1.1.47",
   "name": "jonsoc",
   "description": "AI-powered development tool - an open source fork of OpenCode (opencode.ai)",
   "type": "module",
@@ -39,9 +39,9 @@
     "jonsoc": "./bin/jonsoc"
   },
   "optionalDependencies": {
-    "jonsoc-darwin-arm64": "1.1.46",
-    "jonsoc-linux-x64": "1.1.46",
-    "jonsoc-windows-x64": "1.1.46"
+    "jonsoc-darwin-arm64": "1.1.47",
+    "jonsoc-linux-x64": "1.1.47",
+    "jonsoc-windows-x64": "1.1.47"
   },
   "exports": {
     "./*": "./src/*.ts"
