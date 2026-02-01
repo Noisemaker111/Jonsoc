@@ -39,9 +39,9 @@
     "jonsoc": "./bin/jonsoc"
   },
   "optionalDependencies": {
-    "jonsoc-darwin-arm64": "1.1.42",
-    "jonsoc-linux-x64": "1.1.42",
-    "jonsoc-windows-x64": "1.1.42"
+    "jonsoc-darwin-arm64": "1.1.45",
+    "jonsoc-linux-x64": "1.1.45",
+    "jonsoc-windows-x64": "1.1.45"
   },
   "exports": {
     "./*": "./src/*.ts"

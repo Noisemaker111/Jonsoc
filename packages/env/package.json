@@ -1,11 +1,14 @@
 {
   "name": "@jonsoc/env",
-  "version": "1.0.0",
-  "private": true,
+  "version": "1.1.45",
   "type": "module",
+  "license": "MIT",
   "exports": {
     "./web": "./src/web.ts"
   },
+  "files": [
+    "src"
+  ],
   "dependencies": {
     "@t3-oss/env-core": "catalog:",
     "dotenv": "catalog:",
@@ -14,5 +17,8 @@
   "devDependencies": {
     "@jonsoc/config": "workspace:*",
     "typescript": "catalog:"
+  },
+  "publishConfig": {
+    "access": "public"
   }
 }

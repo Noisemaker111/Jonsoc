@@ -120,6 +120,18 @@ jobs:
       - name: Install dependencies
         run: bun install
 
+      - name: Publish @jonsoc/util
+        working-directory: packages/util
+        run: npm publish --provenance --access public || true
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: Publish @jonsoc/env
+        working-directory: packages/env
+        run: npm publish --provenance --access public || true
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
       - name: Publish @jonsoc/sdk
         working-directory: packages/sdk/js
         run: npm publish --provenance --access public || true
