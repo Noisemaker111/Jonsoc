@@ -62,9 +62,11 @@
     "remeda": "catalog:",
     "shiki": "catalog:",
     "solid-js": "catalog:",
-    "solid-list": "catalog:",
     "tailwindcss": "catalog:",
     "virtua": "catalog:",
     "zod": "catalog:"
+  },
+  "publishConfig": {
+    "access": "public"
   }
 }

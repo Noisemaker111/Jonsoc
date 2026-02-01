@@ -7,7 +7,8 @@
     </picture>
   </a>
 </p>
-<p align="center">The open source AI coding agent.</p>
+<p align="center">An open source fork of <a href="https://opencode.ai"><strong>OpenCode</strong></a> — the AI coding agent.</p>
+<p align="center"><em>Built with 💐 for the original OpenCode team and community</em></p>
 <p align="center">
   <a href="https://jonsoc.com/discord"><img alt="Discord" src="https://img.shields.io/discord/1391832426048651334?style=flat-square&label=discord" /></a>
   <a href="https://www.npmjs.com/package/jonsoc"><img alt="npm" src="https://img.shields.io/npm/v/jonsoc?style=flat-square" /></a>
@@ -18,7 +19,30 @@
 
 ---
 
-## 🔱 Fork Notes
+## 💐 About This Fork
+
+**JonsOC** is a community fork of **[OpenCode](https://github.com/opencode-ai/opencode)**, the incredible open-source AI coding agent created by the OpenCode team. This fork is maintained independently with additional features and enhancements while staying true to the original vision.
+
+### Why We Forked
+
+- To add platform-specific enhancements (Windows Terminal clipboard support, etc.)
+- To provide an alternative distribution channel
+- To experiment with additional features while the upstream project evolves
+- To ensure continued open-source availability
+
+### 🙏 Acknowledgments
+
+This project would not exist without the amazing work of the **OpenCode team** and contributors. We are deeply grateful for their groundbreaking work in open-source AI coding assistants.
+
+- **Original Project**: [OpenCode](https://github.com/opencode-ai/opencode)
+- **Original Website**: [opencode.ai](https://opencode.ai)
+- **License**: MIT (same as original)
+
+Please consider supporting the original OpenCode project!
+
+---
+
+## 🔱 Fork-Specific Features
 
 > [!IMPORTANT]
 > **Enhanced features in this fork:**

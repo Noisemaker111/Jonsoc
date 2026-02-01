@@ -1,8 +1,8 @@
 {
   "$schema": "https://json.schemastore.org/package.json",
-  "version": "1.1.41",
+  "version": "1.1.43",
   "name": "jonsoc",
-  "description": "AI-powered development tool",
+  "description": "AI-powered development tool - an open source fork of OpenCode (opencode.ai)",
   "type": "module",
   "license": "MIT",
   "author": "Jon",
@@ -11,7 +11,9 @@
     "development",
     "cli",
     "jonsoc",
-    "coding-assistant"
+    "coding-assistant",
+    "opencode",
+    "opencode-fork"
   ],
   "repository": {
     "type": "git",
@@ -37,9 +39,9 @@
     "jonsoc": "./bin/jonsoc"
   },
   "optionalDependencies": {
-    "jonsoc-darwin-arm64": "1.1.41",
-    "jonsoc-linux-x64": "1.1.41",
-    "jonsoc-windows-x64": "1.1.41"
+    "jonsoc-darwin-arm64": "1.1.42",
+    "jonsoc-linux-x64": "1.1.42",
+    "jonsoc-windows-x64": "1.1.42"
   },
   "exports": {
     "./*": "./src/*.ts"
@@ -94,14 +96,14 @@
     "@gitlab/gitlab-ai-provider": "3.2.0",
     "@hono/standard-validator": "0.1.5",
     "@hono/zod-validator": "catalog:",
-    "@modelcontextprotocol/sdk": "1.25.2",
-    "@octokit/graphql": "9.0.2",
-    "@octokit/rest": "catalog:",
-    "@openauthjs/openauth": "catalog:",
     "@jonsoc/plugin": "workspace:*",
     "@jonsoc/script": "workspace:*",
     "@jonsoc/sdk": "workspace:*",
     "@jonsoc/util": "workspace:*",
+    "@modelcontextprotocol/sdk": "1.25.2",
+    "@octokit/graphql": "9.0.2",
+    "@octokit/rest": "catalog:",
+    "@openauthjs/openauth": "catalog:",
     "@openrouter/ai-sdk-provider": "1.5.2",
     "@opentui/core": "0.1.75",
     "@opentui/solid": "0.1.75",
@@ -140,5 +142,8 @@
     "yargs": "18.0.0",
     "zod": "catalog:",
     "zod-to-json-schema": "3.24.5"
+  },
+  "publishConfig": {
+    "access": "public"
   }
 }

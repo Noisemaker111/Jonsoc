@@ -28,6 +28,7 @@
   },
   "dependencies": {},
   "publishConfig": {
+    "access": "public",
     "directory": "dist"
   }
 }

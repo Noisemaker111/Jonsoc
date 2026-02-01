@@ -1,5 +1,21 @@
+/**
+ * Brand configuration for JonsOC
+ *
+ * JonsOC is an open-source fork of OpenCode (https://opencode.ai)
+ * This namespace defines all branding constants and URLs.
+ *
+ * The code supports both JONSOC_* and OPENCODE_* environment variable prefixes
+ * to maintain backward compatibility with the original project.
+ *
+ * 💐 Built with gratitude for the OpenCode team and community
+ */
 export namespace Brand {
   export const BRAND_NAME = process.env.JONSOC_BRAND ?? process.env.OPENCODE_BRAND ?? "jonsoc"
+
+  /** Reference to the original upstream project */
+  export const UPSTREAM_NAME = "OpenCode"
+  export const UPSTREAM_URL = "https://opencode.ai"
+  export const UPSTREAM_REPO = "https://github.com/opencode-ai/opencode"
 
   export const BRAND_LOWER = BRAND_NAME.toLowerCase()
 

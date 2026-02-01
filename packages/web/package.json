@@ -41,5 +41,8 @@
     "tailwindcss": "catalog:",
     "typescript": "catalog:",
     "vite": "catalog:"
+  },
+  "publishConfig": {
+    "access": "public"
   }
 }
