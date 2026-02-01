@@ -1,7 +1,7 @@
 #!/usr/bin/env bun
 import path from "node:path"
 
-const rootDir = Bun.cwd()
+const rootDir = process.cwd()
 const rootPkgPath = path.join(rootDir, "package.json")
 const publishVersionRaw = Bun.env.PUBLISH_VERSION
 const publishVersion = typeof publishVersionRaw === "string" && publishVersionRaw.length > 0 ? publishVersionRaw : null
