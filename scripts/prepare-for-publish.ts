@@ -2,9 +2,11 @@
 /**
  * Script to replace workspace and catalog dependencies with actual npm versions
  * for publishing the jonsoc package.
+ * Creates a temporary package.json for publishing without modifying the original.
  */
 
 import { $ } from "bun"
+import path from "path"
 
 const pkgPath = "packages/jonsoc/package.json"
 const rootPkgPath = "package.json"
@@ -17,10 +19,10 @@ const catalog = rootPkg.workspaces.catalog
 // Map of replacements
 const replacements: Record<string, string> = {
   // Workspace packages - use current version
-  "@jonsoc/plugin": "1.1.44",
-  "@jonsoc/script": "1.1.44",
-  "@jonsoc/sdk": "1.1.44",
-  "@jonsoc/util": "1.1.44",
+  "@jonsoc/plugin": "1.1.43",
+  "@jonsoc/script": "1.1.43",
+  "@jonsoc/sdk": "1.1.43",
+  "@jonsoc/util": "1.1.43",
   // Catalog dependencies
   "@hono/zod-validator": catalog["@hono/zod-validator"],
   "@octokit/rest": catalog["@octokit/rest"],
