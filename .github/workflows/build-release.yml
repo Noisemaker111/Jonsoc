@@ -216,7 +216,23 @@ jobs:
       - name: Prepare for publish
         run: bun run scripts/prepare-for-publish.ts
 
+      - name: Check if version exists
+        id: check-version
+        working-directory: packages/jonsoc
+        run: |
+          VERSION=$(jq -r '.version' package.json)
+          if npm view jonsoc@$VERSION version > /dev/null 2>&1; then
+            echo "Version $VERSION already published"
+            echo "exists=true" >> $GITHUB_OUTPUT
+          else
+            echo "Version $VERSION not published yet"
+            echo "exists=false" >> $GITHUB_OUTPUT
+          fi
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
       - name: Publish jonsoc
+        if: steps.check-version.outputs.exists == 'false'
         working-directory: packages/jonsoc
         run: npm publish --provenance --access public
         env:
