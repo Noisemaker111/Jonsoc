@@ -1,14 +1,17 @@
 {
   "$schema": "https://json.schemastore.org/package.json",
-  "name": "jonsoc",
+  "name": "jonsoc-project",
   "description": "AI-powered development tool",
   "private": true,
   "type": "module",
   "packageManager": "bun@1.3.5",
   "version": "1.1.41",
   "scripts": {
-    "dev": "bun run --cwd packages/opencode --conditions=browser src/index.ts",
+    "dev": "bun run --cwd packages/jonsoc --conditions=browser src/index.ts",
+    "dev:web": "bun run --cwd packages/web dev",
+    "dev:convex": "bun run --cwd packages/convex dev",
     "typecheck": "bun turbo typecheck",
+    "check-types": "bun turbo check-types",
     "prepare": "husky",
     "random": "echo 'Random script'",
     "hello": "echo 'Hello World!'",
@@ -16,11 +19,10 @@
   },
   "workspaces": {
     "packages": [
-      "packages/opencode",
-      "packages/plugin",
-      "packages/script",
+      "packages/*",
       "packages/sdk/js",
-      "packages/util"
+      "packages/console/*",
+      "sdks/*"
     ],
     "catalog": {
       "@types/bun": "1.3.5",
@@ -61,7 +63,28 @@
       "@solidjs/router": "0.15.4",
       "@solidjs/start": "https://pkg.pr.new/@solidjs/start@dfb2020",
       "solid-js": "1.9.10",
-      "vite-plugin-solid": "2.11.10"
+      "vite-plugin-solid": "2.11.10",
+      "@t3-oss/env-core": "0.13.4",
+      "@base-ui/react": "1.1.0",
+      "@convex-dev/better-auth": "0.10.10",
+      "better-auth": "1.4.9",
+      "convex": "1.31.7",
+      "@hookform/resolvers": "5.2.2",
+      "@tanstack/react-form": "1.28.0",
+      "@tanstack/react-router": "1.157.18",
+      "@tanstack/react-router-devtools": "1.157.18",
+      "@tanstack/router-plugin": "1.157.18",
+      "@vitejs/plugin-react": "4.7.0",
+      "class-variance-authority": "0.7.1",
+      "clsx": "2.1.1",
+      "dotenv": "17.2.3",
+      "lucide-react": "0.473.0",
+      "next-themes": "0.4.6",
+      "react": "19.2.3",
+      "react-dom": "19.2.3",
+      "sonner": "2.0.7",
+      "tailwind-merge": "3.4.0",
+      "tw-animate-css": "1.4.0"
     }
   },
   "devDependencies": {
@@ -75,9 +98,9 @@
   },
   "dependencies": {
     "@aws-sdk/client-s3": "3.933.0",
-    "@opencode-ai/plugin": "workspace:*",
-    "@opencode-ai/script": "workspace:*",
-    "@opencode-ai/sdk": "workspace:*",
+    "@jonsoc/plugin": "workspace:*",
+    "@jonsoc/script": "workspace:*",
+    "@jonsoc/sdk": "workspace:*",
     "opencode-antigravity-auth": "1.4.3",
     "typescript": "catalog:",
     "zig": "0.3.0"

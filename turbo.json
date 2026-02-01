@@ -2,11 +2,19 @@
   "$schema": "https://turborepo.com/schema.json",
   "tasks": {
     "typecheck": {},
+    "check-types": {
+      "dependsOn": ["^check-types"]
+    },
     "build": {
       "dependsOn": ["^build"],
+      "inputs": ["$TURBO_DEFAULT$", ".env*"],
       "outputs": ["dist/**"]
     },
-    "opencode#test": {
+    "dev": {
+      "cache": false,
+      "persistent": true
+    },
+    "jonsoc#test": {
       "dependsOn": ["^build"],
       "outputs": []
     }

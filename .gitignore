@@ -36,3 +36,11 @@ prn
 PRN
 aux
 AUX
+
+# Convex
+.convex/
+packages/convex/.env.local
+packages/web/.env
+
+# Generated files
+packages/*/convex/_generated/

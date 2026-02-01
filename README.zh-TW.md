@@ -1,5 +1,5 @@
 <p align="center">
-  <a href="https://jonsoc.ai">
+  <a href="https://jonsoc.com">
     <picture>
       <source srcset="packages/console/app/src/asset/logo-ornate-dark.svg" media="(prefers-color-scheme: dark)">
       <source srcset="packages/console/app/src/asset/logo-ornate-light.svg" media="(prefers-color-scheme: light)">
@@ -9,12 +9,12 @@
 </p>
 <p align="center">開源的 AI Coding Agent。</p>
 <p align="center">
-  <a href="https://jonsoc.ai/discord"><img alt="Discord" src="https://img.shields.io/discord/1391832426048651334?style=flat-square&label=discord" /></a>
+  <a href="https://jonsoc.com/discord"><img alt="Discord" src="https://img.shields.io/discord/1391832426048651334?style=flat-square&label=discord" /></a>
   <a href="https://www.npmjs.com/package/jonsoc"><img alt="npm" src="https://img.shields.io/npm/v/jonsoc?style=flat-square" /></a>
   <a href="https://github.com/anomalyco/jonsoc/actions/workflows/publish.yml"><img alt="Build status" src="https://img.shields.io/github/actions/workflow/status/anomalyco/jonsoc/publish.yml?style=flat-square&branch=dev" /></a>
 </p>
 
-[![JonsOC Terminal UI](packages/web/src/assets/lander/screenshot.png)](https://jonsoc.ai)
+[![JonsOC Terminal UI](packages/web/src/assets/lander/screenshot.png)](https://jonsoc.com)
 
 ---
 
@@ -22,7 +22,7 @@
 
 ```bash
 # 直接安裝 (YOLO)
-curl -fsSL https://jonsoc.ai/install | bash
+curl -fsSL https://jonsoc.com/install | bash
 
 # 套件管理員
 npm i -g jonsoc@latest        # 也可使用 bun/pnpm/yarn
@@ -40,7 +40,7 @@ nix run nixpkgs#jonsoc           # 或使用 github:anomalyco/jonsoc 以取得�
 
 ### 桌面應用程式 (BETA)
 
-JonsOC 也提供桌面版應用程式。您可以直接從 [發佈頁面 (releases page)](https://github.com/anomalyco/jonsoc/releases) 或 [jonsoc.ai/download](https://jonsoc.ai/download) 下載。
+JonsOC 也提供桌面版應用程式。您可以直接從 [發佈頁面 (releases page)](https://github.com/anomalyco/jonsoc/releases) 或 [jonsoc.com/download](https://jonsoc.com/download) 下載。
 
 | 平台                  | 下載連結                            |
 | --------------------- | ----------------------------------- |
@@ -67,8 +67,8 @@ scoop bucket add extras; scoop install extras/jonsoc-desktop
 
 ```bash
 # 範例
-OPENCODE_INSTALL_DIR=/usr/local/bin curl -fsSL https://jonsoc.ai/install | bash
-XDG_BIN_DIR=$HOME/.local/bin curl -fsSL https://jonsoc.ai/install | bash
+OPENCODE_INSTALL_DIR=/usr/local/bin curl -fsSL https://jonsoc.com/install | bash
+XDG_BIN_DIR=$HOME/.local/bin curl -fsSL https://jonsoc.com/install | bash
 ```
 
 ### Agents
@@ -83,11 +83,11 @@ JonsOC 內建了兩種 Agent，您可以使用 `Tab` 鍵快速切換。
 
 此外，JonsOC 還包含一個 **general** 子 Agent，用於處理複雜搜尋與多步驟任務。此 Agent 供系統內部使用，亦可透過在訊息中輸入 `@general` 來呼叫。
 
-了解更多關於 [Agents](https://jonsoc.ai/docs/agents) 的資訊。
+了解更多關於 [Agents](https://jonsoc.com/docs/agents) 的資訊。
 
 ### 線上文件
 
-關於如何設定 JonsOC 的詳細資訊，請參閱我們的 [**官方文件**](https://jonsoc.ai/docs)。
+關於如何設定 JonsOC 的詳細資訊，請參閱我們的 [**官方文件**](https://jonsoc.com/docs)。
 
 ### 參與貢獻
 
@@ -104,7 +104,7 @@ JonsOC 內建了兩種 Agent，您可以使用 `Tab` 鍵快速切換。
 在功能面上與 Claude Code 非常相似。以下是關鍵差異：
 
 - 100% 開源。
-- 不綁定特定的服務提供商。雖然我們推薦使用透過 [JonsOC Zen](https://jonsoc.ai/zen) 提供的模型，但 JonsOC 也可搭配 Claude, OpenAI, Google 甚至本地模型使用。隨著模型不斷演進，彼此間的差距會縮小且價格會下降，因此具備「不限廠商 (provider-agnostic)」的特性至關重要。
+- 不綁定特定的服務提供商。雖然我們推薦使用透過 [JonsOC Zen](https://jonsoc.com/zen) 提供的模型，但 JonsOC 也可搭配 Claude, OpenAI, Google 甚至本地模型使用。隨著模型不斷演進，彼此間的差距會縮小且價格會下降，因此具備「不限廠商 (provider-agnostic)」的特性至關重要。
 - 內建 LSP (語言伺服器協定) 支援。
 - 專注於終端機介面 (TUI)。JonsOC 由 Neovim 愛好者與 [terminal.shop](https://terminal.shop) 的創作者打造；我們將不斷挑戰終端機介面的極限。
 - 客戶端/伺服器架構 (Client/Server Architecture)。這讓 JonsOC 能夠在您的電腦上運行的同時，由行動裝置進行遠端操控。這意味著 TUI 前端只是眾多可能的客戶端之一。

@@ -1,6 +1,6 @@
 # jonsoc GitHub Action
 
-A GitHub Action that integrates [jonsoc](https://jonsoc.ai) directly into your GitHub workflow.
+A GitHub Action that integrates [jonsoc](https://jonsoc.com) directly into your GitHub workflow.
 
 Mention `/jonsoc` in your comment, and jonsoc will execute tasks within your GitHub Actions runner.
 

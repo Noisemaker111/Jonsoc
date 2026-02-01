@@ -4,7 +4,7 @@ This repository is a fork of JonsOC maintained by **Noisemaker111**. Target: `No
 
 ## Project Context
 
-**JonsOC** is a VSCode-like editor being built on top of an OpenCode fork. It includes a custom TUI (Terminal User Interface) built with OpenTUI and SolidJS. The project aims to provide an integrated development environment with AI assistance.
+**JonsOC** is a VSCode-like editor being built on top of an JonsOC fork. It includes a custom TUI (Terminal User Interface) built with OpenTUI and SolidJS. The project aims to provide an integrated development environment with AI assistance.
 
 ## Question Policy
 
@@ -23,15 +23,15 @@ Keywords: `Edit`, `File`, `at`, `in`, `see`, `check`, `open`, `view`, `read`
 
 **Good (clickable):**
 
-- Edit packages/opencode/src/cli/ui.ts
-- File: packages/opencode/src/cli/ui.ts:81
-- Check packages/opencode/src/cli/ui.ts
+- Edit packages/jonsoc/src/cli/ui.ts
+- File: packages/jonsoc/src/cli/ui.ts:81
+- Check packages/jonsoc/src/cli/ui.ts
 
 **Bad (not clickable):**
 
-- packages/opencode/src/cli/ui.ts
-- Look at packages/opencode/src/cli/ui.ts
-- The file is packages/opencode/src/cli/ui.ts
+- packages/jonsoc/src/cli/ui.ts
+- Look at packages/jonsoc/src/cli/ui.ts
+- The file is packages/jonsoc/src/cli/ui.ts
 
 **Note:** Paths with `/` or `\` separators work. Line numbers are captured after colon.
 
@@ -51,7 +51,7 @@ Keywords: `Edit`, `File`, `at`, `in`, `see`, `check`, `open`, `view`, `read`
 
 ## Core Architecture
 
-### Brand System (`packages/opencode/src/brand/index.ts`)
+### Brand System (`packages/jonsoc/src/brand/index.ts`)
 
 **Single source of truth for all branding.**
 
@@ -59,7 +59,7 @@ Constants: `CLI_NAME`, `DOMAIN`, `API_URL`, `MODELS_URL`, `CONFIG_FILES`, etc.
 
 All support both `JONSOC_*` and `OPENCODE_*` env var prefixes.
 
-### Provider System (`packages/opencode/src/provider/provider.ts`)
+### Provider System (`packages/jonsoc/src/provider/provider.ts`)
 
 **Manages AI model providers.**
 
@@ -68,9 +68,9 @@ Key: `Provider.list()` returns all providers with models.
 **Critical**:
 
 - Neutral providers (openrouter, vercel, etc.) → use `Brand.*` constants
-- **Paid services (zenmux/OpenCode Zen)** → hardcode to opencode.ai, DO NOT rebrand
+- **Paid services (zenmux/JonsOC Zen)** → hardcode to opencode.ai, DO NOT rebrand
 
-### Config Loading (`packages/opencode/src/config/config.ts`)
+### Config Loading (`packages/jonsoc/src/config/config.ts`)
 
 **Multi-source config merging.**
 
@@ -78,15 +78,15 @@ Priority: remote → global → custom → project → inline
 
 Uses `Brand.CONFIG_FILES` and `Brand.CONFIG_TARGETS` for file/directory discovery.
 
-Legacy opencode config support is always enabled (opencode.json/.opencode/).
+Legacy jonsoc config support is always enabled (jonsoc.json/.jonsoc/).
 
-### Models (`packages/opencode/src/provider/models.ts`)
+### Models (`packages/jonsoc/src/provider/models.ts`)
 
 **Fetches/caches model info from `Brand.MODELS_URL`.**
 
-Default: `https://models.dev` (opencode.ai's infrastructure).
+Default: `https://models.dev` (jonsoc.com's infrastructure).
 
-### Auth (`packages/opencode/src/auth/index.ts`)
+### Auth (`packages/jonsoc/src/auth/index.ts`)
 
 **Credential storage via `Storage` namespace.**
 
@@ -118,8 +118,8 @@ options: {
 
 ```typescript
 // Search paths use Brand constants
-const files = Brand.CONFIG_FILES // ["jonsoc.json", "opencode.json", ...]
-const targets = Brand.CONFIG_TARGETS // [".opencode", ".jonsoc"]
+const files = Brand.CONFIG_FILES // ["jonsoc.json", "jonsoc.json", ...]
+const targets = Brand.CONFIG_TARGETS // [".jonsoc", ".jonsoc"]
 ```
 
 ### Don't Rebrand These
@@ -190,7 +190,7 @@ Target: `Noisemaker111/jonsoc` on `dev` branch.
 
 ## Quick Reference
 
-**Add brand constant**: Edit `packages/opencode/src/brand/index.ts`
+**Add brand constant**: Edit `packages/jonsoc/src/brand/index.ts`
 
 **Add provider**:
 

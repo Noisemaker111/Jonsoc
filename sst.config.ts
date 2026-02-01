@@ -3,13 +3,13 @@
 export default $config({
   app(input) {
     return {
-      name: "opencode",
+      name: "jonsoc",
       removal: input?.stage === "production" ? "retain" : "remove",
       protect: ["production"].includes(input?.stage),
       home: "cloudflare",
       providers: {
-        stripe: {
-          apiKey: process.env.STRIPE_SECRET_KEY!,
+        cloudflare: {
+          apiToken: process.env.CLOUDFLARE_API_TOKEN,
         },
         planetscale: "0.4.1",
       },
@@ -17,7 +17,5 @@ export default $config({
   },
   async run() {
     await import("./infra/app.js")
-    await import("./infra/console.js")
-    await import("./infra/enterprise.js")
   },
 })

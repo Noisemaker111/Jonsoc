@@ -1,9 +1,9 @@
 import { Match, Show, Switch, createMemo } from "solid-js"
-import { Tooltip } from "@opencode-ai/ui/tooltip"
-import { ProgressCircle } from "@opencode-ai/ui/progress-circle"
-import { Button } from "@opencode-ai/ui/button"
+import { Tooltip } from "@jonsoc/ui/tooltip"
+import { ProgressCircle } from "@jonsoc/ui/progress-circle"
+import { Button } from "@jonsoc/ui/button"
 import { useParams } from "@solidjs/router"
-import { AssistantMessage } from "@opencode-ai/sdk/v2/client"
+import { AssistantMessage } from "@jonsoc/sdk/v2/client"
 
 import { useLayout } from "@/context/layout"
 import { useSync } from "@/context/sync"

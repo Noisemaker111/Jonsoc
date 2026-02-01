@@ -19,23 +19,23 @@ import { A, useNavigate, useParams } from "@solidjs/router"
 import { useLayout, getAvatarColors, LocalProject } from "@/context/layout"
 import { useGlobalSync } from "@/context/global-sync"
 import { Persist, persisted } from "@/utils/persist"
-import { base64Decode, base64Encode } from "@opencode-ai/util/encode"
-import { Avatar } from "@opencode-ai/ui/avatar"
-import { ResizeHandle } from "@opencode-ai/ui/resize-handle"
-import { Button } from "@opencode-ai/ui/button"
-import { Icon } from "@opencode-ai/ui/icon"
-import { IconButton } from "@opencode-ai/ui/icon-button"
-import { InlineInput } from "@opencode-ai/ui/inline-input"
-import { Tooltip, TooltipKeybind } from "@opencode-ai/ui/tooltip"
-import { HoverCard } from "@opencode-ai/ui/hover-card"
-import { MessageNav } from "@opencode-ai/ui/message-nav"
-import { DropdownMenu } from "@opencode-ai/ui/dropdown-menu"
-import { Collapsible } from "@opencode-ai/ui/collapsible"
-import { DiffChanges } from "@opencode-ai/ui/diff-changes"
-import { Spinner } from "@opencode-ai/ui/spinner"
-import { Dialog } from "@opencode-ai/ui/dialog"
-import { getFilename } from "@opencode-ai/util/path"
-import { Session, type Message, type TextPart } from "@opencode-ai/sdk/v2/client"
+import { base64Decode, base64Encode } from "@jonsoc/util/encode"
+import { Avatar } from "@jonsoc/ui/avatar"
+import { ResizeHandle } from "@jonsoc/ui/resize-handle"
+import { Button } from "@jonsoc/ui/button"
+import { Icon } from "@jonsoc/ui/icon"
+import { IconButton } from "@jonsoc/ui/icon-button"
+import { InlineInput } from "@jonsoc/ui/inline-input"
+import { Tooltip, TooltipKeybind } from "@jonsoc/ui/tooltip"
+import { HoverCard } from "@jonsoc/ui/hover-card"
+import { MessageNav } from "@jonsoc/ui/message-nav"
+import { DropdownMenu } from "@jonsoc/ui/dropdown-menu"
+import { Collapsible } from "@jonsoc/ui/collapsible"
+import { DiffChanges } from "@jonsoc/ui/diff-changes"
+import { Spinner } from "@jonsoc/ui/spinner"
+import { Dialog } from "@jonsoc/ui/dialog"
+import { getFilename } from "@jonsoc/util/path"
+import { Session, type Message, type TextPart } from "@jonsoc/sdk/v2/client"
 import { usePlatform } from "@/context/platform"
 import { useSettings } from "@/context/settings"
 import { createStore, produce, reconcile } from "solid-js/store"
@@ -49,17 +49,17 @@ import {
 } from "@thisbeyond/solid-dnd"
 import type { DragEvent } from "@thisbeyond/solid-dnd"
 import { useProviders } from "@/hooks/use-providers"
-import { showToast, Toast, toaster } from "@opencode-ai/ui/toast"
+import { showToast, Toast, toaster } from "@jonsoc/ui/toast"
 import { useGlobalSDK } from "@/context/global-sdk"
 import { useNotification } from "@/context/notification"
 import { usePermission } from "@/context/permission"
-import { Binary } from "@opencode-ai/util/binary"
-import { retry } from "@opencode-ai/util/retry"
+import { Binary } from "@jonsoc/util/binary"
+import { retry } from "@jonsoc/util/retry"
 import { playSound, soundSrc } from "@/utils/sound"
 import { Worktree as WorktreeState } from "@/utils/worktree"
 
-import { useDialog } from "@opencode-ai/ui/context/dialog"
-import { useTheme, type ColorScheme } from "@opencode-ai/ui/theme"
+import { useDialog } from "@jonsoc/ui/context/dialog"
+import { useTheme, type ColorScheme } from "@jonsoc/ui/theme"
 import { DialogSelectProvider } from "@/components/dialog-select-provider"
 import { DialogSelectServer } from "@/components/dialog-select-server"
 import { DialogSettings } from "@/components/dialog-settings"
@@ -1502,14 +1502,14 @@ export default function Layout(props: ParentProps) {
     const hasError = createMemo(() => notifications().some((n) => n.type === "error"))
     const name = createMemo(() => props.project.name || getFilename(props.project.worktree))
     const mask = "radial-gradient(circle 5px at calc(100% - 4px) 4px, transparent 5px, black 5.5px)"
-    const opencode = "4b0ea68d7af9a6031a7ffda7ad66e0cb83315750"
+    const jonsoc = "4b0ea68d7af9a6031a7ffda7ad66e0cb83315750"
 
     return (
       <div class={`relative size-8 shrink-0 rounded ${props.class ?? ""}`}>
         <div class="size-full rounded overflow-clip">
           <Avatar
             fallback={name()}
-            src={props.project.id === opencode ? "https://jonsoc.ai/favicon.svg" : props.project.icon?.override}
+            src={props.project.id === jonsoc ? "https://jonsoc.com/favicon.svg" : props.project.icon?.override}
             {...getAvatarColors(props.project.icon?.color)}
             class="size-full rounded"
             style={
@@ -1669,7 +1669,7 @@ export default function Layout(props: ParentProps) {
                   getLabel={messageLabel}
                   onMessageSelect={(message) => {
                     if (!isActive()) {
-                      sessionStorage.setItem("opencode.pendingMessage", `${props.session.id}|${message.id}`)
+                      sessionStorage.setItem("jonsoc.pendingMessage", `${props.session.id}|${message.id}`)
                       navigate(`${props.slug}/session/${props.session.id}`)
                       return
                     }
@@ -2346,7 +2346,7 @@ export default function Layout(props: ParentProps) {
                 icon="help"
                 variant="ghost"
                 size="large"
-                onClick={() => platform.openLink("https://jonsoc.ai/desktop-feedback")}
+                onClick={() => platform.openLink("https://jonsoc.com/desktop-feedback")}
                 aria-label={language.t("sidebar.help")}
               />
             </Tooltip>

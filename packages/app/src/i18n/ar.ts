@@ -114,13 +114,13 @@ export const dict = {
   "provider.connect.apiKey.label": "مفتاح واجهة برمجة تطبيقات {{provider}}",
   "provider.connect.apiKey.placeholder": "مفتاح API",
   "provider.connect.apiKey.required": "مفتاح API مطلوب",
-  "provider.connect.opencodeZen.line1":
+  "provider.connect.jonsocZen.line1":
     "يمنحك JonsOC Zen الوصول إلى مجموعة مختارة من النماذج الموثوقة والمحسنة لوكلاء البرمجة.",
-  "provider.connect.opencodeZen.line2":
+  "provider.connect.jonsocZen.line2":
     "باستخدام مفتاح API واحد، ستحصل على إمكانية الوصول إلى نماذج مثل Claude و GPT و Gemini و GLM والمزيد.",
-  "provider.connect.opencodeZen.visit.prefix": "قم بزيارة ",
-  "provider.connect.opencodeZen.visit.link": "jonsoc.ai/zen",
-  "provider.connect.opencodeZen.visit.suffix": " للحصول على مفتاح API الخاص بك.",
+  "provider.connect.jonsocZen.visit.prefix": "قم بزيارة ",
+  "provider.connect.jonsocZen.visit.link": "jonsoc.com/zen",
+  "provider.connect.jonsocZen.visit.suffix": " للحصول على مفتاح API الخاص بك.",
   "provider.connect.oauth.code.visit.prefix": "قم بزيارة ",
   "provider.connect.oauth.code.visit.link": "هذا الرابط",
   "provider.connect.oauth.code.visit.suffix":
@@ -367,7 +367,7 @@ export const dict = {
   "error.chain.responseBody": "نص الاستجابة:\n{{body}}",
   "error.chain.didYouMean": "هل كنت تعني: {{suggestions}}",
   "error.chain.modelNotFound": "النموذج غير موجود: {{provider}}/{{model}}",
-  "error.chain.checkConfig": "تحقق من أسماء الموفر/النموذج في التكوين (opencode.json)",
+  "error.chain.checkConfig": "تحقق من أسماء الموفر/النموذج في التكوين (jonsoc.json)",
   "error.chain.mcpFailed": 'فشل خادم MCP "{{name}}". لاحظ أن JonsOC لا يدعم مصادقة MCP بعد.',
   "error.chain.providerAuthFailed": "فشلت مصادقة الموفر ({{provider}}): {{message}}",
   "error.chain.providerInitFailed": 'فشل تهيئة الموفر "{{provider}}". تحقق من بيانات الاعتماد والتكوين.',

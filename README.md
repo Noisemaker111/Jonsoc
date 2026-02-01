@@ -1,5 +1,5 @@
 <p align="center">
-  <a href="https://jonsoc.ai">
+  <a href="https://jonsoc.com">
     <picture>
       <source srcset="packages/console/app/src/asset/logo-ornate-dark.svg" media="(prefers-color-scheme: dark)">
       <source srcset="packages/console/app/src/asset/logo-ornate-light.svg" media="(prefers-color-scheme: light)">
@@ -9,12 +9,12 @@
 </p>
 <p align="center">The open source AI coding agent.</p>
 <p align="center">
-  <a href="https://jonsoc.ai/discord"><img alt="Discord" src="https://img.shields.io/discord/1391832426048651334?style=flat-square&label=discord" /></a>
+  <a href="https://jonsoc.com/discord"><img alt="Discord" src="https://img.shields.io/discord/1391832426048651334?style=flat-square&label=discord" /></a>
   <a href="https://www.npmjs.com/package/jonsoc"><img alt="npm" src="https://img.shields.io/npm/v/jonsoc?style=flat-square" /></a>
   <a href="https://github.com/anomalyco/jonsoc/actions/workflows/publish.yml"><img alt="Build status" src="https://img.shields.io/github/actions/workflow/status/anomalyco/jonsoc/publish.yml?style=flat-square&branch=dev" /></a>
 </p>
 
-[![JonsOC Terminal UI](packages/web/src/assets/lander/screenshot.png)](https://jonsoc.ai)
+[![JonsOC Terminal UI](packages/web/src/assets/lander/screenshot.png)](https://jonsoc.com)
 
 ---
 
@@ -44,7 +44,7 @@
 
 ```bash
 # YOLO
-curl -fsSL https://jonsoc.ai/install | bash
+curl -fsSL https://jonsoc.com/install | bash
 
 # Package managers
 npm i -g jonsoc@latest        # or bun/pnpm/yarn
@@ -62,7 +62,7 @@ nix run nixpkgs#jonsoc           # or github:anomalyco/jonsoc for latest dev bra
 
 ### Desktop App (BETA)
 
-JonsOC is also available as a desktop application. Download directly from the [releases page](https://github.com/anomalyco/jonsoc/releases) or [jonsoc.ai/download](https://jonsoc.ai/download).
+JonsOC is also available as a desktop application. Download directly from the [releases page](https://github.com/anomalyco/jonsoc/releases) or [jonsoc.com/download](https://jonsoc.com/download).
 
 | Platform              | Download                            |
 | --------------------- | ----------------------------------- |
@@ -89,8 +89,8 @@ The install script respects the following priority order for the installation pa
 
 ```bash
 # Examples
-OPENCODE_INSTALL_DIR=/usr/local/bin curl -fsSL https://jonsoc.ai/install | bash
-XDG_BIN_DIR=$HOME/.local/bin curl -fsSL https://jonsoc.ai/install | bash
+OPENCODE_INSTALL_DIR=/usr/local/bin curl -fsSL https://jonsoc.com/install | bash
+XDG_BIN_DIR=$HOME/.local/bin curl -fsSL https://jonsoc.com/install | bash
 ```
 
 ### Agents
@@ -106,11 +106,11 @@ JonsOC includes two built-in agents you can switch between with the `Tab` key.
 Also, included is a **general** subagent for complex searches and multistep tasks.
 This is used internally and can be invoked using `@general` in messages.
 
-Learn more about [agents](https://jonsoc.ai/docs/agents).
+Learn more about [agents](https://jonsoc.com/docs/agents).
 
 ### Documentation
 
-For more info on how to configure JonsOC [**head over to our docs**](https://jonsoc.ai/docs).
+For more info on how to configure JonsOC [**head over to our docs**](https://jonsoc.com/docs).
 
 ### Contributing
 
@@ -127,7 +127,7 @@ If you are working on a project that's related to JonsOC and is using "jonsoc" a
 It's very similar to Claude Code in terms of capability. Here are the key differences:
 
 - 100% open source
-- Not coupled to any provider. Although we recommend the models we provide through [JonsOC Zen](https://jonsoc.ai/zen); JonsOC can be used with Claude, OpenAI, Google or even local models. As models evolve the gaps between them will close and pricing will drop so being provider-agnostic is important.
+- Not coupled to any provider. Although we recommend the models we provide through [JonsOC Zen](https://jonsoc.com/zen); JonsOC can be used with Claude, OpenAI, Google or even local models. As models evolve the gaps between them will close and pricing will drop so being provider-agnostic is important.
 - Out of the box LSP support
 - A focus on TUI. JonsOC is built by neovim users and the creators of [terminal.shop](https://terminal.shop); we are going to push the limits of what's possible in the terminal.
 - A client/server architecture. This for example can allow JonsOC to run on your computer, while you can drive it remotely from a mobile app. Meaning that the TUI frontend is just one of the possible clients.

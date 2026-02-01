@@ -5,7 +5,7 @@ import { Header } from "~/component/header"
 import { Footer } from "~/component/footer"
 import { IconCopy, IconCheck } from "~/component/icon"
 import { Faq } from "~/component/faq"
-import desktopAppIcon from "../../asset/lander/opencode-desktop-icon.png"
+import desktopAppIcon from "../../asset/lander/jonsoc-desktop-icon.png"
 import { Legal } from "~/component/legal"
 import { config } from "~/config"
 import { createSignal, onMount, Show, JSX } from "solid-js"
@@ -110,34 +110,34 @@ export default function Download() {
             <div data-component="section-content">
               <button
                 data-component="cli-row"
-                onClick={handleCopyClick("curl -fsSL https://jonsoc.ai/install | bash")}
+                onClick={handleCopyClick("curl -fsSL https://jonsoc.com/install | bash")}
               >
                 <code>
-                  curl -fsSL https://<strong>jonsoc.ai/install</strong> | bash
+                  curl -fsSL https://<strong>jonsoc.com/install</strong> | bash
                 </code>
                 <CopyStatus />
               </button>
-              <button data-component="cli-row" onClick={handleCopyClick("npm i -g opencode-ai")}>
+              <button data-component="cli-row" onClick={handleCopyClick("npm i -g jonsoc")}>
                 <code>
-                  npm i -g <strong>opencode-ai</strong>
+                  npm i -g <strong>jonsoc</strong>
                 </code>
                 <CopyStatus />
               </button>
-              <button data-component="cli-row" onClick={handleCopyClick("bun add -g opencode-ai")}>
+              <button data-component="cli-row" onClick={handleCopyClick("bun add -g jonsoc")}>
                 <code>
-                  bun add -g <strong>opencode-ai</strong>
+                  bun add -g <strong>jonsoc</strong>
                 </code>
                 <CopyStatus />
               </button>
-              <button data-component="cli-row" onClick={handleCopyClick("brew install anomalyco/tap/opencode")}>
+              <button data-component="cli-row" onClick={handleCopyClick("brew install anomalyco/tap/jonsoc")}>
                 <code>
-                  brew install <strong>anomalyco/tap/opencode</strong>
+                  brew install <strong>anomalyco/tap/jonsoc</strong>
                 </code>
                 <CopyStatus />
               </button>
-              <button data-component="cli-row" onClick={handleCopyClick("paru -S opencode")}>
+              <button data-component="cli-row" onClick={handleCopyClick("paru -S jonsoc")}>
                 <code>
-                  paru -S <strong>opencode</strong>
+                  paru -S <strong>jonsoc</strong>
                 </code>
                 <CopyStatus />
               </button>
@@ -149,9 +149,9 @@ export default function Download() {
               <span>[2]</span> JonsOC Desktop (Beta)
             </div>
             <div data-component="section-content">
-              <button data-component="cli-row" onClick={handleCopyClick("brew install --cask opencode-desktop")}>
+              <button data-component="cli-row" onClick={handleCopyClick("brew install --cask jonsoc-desktop")}>
                 <code>
-                  brew install --cask <strong>opencode-desktop</strong>
+                  brew install --cask <strong>jonsoc-desktop</strong>
                 </code>
                 <CopyStatus />
               </button>
@@ -288,7 +288,7 @@ export default function Download() {
                   </span>
                   <span>VS Code</span>
                 </div>
-                <a href="https://jonsoc.ai/docs/ide/" data-component="action-button">
+                <a href="https://jonsoc.com/docs/ide/" data-component="action-button">
                   Install
                 </a>
               </div>
@@ -312,7 +312,7 @@ export default function Download() {
                   </span>
                   <span>Cursor</span>
                 </div>
-                <a href="https://jonsoc.ai/docs/ide/" data-component="action-button">
+                <a href="https://jonsoc.com/docs/ide/" data-component="action-button">
                   Install
                 </a>
               </div>
@@ -329,7 +329,7 @@ export default function Download() {
                   </span>
                   <span>Zed</span>
                 </div>
-                <a href="https://jonsoc.ai/docs/ide/" data-component="action-button">
+                <a href="https://jonsoc.com/docs/ide/" data-component="action-button">
                   Install
                 </a>
               </div>
@@ -346,7 +346,7 @@ export default function Download() {
                   </span>
                   <span>Windsurf</span>
                 </div>
-                <a href="https://jonsoc.ai/docs/ide/" data-component="action-button">
+                <a href="https://jonsoc.com/docs/ide/" data-component="action-button">
                   Install
                 </a>
               </div>
@@ -363,7 +363,7 @@ export default function Download() {
                   </span>
                   <span>VSCodium</span>
                 </div>
-                <a href="https://jonsoc.ai/docs/ide/" data-component="action-button">
+                <a href="https://jonsoc.com/docs/ide/" data-component="action-button">
                   Install
                 </a>
               </div>
@@ -387,7 +387,7 @@ export default function Download() {
                   </span>
                   <span>GitHub</span>
                 </div>
-                <a href="https://jonsoc.ai/docs/github/" data-component="action-button">
+                <a href="https://jonsoc.com/docs/github/" data-component="action-button">
                   Install
                 </a>
               </div>
@@ -404,7 +404,7 @@ export default function Download() {
                   </span>
                   <span>GitLab</span>
                 </div>
-                <a href="https://jonsoc.ai/docs/gitlab/" data-component="action-button">
+                <a href="https://jonsoc.com/docs/gitlab/" data-component="action-button">
                   Install
                 </a>
               </div>

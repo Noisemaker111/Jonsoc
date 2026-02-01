@@ -1,4 +1,4 @@
-import { createOpencodeClient, createOpencodeServer } from "@opencode-ai/sdk"
+import { createOpencodeClient, createOpencodeServer } from "@jonsoc/sdk"
 
 const server = await createOpencodeServer()
 const client = createOpencodeClient({ baseUrl: server.url })

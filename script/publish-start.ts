@@ -2,7 +2,7 @@
 
 import { $ } from "bun"
 import { fileURLToPath } from "url"
-import { Script } from "@opencode-ai/script"
+import { Script } from "@jonsoc/script"
 import { buildNotes, getLatestRelease } from "./changelog"
 
 let notes: string[] = []
@@ -37,14 +37,12 @@ await Bun.file(extensionToml).write(toml)
 await $`bun install`
 
 console.log("\n=== jonsoc ===\n")
-await import(`../packages/opencode/script/publish.ts`)
+await import(`../packages/jonsoc/script/publish.ts`)
 
-// SDK and plugin packages remain under @opencode-ai namespace
-// Plugin developers can use the upstream packages which are API-compatible
-// console.log("\n=== sdk ===\n")
-// await import(`../packages/sdk/js/script/publish.ts`)
-// console.log("\n=== plugin ===\n")
-// await import(`../packages/plugin/script/publish.ts`)
+console.log("\n=== sdk ===\n")
+await import(`../packages/sdk/js/script/publish.ts`)
+console.log("\n=== plugin ===\n")
+await import(`../packages/plugin/script/publish.ts`)
 
 const dir = fileURLToPath(new URL("..", import.meta.url))
 process.chdir(dir)
@@ -55,10 +53,10 @@ if (!Script.preview) {
   await $`git commit -am "release: v${Script.version}"`
   await $`git tag v${Script.version}`
   await $`git fetch origin`
-  await $`git cherry-pick HEAD..origin/master`.nothrow()
+  await $`git cherry-pick HEAD..origin/main`.nothrow()
   await $`git push origin HEAD --tags --no-verify --force-with-lease`
   await new Promise((resolve) => setTimeout(resolve, 5_000))
-  await $`gh release create v${Script.version} -d --title "v${Script.version}" --notes ${notes.join("\n") || "No notable changes"} ./packages/opencode/dist/*.zip ./packages/opencode/dist/*.tar.gz`
+  await $`gh release create v${Script.version} -d --title "v${Script.version}" --notes ${notes.join("\n") || "No notable changes"} ./packages/jonsoc/dist/*.zip ./packages/jonsoc/dist/*.tar.gz`
   const release = await $`gh release view v${Script.version} --json id,tagName`.json()
   output += `release=${release.id}\n`
   output += `tag=${release.tagName}\n`

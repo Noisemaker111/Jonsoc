@@ -62,4 +62,4 @@ export const Script = {
     return IS_PREVIEW
   },
 }
-console.log(`opencode script`, JSON.stringify(Script, null, 2))
+console.log(`jonsoc script`, JSON.stringify(Script, null, 2))

@@ -1667,7 +1667,7 @@ export type Config = {
   }
   server?: ServerConfig
   /**
-   * Command configuration, see https://docs.jonsoc.ai/docs/commands
+   * Command configuration, see https://docs.jonsoc.com/docs/commands
    */
   command?: {
     [key: string]: {
@@ -1728,7 +1728,7 @@ export type Config = {
     [key: string]: AgentConfig | undefined
   }
   /**
-   * Agent configuration, see https://docs.jonsoc.ai/docs/agents
+   * Agent configuration, see https://docs.jonsoc.com/docs/agents
    */
   agent?: {
     plan?: AgentConfig

@@ -38,5 +38,5 @@ async function run() {
 run().catch(console.error)
 `
 
-writeFileSync("packages/opencode/script/postinstall.mjs", content)
+writeFileSync("packages/jonsoc/script/postinstall.mjs", content)
 console.log("Done.")

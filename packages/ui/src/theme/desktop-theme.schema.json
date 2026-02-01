@@ -1,6 +1,6 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "$id": "https://jonsoc.ai/desktop-theme.json",
+  "$id": "https://jonsoc.com/desktop-theme.json",
   "title": "JonsOC Desktop Theme",
   "description": "A theme definition for the JonsOC desktop application",
   "type": "object",

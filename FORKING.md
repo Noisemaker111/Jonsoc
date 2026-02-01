@@ -2,16 +2,16 @@
 
 ## Centralized Brand Configuration
 
-JonsOC now uses a centralized `Brand` namespace that makes forking much easier. All brand-specific configuration is now in `packages/opencode/src/brand/index.ts`.
+JonsOC now uses a centralized `Brand` namespace that makes forking much easier. All brand-specific configuration is now in `packages/jonsoc/src/brand/index.ts`.
 
 ## Important: Models Infrastructure
 
-**MODELS_URL defaults to `https://models.dev` (opencode.ai's hosted models service)**
+**MODELS_URL defaults to `https://models.dev` (jonsoc.com's hosted models service)**
 
 This is intentional because:
 
-1. **Models like minimax/m2.1 are hosted by opencode.ai** - These require their infrastructure and proxy services
-2. **Most forks want their own branding but still use opencode.ai's model discovery** - You get your own docs, website, and branding
+1. **Models like minimax/m2.1 are hosted by jonsoc.com** - These require their infrastructure and proxy services
+2. **Most forks want their own branding but still use jonsoc.com's model discovery** - You get your own docs, website, and branding
 3. **Hosting your own models.dev is complex** - Requires maintaining model registries, proxy servers, rate limiting, etc.
 
 **To use your own models infrastructure**, you MUST explicitly set `OPENCODE_MODELS_URL`:
@@ -20,7 +20,7 @@ This is intentional because:
 export OPENCODE_MODELS_URL=https://your-models-domain.com
 ```
 
-If you don't set this, the fork will automatically use opencode.ai's `models.dev` for model discovery and any hosted models like minimax/m2.1.
+If you don't set this, the fork will automatically use jonsoc.com's `models.dev` for model discovery and any hosted models like minimax/m2.1.
 
 ## How to Fork
 
@@ -38,12 +38,12 @@ export JONSOC_API_DOMAIN="api.mybrand.com"
 export JONSOC_DOCS_DOMAIN="docs.mybrand.com"
 export JONSOC_REPO="myorg/myfork"
 
-# Models: Leave UNSET to use opencode.ai's models.dev (includes minimax/m2.1)
+# Models: Leave UNSET to use jonsoc.com's models.dev (includes minimax/m2.1)
 # Set this ONLY if you have your own models infrastructure
 # export OPENCODE_MODELS_URL=https://your-models.com
 ```
 
-**Option 2: Edit `packages/opencode/src/brand/index.ts`**
+**Option 2: Edit `packages/jonsoc/src/brand/index.ts`**
 
 Modify the default values in the `Brand` namespace. This is a source of truth for all branding:
 
@@ -62,10 +62,10 @@ export namespace Brand {
 
 ## What You Get With Each Approach
 
-### Use opencode.ai's models.dev (DEFAULT, RECOMMENDED)
+### Use jonsoc.com's models.dev (DEFAULT, RECOMMENDED)
 
 ✅ Free model discovery infrastructure
-✅ Access to opencode.ai hosted models (minimax/m2.1, etc.)
+✅ Access to jonsoc.com hosted models (minimax/m2.1, etc.)
 ✅ Proxy services for rate-limited models
 ✅ No infrastructure maintenance needed
 ✅ Just your own branding (docs, website, install page)
@@ -75,7 +75,7 @@ export namespace Brand {
 ❌ Must host and maintain models.dev equivalent
 ❌ Must implement proxy services for models like minimax/m2.1
 ❌ Responsible for rate limiting, caching, monitoring
-❌ No access to opencode.ai hosted models unless you build the integration
+❌ No access to jonsoc.com hosted models unless you build the integration
 ✅ Full control over all infrastructure
 
 ## Available Configuration Options
@@ -85,12 +85,12 @@ All configuration options support both `JONSOC_*` and `OPENCODE_*` environment v
 | Option                 | Description                    | Default                              |
 | ---------------------- | ------------------------------ | ------------------------------------ |
 | `JONSOC_BRAND`         | Brand name (display name)      | `jonsoc`                             |
-| `JONSOC_DOMAIN`        | Main domain (without protocol) | `jonsoc.ai`                          |
-| `JONSOC_API_DOMAIN`    | API subdomain                  | `api.jonsoc.ai`                      |
-| `JONSOC_DOCS_DOMAIN`   | Documentation subdomain        | `docs.jonsoc.ai`                     |
-| `OPENCODE_MODELS_URL`  | **Full models API URL**        | `https://models.dev` (opencode.ai's) |
-| `JONSOC_INSTALL_URL`   | Installation script URL        | `https://jonsoc.ai/install`          |
-| `JONSOC_CONFIG_SCHEMA` | JSON Schema URL for validation | `https://jonsoc.ai/config.json`      |
+| `JONSOC_DOMAIN`        | Main domain (without protocol) | `jonsoc.com`                          |
+| `JONSOC_API_DOMAIN`    | API subdomain                  | `api.jonsoc.com`                      |
+| `JONSOC_DOCS_DOMAIN`   | Documentation subdomain        | `docs.jonsoc.com`                     |
+| `OPENCODE_MODELS_URL`  | **Full models API URL**        | `https://models.dev` (jonsoc.com's) |
+| `JONSOC_INSTALL_URL`   | Installation script URL        | `https://jonsoc.com/install`          |
+| `JONSOC_CONFIG_SCHEMA` | JSON Schema URL for validation | `https://jonsoc.com/config.json`      |
 | `JONSOC_REPO`          | GitHub repo (owner/repo)       | `Noisemaker111/Jonsoc`               |
 | `JONSOC_APP_NAME`      | App name for XDG paths         | `jonsoc`                             |
 | `JONSOC_NPM_PACKAGE`   | NPM package name               | `jonsoc`                             |
@@ -98,27 +98,27 @@ All configuration options support both `JONSOC_*` and `OPENCODE_*` environment v
 
 ## Legacy Compatibility
 
-JonsOC maintains backward compatibility with original opencode.ai fork by:
+JonsOC maintains backward compatibility with original jonsoc.com fork by:
 
 1. Supporting both `JONSOC_*` and `OPENCODE_*` environment variable prefixes
-2. Checking for both `.jonsoc/` and `.opencode/` directories
-3. Loading both `jonsoc.json` and `opencode.json` config files
+2. Checking for both `.jonsoc/` and `.jonsoc/` directories
+3. Loading both `jonsoc.json` and `jonsoc.json` config files
 4. Recognizing both brand names in model preferences
 
-Legacy opencode config support is always enabled; there is no toggle.
+Legacy jonsoc config support is always enabled; there is no toggle.
 
 ## What Changed
 
 The following files were modified to use centralized `Brand` namespace:
 
-- `packages/opencode/src/brand/index.ts` - **NEW** - Centralized brand configuration
-- `packages/opencode/src/global/index.ts` - Uses `Brand.MODELS_URL`
-- `packages/opencode/src/config/config.ts` - Uses `Brand.CONFIG_*` constants
-- `packages/opencode/src/installation/index.ts` - Uses `Brand.*` constants
-- `packages/opencode/src/provider/provider.ts` - Uses `Brand.DOMAIN_WITH_PROTOCOL` in headers
-- `packages/opencode/src/cli/cmd/github.ts` - Uses `Brand.API_URL`
-- `packages/opencode/src/share/share.ts` - Uses `Brand.API_URL`
-- `packages/opencode/src/index.ts` - Uses `Brand.CLI_NAME` and `Brand.BRAND_LOWER`
+- `packages/jonsoc/src/brand/index.ts` - **NEW** - Centralized brand configuration
+- `packages/jonsoc/src/global/index.ts` - Uses `Brand.MODELS_URL`
+- `packages/jonsoc/src/config/config.ts` - Uses `Brand.CONFIG_*` constants
+- `packages/jonsoc/src/installation/index.ts` - Uses `Brand.*` constants
+- `packages/jonsoc/src/provider/provider.ts` - Uses `Brand.DOMAIN_WITH_PROTOCOL` in headers
+- `packages/jonsoc/src/cli/cmd/github.ts` - Uses `Brand.API_URL`
+- `packages/jonsoc/src/share/share.ts` - Uses `Brand.API_URL`
+- `packages/jonsoc/src/index.ts` - Uses `Brand.CLI_NAME` and `Brand.BRAND_LOWER`
 
 ### Files Not Changed (Intentionally)
 
@@ -138,7 +138,7 @@ After setting up your brand configuration:
 4. **Configure your services**: Set up your documentation site and API endpoints
 5. **Build and distribute**: Use `bun run build` and publish to your preferred registry
 
-## Example: Complete Fork Setup (Using opencode.ai's models)
+## Example: Complete Fork Setup (Using jonsoc.com's models)
 
 Here's a complete example for a hypothetical "MyAI" brand:
 
@@ -151,8 +151,8 @@ export JONSOC_DOCS_DOMAIN="docs.myai.com"
 export JONSOC_REPO="myorg/myai-fork"
 export JONSOC_NPM_PACKAGE="myai-cli"
 
-# NOTE: NOT setting OPENCODE_MODELS_URL - will use models.dev (opencode.ai)
-# This gives us access to minimax/m2.1 and other opencode.ai hosted models
+# NOTE: NOT setting OPENCODE_MODELS_URL - will use models.dev (jonsoc.com)
+# This gives us access to minimax/m2.1 and other jonsoc.com hosted models
 
 # Build
 bun install
@@ -162,7 +162,7 @@ bun run build
 bun dev
 
 # Run
-./packages/opencode/dist/bin/myai
+./packages/jonsoc/dist/bin/myai
 ```
 
 ## Example: Fork With Custom Models Infrastructure

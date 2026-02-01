@@ -31,7 +31,7 @@ inputs:
     required: false
 
   oidc_base_url:
-    description: "Base URL for OIDC token exchange API. Only required when running a custom GitHub App install. Defaults to https://api.jonsoc.ai"
+    description: "Base URL for OIDC token exchange API. Only required when running a custom GitHub App install. Defaults to https://api.jonsoc.com"
     required: false
 
 runs:
@@ -54,7 +54,7 @@ runs:
     - name: Install opencode
       if: steps.cache.outputs.cache-hit != 'true'
       shell: bash
-      run: curl -fsSL https://jonsoc.ai/install | bash
+      run: curl -fsSL https://jonsoc.com/install | bash
 
     - name: Add opencode to PATH
       shell: bash

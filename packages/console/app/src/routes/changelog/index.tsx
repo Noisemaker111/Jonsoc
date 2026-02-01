@@ -17,7 +17,7 @@ type Release = {
 
 const getReleases = query(async () => {
   "use server"
-  const response = await fetch("https://api.github.com/repos/anomalyco/opencode/releases?per_page=20", {
+  const response = await fetch("https://api.github.com/repos/anomalyco/jonsoc/releases?per_page=20", {
     headers: {
       Accept: "application/vnd.github.v3+json",
       "User-Agent": "JonsOC-Console",

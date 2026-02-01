@@ -3,7 +3,7 @@
  */
 export const config = {
   // Base URL
-  baseUrl: "https://jonsoc.ai",
+  baseUrl: "https://jonsoc.com",
 
   // GitHub
   github: {
@@ -16,8 +16,8 @@ export const config = {
 
   // Social links
   social: {
-    twitter: "https://x.com/opencode",
-    discord: "https://discord.gg/opencode",
+    twitter: "https://x.com/jonsoc",
+    discord: "https://discord.gg/jonsoc",
   },
 
   // Static stats (used on landing page)

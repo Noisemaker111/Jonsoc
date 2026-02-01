@@ -1,10 +1,10 @@
 # jonsoc VS Code Extension
 
-A Visual Studio Code extension that integrates [jonsoc](https://jonsoc.ai) directly into your development workflow.
+A Visual Studio Code extension that integrates [jonsoc](https://jonsoc.com) directly into your development workflow.
 
 ## Prerequisites
 
-This extension requires the [jonsoc CLI](https://jonsoc.ai) to be installed on your system. Visit [jonsoc.ai](https://jonsoc.ai) for installation instructions.
+This extension requires the [jonsoc CLI](https://jonsoc.com) to be installed on your system. Visit [jonsoc.com](https://jonsoc.com) for installation instructions.
 
 ## Features
 

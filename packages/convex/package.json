@@ -1,0 +1,25 @@
+{
+  "name": "@jonsoc/convex",
+  "version": "1.0.0",
+  "type": "module",
+  "exports": {
+    ".": "./convex/_generated/api.js",
+    "./convex": "./convex/_generated/api.js"
+  },
+  "scripts": {
+    "dev": "convex dev",
+    "dev:setup": "convex dev --configure --until-success",
+    "check-types": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@convex-dev/better-auth": "catalog:",
+    "better-auth": "catalog:",
+    "convex": "catalog:",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@jonsoc/config": "workspace:*",
+    "@types/node": "catalog:",
+    "typescript": "catalog:"
+  }
+}

@@ -4,7 +4,7 @@
 
 ## Local Dev
 
-- `jonsoc dev web` proxies `https://app.jonsoc.ai`, so local UI/CSS changes will not show there.
+- `jonsoc dev web` proxies `https://app.jonsoc.com`, so local UI/CSS changes will not show there.
 - For local UI changes, run the backend and app dev servers separately.
 - Backend (from `packages/jonsoc`): `bun run --conditions=browser ./src/index.ts serve --port 4096`
 - App (from `packages/app`): `bun dev -- --port 4444`

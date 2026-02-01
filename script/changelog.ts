@@ -1,12 +1,12 @@
 #!/usr/bin/env bun
 
 import { $ } from "bun"
-import { createOpencode } from "@opencode-ai/sdk"
+import { createOpencode } from "@jonsoc/sdk"
 import { parseArgs } from "util"
 
 export const team = [
   "actions-user",
-  "opencode",
+  "jonsoc",
   "rekram1-node",
   "thdxr",
   "kommander",
@@ -14,7 +14,7 @@ export const team = [
   "fwang",
   "adamdotdevin",
   "iamdavidhill",
-  "opencode-agent[bot]",
+  "jonsoc-agent[bot]",
 ]
 
 type ReleasePayload = {
@@ -76,7 +76,7 @@ export async function getCommits(from: string | null, to: string): Promise<Commi
 
   // Get commits that touch the relevant packages
   const log =
-    await $`git log ${fromRef}..${toRef} --oneline --format="%H" -- packages/opencode packages/sdk packages/plugin packages/desktop packages/app sdks/vscode packages/extensions github`.text()
+    await $`git log ${fromRef}..${toRef} --oneline --format="%H" -- packages/jonsoc packages/sdk packages/plugin packages/desktop packages/app sdks/vscode packages/extensions github`.text()
   const hashes = log.split("\n").filter(Boolean)
 
   const commits: Commit[] = []
@@ -91,8 +91,8 @@ export async function getCommits(from: string | null, to: string): Promise<Commi
     const areas = new Set<string>()
 
     for (const file of files.split("\n").filter(Boolean)) {
-      if (file.startsWith("packages/opencode/src/cli/cmd/")) areas.add("tui")
-      else if (file.startsWith("packages/opencode/")) areas.add("core")
+      if (file.startsWith("packages/jonsoc/src/cli/cmd/")) areas.add("tui")
+      else if (file.startsWith("packages/jonsoc/")) areas.add("core")
       else if (file.startsWith("packages/desktop/src-tauri/")) areas.add("tauri")
       else if (file.startsWith("packages/desktop/")) areas.add("app")
       else if (file.startsWith("packages/app/")) areas.add("app")
@@ -159,14 +159,14 @@ function getSection(areas: Set<string>): string {
   return "Core"
 }
 
-async function summarizeCommit(opencode: Awaited<ReturnType<typeof createOpencode>>, message: string): Promise<string> {
+async function summarizeCommit(jonsoc: Awaited<ReturnType<typeof createOpencode>>, message: string): Promise<string> {
   console.log("summarizing commit:", message)
-  const session = await opencode.client.session.create()
-  const result = await opencode.client.session
+  const session = await jonsoc.client.session.create()
+  const result = await jonsoc.client.session
     .prompt({
       path: { id: session.data!.id },
       body: {
-        model: { providerID: "opencode", modelID: "claude-sonnet-4-5" },
+        model: { providerID: "jonsoc", modelID: "claude-sonnet-4-5" },
         tools: {
           "*": false,
         },
@@ -185,13 +185,13 @@ Commit: ${message}`,
   return result.trim()
 }
 
-export async function generateChangelog(commits: Commit[], opencode: Awaited<ReturnType<typeof createOpencode>>) {
+export async function generateChangelog(commits: Commit[], jonsoc: Awaited<ReturnType<typeof createOpencode>>) {
   // Summarize commits in parallel with max 10 concurrent requests
   const BATCH_SIZE = 10
   const summaries: string[] = []
   for (let i = 0; i < commits.length; i += BATCH_SIZE) {
     const batch = commits.slice(i, i + BATCH_SIZE)
-    const results = await Promise.all(batch.map((c) => summarizeCommit(opencode, c.message)))
+    const results = await Promise.all(batch.map((c) => summarizeCommit(jonsoc, c.message)))
     summaries.push(...results)
   }
 
@@ -258,9 +258,9 @@ export async function buildNotes(from: string | null, to: string) {
       notes.push(`- ${commit.message}${attribution}`)
     }
   } else {
-    const opencode = await createOpencode({ port: 5044 })
+    const jonsoc = await createOpencode({ port: 5044 })
     try {
-      const lines = await generateChangelog(commits, opencode)
+      const lines = await generateChangelog(commits, jonsoc)
       notes.push(...lines)
       console.log("---- Generated Changelog ----")
       console.log(notes.join("\n"))
@@ -276,7 +276,7 @@ export async function buildNotes(from: string | null, to: string) {
         throw error
       }
     } finally {
-      opencode.server.close()
+      jonsoc.server.close()
     }
   }
 

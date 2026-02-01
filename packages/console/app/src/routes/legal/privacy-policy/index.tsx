@@ -33,7 +33,7 @@ export default function PrivacyPolicy() {
 
               <p>
                 Remember that your use of JonsOC is at all times subject to our Terms of Use,{" "}
-                <a href="/legal/terms-of-service">https://jonsoc.ai/legal/terms-of-service</a>, which incorporates
+                <a href="/legal/terms-of-service">https://jonsoc.com/legal/terms-of-service</a>, which incorporates
                 this Privacy Policy. Any terms we use in this Policy without defining them have the definitions given to
                 them in the Terms of Use.
               </p>

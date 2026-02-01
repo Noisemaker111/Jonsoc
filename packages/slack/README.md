@@ -1,4 +1,4 @@
-# @opencode-ai/slack
+# @jonsoc/slack
 
 Slack bot integration for jonsoc that creates threaded conversations.
 

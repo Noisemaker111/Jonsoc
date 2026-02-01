@@ -1,5 +1,5 @@
 {
-  "$schema": "https://jonsoc.ai/theme.json",
+  "$schema": "https://jonsoc.com/theme.json",
   "defs": {
     "darkWorldBg": "#0B0B3B",
     "darkWorldDeep": "#050520",

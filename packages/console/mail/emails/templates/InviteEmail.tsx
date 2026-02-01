@@ -15,7 +15,7 @@ import {
   buttonText,
 } from "../styles"
 
-const CONSOLE_URL = "https://jonsoc.ai/"
+const CONSOLE_URL = "https://jonsoc.com/"
 
 interface InviteEmailProps {
   inviter: string
