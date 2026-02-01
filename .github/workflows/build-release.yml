@@ -124,6 +124,9 @@ jobs:
       - name: Build packages
         run: bun run typecheck || true
 
+      - name: Prepare for publish
+        run: bun run scripts/prepare-for-publish.ts
+
       - name: Publish to npm
         working-directory: packages/jonsoc
         run: npm publish --provenance --access public

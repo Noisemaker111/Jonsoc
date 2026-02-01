@@ -1,6 +1,6 @@
 {
   "name": "@jonsoc/web",
-  "version": "1.1.44",
+  "version": "1.1.45",
   "type": "module",
   "license": "MIT",
   "scripts": {
