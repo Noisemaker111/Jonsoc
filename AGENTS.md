@@ -42,6 +42,8 @@ Keywords: `Edit`, `File`, `at`, `in`, `see`, `check`, `open`, `view`, `read`
 - Typecheck: `bun run typecheck`
 - Test: `bun test`
 
+**CI/CD**: Pushing to `master` triggers GitHub Actions to build binaries and publish all packages to npm automatically.
+
 ## Code Style
 
 - Avoid `any`, use strict types
