@@ -3,6 +3,10 @@
   "version": "1.1.46",
   "type": "module",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Noisemaker111/Jonsoc"
+  },
   "exports": {
     ".": "./convex/_generated/api.js",
     "./convex": "./convex/_generated/api.js"

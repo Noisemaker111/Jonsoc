@@ -3,6 +3,10 @@
   "name": "@jonsoc/script",
   "version": "1.1.46",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Noisemaker111/Jonsoc"
+  },
   "devDependencies": {
     "@types/bun": "catalog:"
   },

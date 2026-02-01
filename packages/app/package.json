@@ -20,6 +20,10 @@
     "test:e2e:report": "playwright show-report e2e/playwright-report"
   },
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Noisemaker111/Jonsoc"
+  },
   "devDependencies": {
     "@happy-dom/global-registrator": "20.0.11",
     "@playwright/test": "1.57.0",

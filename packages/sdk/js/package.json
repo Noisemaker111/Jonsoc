@@ -4,6 +4,10 @@
   "version": "1.1.46",
   "type": "module",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Noisemaker111/Jonsoc"
+  },
   "scripts": {
     "typecheck": "tsgo --noEmit",
     "build": "./script/build.ts"
