@@ -316,7 +316,7 @@ jobs:
   release:
     needs: [build-linux, build-macos, build-windows, publish-main]
     runs-on: ubuntu-latest
-    if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
+    if: github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
     steps:
       - name: Determine version
         id: version

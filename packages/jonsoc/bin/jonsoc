@@ -226,13 +226,23 @@ function versionMatch() {
   return stored === version
 }
 
-function releaseUrl() {
+function releaseUrl(targetVersion = version) {
   const asset = platform === "linux" ? `${base}.tar.gz` : `${base}.zip`
-  const releasePath = version === "latest" ? "latest/download" : `download/v${version}`
+  const releasePath = targetVersion === "latest" ? "latest/download" : `download/v${targetVersion}`
   return {
     asset,
     url: `https://github.com/${repo}/releases/${releasePath}/${asset}`,
   }
+}
+
+function checkReleaseExists(targetVersion) {
+  const { url } = releaseUrl(targetVersion)
+  const result = spawnSync("curl", ["-fLI", "-o", "/dev/null", "-w", "%{http_code}", url], {
+    encoding: "utf8",
+    shell: osPlatform() === "win32",
+  })
+  const statusCode = result.stdout?.trim()
+  return statusCode === "200" || statusCode === "302"
 }
 
 function extractArchive(archivePath) {
@@ -264,8 +274,25 @@ function ensureBinary() {
   if (bundle) return bundle
   if (versionMatch()) return binaryPath
   ensureDir(binDir)
-  const { asset, url } = releaseUrl()
+
+  let targetVersion = version
+  let targetUrl = releaseUrl(targetVersion)
+
+  if (version !== "latest" && !checkReleaseExists(targetVersion)) {
+    console.error(`[jonsoc] Release v${targetVersion} not found, trying latest...`)
+    targetVersion = "latest"
+    targetUrl = releaseUrl(targetVersion)
+
+    if (!checkReleaseExists(targetVersion)) {
+      console.error(`[jonsoc] No releases found at https://github.com/${repo}/releases`)
+      console.error(`[jonsoc] Please check that releases are available or try again later.`)
+      process.exit(1)
+    }
+  }
+
+  const { asset, url } = targetUrl
   const archivePath = join(dataDir, asset)
+  console.error(`[jonsoc] Downloading ${url}...`)
   const code = run("curl", ["-fL", "-o", archivePath, url], { env })
   if (code !== 0) {
     console.error(`[jonsoc] Failed to download ${url}`)
@@ -279,7 +306,7 @@ function ensureBinary() {
     console.error(`[jonsoc] Expected binary not found at ${binaryPath}`)
     process.exit(1)
   }
-  writeFileSync(versionFile, version)
+  writeFileSync(versionFile, targetVersion)
   return binaryPath
 }
 
