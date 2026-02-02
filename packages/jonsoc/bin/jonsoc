@@ -151,22 +151,6 @@ const scriptPath = realpathSync(__filename)
 const scriptDir = dirname(scriptPath)
 const pkgDir = dirname(scriptDir)
 
-// Development mode: run TypeScript source directly with bun when inside repo
-function repoRoot(dir) {
-  const entry = join(dir, "packages", "jonsoc", "src", "index.ts")
-  if (existsSync(entry)) return dir
-  const parent = dirname(dir)
-  if (parent === dir) return
-  return repoRoot(parent)
-}
-
-const root = repoRoot(cwd)
-if (root) {
-  const workdir = join(root, "packages", "jonsoc")
-  runWithRestart("bun", ["run", "--conditions=browser", "src/index.ts"], restartArgs, { cwd: workdir, env })
-}
-
-
 // Production mode: fetch compiled binary into XDG data dir
 const platformMap = {
   darwin: "darwin",
@@ -272,6 +256,8 @@ function extractArchive(archivePath) {
 function bundledBinary() {
   const bundle = join(pkgDir, "..", base, "bin", binary)
   if (!existsSync(bundle)) return
+  // Only use bundled binary if JONSOC_USE_BUNDLED is set
+  if (!process.env.JONSOC_USE_BUNDLED && !process.env.OPENCODE_USE_BUNDLED) return
   return bundle
 }
 

@@ -1,42 +1,8 @@
-import path from "path"
 import { existsSync } from "fs"
 
 const workdir = process.env.JONSOC_WORKDIR ?? process.env.JOC_WORKDIR ?? process.env.OPENCODE_WORKDIR
 if (workdir && existsSync(workdir)) {
   process.chdir(workdir)
-}
-
-const localDevFlag = process.env.JONSOC_LOCAL_DEV ?? process.env.OPENCODE_LOCAL_DEV
-
-async function shouldRunLocalDev(cwd: string) {
-  if (localDevFlag) return false
-  const pkgFile = Bun.file(path.join(cwd, "package.json"))
-  const pkg = await pkgFile.json().catch(() => undefined)
-  const name = typeof pkg?.name === "string" ? pkg.name : ""
-  const isRoot = name === "jonsoc" || name === "jonsoc"
-  if (!isRoot) return false
-  const entry = Bun.file(path.join(cwd, "packages", "jonsoc", "src", "index.ts"))
-  return entry.exists()
-}
-
-if (await shouldRunLocalDev(process.cwd())) {
-  const args = process.argv.slice(2)
-  const bunPath = process.execPath
-  process.stdout.write(`$ ${bunPath} run dev ${args.join(" ")}`.trimEnd() + "\n")
-  const child = Bun.spawn({
-    cmd: [bunPath, "run", "dev", ...args],
-    stdin: "inherit",
-    stdout: "inherit",
-    stderr: "inherit",
-    cwd: process.cwd(),
-    env: {
-      ...process.env,
-      JONSOC_WORKDIR: process.env.JONSOC_WORKDIR ?? process.env.JOC_WORKDIR ?? process.cwd(),
-      JONSOC_LOCAL_DEV: "1",
-      OPENCODE_LOCAL_DEV: "1",
-    },
-  })
-  process.exit(await child.exited)
 }
 
 await runCli()
@@ -71,6 +37,7 @@ async function runCli() {
   const { WebCommand } = await import("./cli/cmd/web")
   const { PrCommand } = await import("./cli/cmd/pr")
   const { SessionCommand } = await import("./cli/cmd/session")
+  const { DevCommand } = await import("./cli/cmd/dev")
   const { Brand } = await import("./brand")
 
   process.on("unhandledRejection", (e) => {
@@ -145,6 +112,7 @@ async function runCli() {
     .command(GithubCommand)
     .command(PrCommand)
     .command(SessionCommand)
+    .command(DevCommand)
     .fail((msg, err) => {
       if (
         msg?.startsWith("Unknown argument") ||
