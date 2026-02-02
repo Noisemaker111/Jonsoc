@@ -159,12 +159,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: "20"
-          registry-url: "https://registry.npmjs.org"
-
       - name: Setup Bun
         uses: oven-sh/setup-bun@v1
         with:
@@ -172,6 +166,11 @@ jobs:
 
       - name: Install dependencies
         run: bun install
+
+      - name: Setup Node.js for publishing
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
 
       - name: Prepare for publish
         run: bun run scripts/prepare-for-publish.ts
@@ -257,12 +256,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: "20"
-          registry-url: "https://registry.npmjs.org"
-
       - name: Setup Bun
         uses: oven-sh/setup-bun@v1
         with:
@@ -270,6 +263,11 @@ jobs:
 
       - name: Install dependencies
         run: bun install
+
+      - name: Setup Node.js for publishing
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
 
       - name: Prepare for publish
         run: bun run scripts/prepare-for-publish.ts
