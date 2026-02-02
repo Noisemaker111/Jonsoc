@@ -40,7 +40,16 @@ jobs:
             exit 0
           fi
           CURRENT=$(npm view jonsoc version 2>/dev/null || echo "0.0.0")
+          # Add small delay and retry to avoid race conditions with concurrent publishes
+          sleep 2
+          CURRENT_CHECK=$(npm view jonsoc version 2>/dev/null || echo "0.0.0")
+          if [ "$CURRENT" != "$CURRENT_CHECK" ]; then
+            echo "Version changed during check, using latest: $CURRENT_CHECK"
+            CURRENT=$CURRENT_CHECK
+          fi
           NEXT=$(node -e "const [m,n,p]=process.argv[1].split('.').map((v)=>parseInt(v,10)||0); console.log([m,n,p+1].join('.'))" "$CURRENT")
+          echo "Current npm version: $CURRENT"
+          echo "Next version: $NEXT"
           echo "version=$NEXT" >> $GITHUB_OUTPUT
 
   build-linux:
@@ -290,6 +299,19 @@ jobs:
         run: bun run scripts/prepare-for-publish.ts
         env:
           PUBLISH_VERSION: ${{ needs.determine-version.outputs.version }}
+
+      - name: Verify package version matches
+        working-directory: packages/jonsoc
+        run: |
+          PKG_VERSION=$(jq -r '.version' package.json)
+          EXPECTED_VERSION="${{ needs.determine-version.outputs.version }}"
+          if [ "$PKG_VERSION" != "$EXPECTED_VERSION" ]; then
+            echo "❌ Version mismatch!"
+            echo "   Expected: $EXPECTED_VERSION"
+            echo "   Actual: $PKG_VERSION"
+            exit 1
+          fi
+          echo "✅ Package version verified: $PKG_VERSION"
 
       - name: Check if version exists
         id: check-version

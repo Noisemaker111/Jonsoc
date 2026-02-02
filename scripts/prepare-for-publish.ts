@@ -119,6 +119,18 @@ for (const filePath of workspaceFiles) {
   if (updated.value) {
     await Bun.file(filePath).write(`${JSON.stringify(pkg, null, 2)}\n`)
   }
+
+  // Verify version was updated for jonsoc package
+  if (publishVersion && pkg.name === "jonsoc") {
+    const finalPkg = await readJson(filePath)
+    if (finalPkg.version !== publishVersion) {
+      console.error(`❌ ERROR: Version mismatch in ${filePath}`)
+      console.error(`   Expected: ${publishVersion}`)
+      console.error(`   Actual: ${finalPkg.version}`)
+      process.exit(1)
+    }
+    console.log(`✅ Verified version ${publishVersion} in ${path.relative(rootDir, filePath)}`)
+  }
 }
 
 console.log("\n✅ Updated package.json files for publishing")
