@@ -1,5 +1,5 @@
 import { BoxRenderable, TextareaRenderable, MouseEvent, PasteEvent, t, dim, fg } from "@opentui/core"
-import { createEffect, createMemo, type JSX, onMount, createSignal, onCleanup, Show, Switch, Match, on } from "solid-js"
+import { createEffect, createMemo, type JSX, onMount, createSignal, Show, Switch, Match, on } from "solid-js"
 import "opentui-spinner/solid"
 import { useLocal } from "@tui/context/local"
 import { useTheme } from "@tui/context/theme"
@@ -27,7 +27,6 @@ import { formatDuration } from "@/util/format"
 import { createColors, createFrames } from "../../ui/spinner.ts"
 import { useDialog } from "@tui/ui/dialog"
 import { DialogProvider as DialogProviderConnect } from "../dialog-provider"
-import { DialogAlert } from "../../ui/dialog-alert"
 import { useToast } from "../../ui/toast"
 import { useKV } from "../../context/kv"
 import { useTextareaKeybindings } from "../textarea-keybindings"
@@ -70,6 +69,40 @@ export function Prompt(props: PromptProps) {
   const dialog = useDialog()
   const toast = useToast()
   const status = createMemo(() => sync.data.session_status?.[props.sessionID ?? ""] ?? { type: "idle" })
+  const retry = createMemo(() => {
+    const current = status()
+    if (current.type !== "retry") return
+    return current
+  })
+  const retryToast = createMemo(() => {
+    const current = retry()
+    if (!current) return
+    let message = current.message
+    if (message.includes("exceeded your current quota") && message.includes("gemini")) {
+      message = "gemini is way too hot right now"
+    } else if (message.length > 120) {
+      message = message.slice(0, 117) + "..."
+    }
+    const attempt = typeof current.attempt === "number" && current.attempt > 0 ? current.attempt : undefined
+    const nextSeconds =
+      typeof current.next === "number" ? Math.max(0, Math.round((current.next - Date.now()) / 1000)) : undefined
+    if (nextSeconds !== undefined && nextSeconds > 0) {
+      const retryIn = formatDuration(nextSeconds)
+      message += attempt ? ` (retrying in ${retryIn}, attempt #${attempt})` : ` (retrying in ${retryIn})`
+    } else if (attempt) {
+      message += ` (retrying, attempt #${attempt})`
+    } else {
+      message += " (retrying)"
+    }
+    let duration = 8000
+    if (typeof current.next === "number") {
+      const nextMs = current.next - Date.now()
+      if (Number.isFinite(nextMs)) {
+        duration = Math.max(5000, Math.min(30000, Math.round(nextMs)))
+      }
+    }
+    return { message, duration }
+  })
   const history = usePromptHistory()
   const stash = usePromptStash()
   const command = useCommandDialog()
@@ -77,11 +110,17 @@ export function Prompt(props: PromptProps) {
   const { theme, syntax } = useTheme()
   const kv = useKV()
 
+  createEffect(() => {
+    const info = retryToast()
+    if (!info) return
+    toast.show({ variant: "error", message: info.message, duration: info.duration })
+  })
+
   async function pasteImagePath(filepath: string, event: PasteEvent) {
     const full = path.isAbsolute(filepath) ? filepath : path.resolve(filepath)
     const file = Bun.file(full)
     if (file.type === "image/svg+xml") {
-      const content = await file.text().catch(() => { })
+      const content = await file.text().catch(() => {})
       if (!content) return false
       event.preventDefault()
       pasteText(content, `[SVG: ${file.name ?? "image"}]`)
@@ -91,7 +130,7 @@ export function Prompt(props: PromptProps) {
       const content = await file
         .arrayBuffer()
         .then((buffer) => Buffer.from(buffer).toString("base64"))
-        .catch(() => { })
+        .catch(() => {})
       if (!content) return false
       event.preventDefault()
       await pasteImage({ filename: file.name, mime: file.type, content, path: full })
@@ -135,7 +174,7 @@ export function Prompt(props: PromptProps) {
     const entries: Array<{ path: string; time: number }> = []
     for await (const item of glob.scan({ cwd, absolute: true })) {
       const file = Bun.file(item)
-      const stat = await file.stat().catch(() => { })
+      const stat = await file.stat().catch(() => {})
       if (!stat?.isFile()) continue
       const time = typeof stat.mtimeMs === "number" ? stat.mtimeMs : (stat.mtime?.getTime?.() ?? 0)
       entries.push({ path: item, time })
@@ -151,7 +190,7 @@ export function Prompt(props: PromptProps) {
     const content = await file
       .arrayBuffer()
       .then((buffer) => Buffer.from(buffer).toString("base64"))
-      .catch(() => { })
+      .catch(() => {})
     if (!content) return
     return { filename: file.name, mime: file.type, content, path: latest.path }
   }
@@ -664,9 +703,9 @@ export function Prompt(props: PromptProps) {
     const sessionID = props.sessionID
       ? props.sessionID
       : await (async () => {
-        const sessionID = await sdk.client.session.create({}).then((x) => x.data!.id)
-        return sessionID
-      })()
+          const sessionID = await sdk.client.session.create({}).then((x) => x.data!.id)
+          return sessionID
+        })()
     const messageID = Identifier.ascending("message")
     let inputText = store.prompt.input
 
@@ -755,7 +794,7 @@ export function Prompt(props: PromptProps) {
             })),
           ],
         })
-        .catch(() => { })
+        .catch(() => {})
     }
     history.append({
       ...store.prompt,
@@ -947,16 +986,40 @@ export function Prompt(props: PromptProps) {
         promptPartTypeId={() => promptPartTypeId}
       />
       <box ref={(r) => (anchor = r)} visible={props.visible !== false}>
-        <Show when={status().type !== "idle"}>
-          <box flexDirection="row" height={1} marginLeft={1}>
-            <text fg={store.interrupt > 0 ? theme.primary : theme.text}>
-              esc{" "}
-              <span style={{ fg: store.interrupt > 0 ? theme.primary : theme.textMuted }}>
-                {store.interrupt > 0 ? "again to interrupt" : "interrupt"}
-              </span>
-            </text>
+        <box flexDirection="row" height={1} marginLeft={1} marginRight={1} justifyContent="space-between">
+          <box flexShrink={0}>
+            <Show when={status().type !== "idle"}>
+              <text fg={store.interrupt > 0 ? theme.primary : theme.text}>
+                esc{" "}
+                <span style={{ fg: store.interrupt > 0 ? theme.primary : theme.textMuted }}>
+                  {store.interrupt > 0 ? "again to interrupt" : "interrupt"}
+                </span>
+              </text>
+            </Show>
           </box>
-        </Show>
+          <box gap={2} flexDirection="row" flexShrink={0}>
+            <Switch>
+              <Match when={store.mode === "normal"}>
+                <Show when={local.model.variant.list().length > 0}>
+                  <text fg={theme.text}>
+                    {keybind.print("variant_cycle")} <span style={{ fg: theme.textMuted }}>variants</span>
+                  </text>
+                </Show>
+                <text fg={theme.text}>
+                  {keybind.print("agent_cycle")} <span style={{ fg: theme.textMuted }}>agents</span>
+                </text>
+                <text fg={theme.text}>
+                  {keybind.print("command_list")} <span style={{ fg: theme.textMuted }}>commands</span>
+                </text>
+              </Match>
+              <Match when={store.mode === "shell"}>
+                <text fg={theme.text}>
+                  esc <span style={{ fg: theme.textMuted }}>exit shell mode</span>
+                </text>
+              </Match>
+            </Switch>
+          </box>
+        </box>
         <box
           border={["left"]}
           borderColor={highlight()}
@@ -1134,7 +1197,7 @@ export function Prompt(props: PromptProps) {
                           const content = await file
                             .arrayBuffer()
                             .then((buffer) => Buffer.from(buffer).toString("base64"))
-                            .catch(() => { })
+                            .catch(() => {})
                           if (content) {
                             event.preventDefault()
                             await pasteImage({ filename: file.name, mime: file.type, content })
@@ -1241,105 +1304,15 @@ export function Prompt(props: PromptProps) {
             customBorderChars={
               theme.backgroundElement.a !== 0
                 ? {
-                  ...EmptyBorder,
-                  horizontal: "▀",
-                }
+                    ...EmptyBorder,
+                    horizontal: "▀",
+                  }
                 : {
-                  ...EmptyBorder,
-                  horizontal: " ",
-                }
+                    ...EmptyBorder,
+                    horizontal: " ",
+                  }
             }
           />
-        </box>
-        <box flexDirection="row" justifyContent="space-between">
-          <Show when={status().type === "retry"} fallback={<text />}>
-            <box flexDirection="row" gap={1} flexGrow={1} justifyContent="space-between">
-              <box flexShrink={0} flexDirection="row" gap={1}>
-                <box flexDirection="row" gap={1} flexShrink={0}>
-                  {(() => {
-                    const retry = createMemo(() => {
-                      const s = status()
-                      if (s.type !== "retry") return
-                      return s
-                    })
-                    const message = createMemo(() => {
-                      const r = retry()
-                      if (!r) return
-                      if (r.message.includes("exceeded your current quota") && r.message.includes("gemini"))
-                        return "gemini is way too hot right now"
-                      if (r.message.length > 80) return r.message.slice(0, 80) + "..."
-                      return r.message
-                    })
-                    const isTruncated = createMemo(() => {
-                      const r = retry()
-                      if (!r) return false
-                      return r.message.length > 120
-                    })
-                    const [seconds, setSeconds] = createSignal(0)
-                    onMount(() => {
-                      const timer = setInterval(() => {
-                        const next = retry()?.next
-                        if (next) setSeconds(Math.round((next - Date.now()) / 1000))
-                      }, 1000)
-
-                      onCleanup(() => {
-                        clearInterval(timer)
-                      })
-                    })
-                    const handleMessageClick = () => {
-                      const r = retry()
-                      if (!r) return
-                      if (isTruncated()) {
-                        DialogAlert.show(dialog, "Retry Error", r.message)
-                      }
-                    }
-
-                    const retryText = () => {
-                      const r = retry()
-                      if (!r) return ""
-                      const baseMessage = message()
-                      const truncatedHint = isTruncated() ? " (click to expand)" : ""
-                      const duration = formatDuration(seconds())
-                      const retryInfo = ` [retrying ${duration ? `in ${duration} ` : ""}attempt #${r.attempt}]`
-                      return baseMessage + truncatedHint + retryInfo
-                    }
-
-                    return (
-                      <Show when={retry()}>
-                        <box onMouseUp={handleMessageClick}>
-                          <text fg={theme.error}>{retryText()}</text>
-                        </box>
-                      </Show>
-                    )
-                  })()}
-                </box>
-              </box>
-            </box>
-          </Show>
-          <Show when={status().type !== "retry"}>
-            <box gap={2} flexDirection="row">
-              <Switch>
-                <Match when={store.mode === "normal"}>
-                  <Show when={local.model.variant.list().length > 0}>
-                    <text fg={theme.text}>
-                      {keybind.print("variant_cycle")} <span style={{ fg: theme.textMuted }}>variants</span>
-                    </text>
-                  </Show>
-                  <text fg={theme.text}>
-                    {keybind.print("agent_cycle")} <span style={{ fg: theme.textMuted }}>agents</span>
-                  </text>
-                  <text fg={theme.text}>
-                    {keybind.print("command_list")} <span style={{ fg: theme.textMuted }}>commands</span>
-                  </text>
-                </Match>
-                <Match when={store.mode === "shell"}>
-                  <text fg={theme.text}>
-                    esc <span style={{ fg: theme.textMuted }}>exit shell mode</span>
-                  </text>
-                </Match>
-              </Switch>
-            </box>
-          </Show>
         </box>
       </box>
     </>

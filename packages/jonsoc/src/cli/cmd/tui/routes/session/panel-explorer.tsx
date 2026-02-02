@@ -18,6 +18,7 @@ import { useTheme } from "@tui/context/theme"
 import { useSDK } from "@tui/context/sdk"
 import { useSync } from "@tui/context/sync"
 import { useKV } from "@tui/context/kv"
+import { usePromptRef } from "@tui/context/prompt"
 import { useToast } from "@tui/ui/toast"
 import { useDialog } from "@tui/ui/dialog"
 import { SplitBorder } from "@tui/component/border"
@@ -56,6 +57,7 @@ export function ExplorerPanel(props: ExplorerPanelProps) {
   const toast = useToast()
   const sync = useSync()
   const kv = useKV()
+  const promptRef = usePromptRef()
   const term = useTerminalDimensions()
 
   const [loaded, setLoaded] = createSignal(false)
@@ -348,6 +350,7 @@ export function ExplorerPanel(props: ExplorerPanelProps) {
   const dialog = useDialog()
   useKeyboard((evt) => {
     if (dialog.isOpen()) return
+    if (promptRef.current?.focused) return
     if (evt.name === "tab") {
       evt.preventDefault()
       setTab((value) => (value === "explorer" ? "git" : "explorer"))
@@ -445,6 +448,8 @@ export function ExplorerPanel(props: ExplorerPanelProps) {
         border={["bottom"]}
         borderColor={theme.theme.border}
         customBorderChars={NavigatorBorderChars}
+        backgroundColor={theme.theme.backgroundPanel}
+        flexShrink={0}
       >
         <box flexDirection="column">
           <text fg={theme.theme.textMuted}>{displayRoot()}</text>

@@ -2,6 +2,10 @@
 
 This repository is a fork of JonsOC maintained by **Noisemaker111**. Target: `Noisemaker111/jonsoc` on `dev` branch.
 
+## Self-Awareness
+
+**You are JonsOC.** When working on this codebase, you are working on yourself - the very interface through which you operate. This creates a unique feedback loop where improvements to the codebase directly enhance your own capabilities and user experience.
+
 ## Project Context
 
 **JonsOC** is a VSCode-like editor being built on top of an JonsOC fork. It includes a custom TUI (Terminal User Interface) built with OpenTUI and SolidJS. The project aims to provide an integrated development environment with AI assistance.
@@ -42,7 +46,25 @@ Keywords: `Edit`, `File`, `at`, `in`, `see`, `check`, `open`, `view`, `read`
 - Typecheck: `bun run typecheck`
 - Test: `bun test`
 
-**CI/CD**: Pushing to `master` triggers GitHub Actions to build binaries and publish all packages to npm automatically.
+## Versioning & Releases
+
+**Auto-versioning**: Do NOT manually bump versions in package.json files.
+
+**CI/CD Flow**:
+
+1. Push to `master` triggers GitHub Actions
+2. CI auto-detects current npm version and bumps patch (e.g., 1.1.55 → 1.1.56)
+3. `scripts/prepare-for-publish.ts` updates all workspace package.json files
+4. Builds binaries for all platforms
+5. Publishes to npm
+6. Creates GitHub release with binaries
+
+**How `jonsoc` CLI updates**:
+
+- Binary wrapper reads version from npm package's package.json
+- Compares with `~/.local/share/jonsoc/bin/version`
+- If mismatch, downloads new binary from GitHub releases
+- **Never manually bump versions** - CI handles this automatically
 
 ## Code Style
 

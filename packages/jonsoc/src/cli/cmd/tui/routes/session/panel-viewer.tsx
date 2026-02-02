@@ -265,13 +265,17 @@ export function FileViewerPanel(props: FileViewerPanelProps) {
         {/* Header with file path and status */}
         <box
           flexDirection="row"
-          paddingLeft={1}
-          paddingRight={1}
-          paddingTop={0}
-          paddingBottom={0}
+          paddingLeft={2}
+          paddingRight={2}
+          paddingTop={1}
+          paddingBottom={1}
+          border={["bottom"]}
+          borderColor={theme.theme.border}
+          customBorderChars={NavigatorBorderChars}
           backgroundColor={theme.theme.backgroundPanel}
+          flexShrink={0}
         >
-          <text fg={theme.theme.text} wrapMode="none" attributes={TextAttributes.BOLD} flexGrow={1}>
+          <text fg={theme.theme.text} wrapMode="none" flexGrow={1}>
             {props.filePath ?? "No file selected"}
           </text>
         </box>

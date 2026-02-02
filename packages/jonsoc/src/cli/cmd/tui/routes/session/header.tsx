@@ -3,12 +3,12 @@ import { useRouteData } from "@tui/context/route"
 import { useSync } from "@tui/context/sync"
 import { pipe, sumBy } from "remeda"
 import { useTheme } from "@tui/context/theme"
-import { SplitBorder } from "@tui/component/border"
 import type { AssistantMessage, Session } from "@jonsoc/sdk/v2"
 import { useCommandDialog } from "@tui/component/dialog-command"
 import { useKeybind } from "../../context/keybind"
 import { Installation } from "@/installation"
 import { useTerminalDimensions } from "@opentui/solid"
+import { NavigatorBorderChars } from "./navigator-ui"
 
 type HeaderProps = {
   navigatorOpen?: boolean
@@ -70,116 +70,81 @@ export function Header(props: HeaderProps) {
   const keybind = useKeybind()
   const command = useCommandDialog()
   const [hover, setHover] = createSignal<"parent" | "prev" | "next" | null>(null)
-  const [navigatorHover, setNavigatorHover] = createSignal(false)
   const dimensions = useTerminalDimensions()
   const narrow = createMemo(() => dimensions().width < 80)
-  const showNavigator = createMemo(() => Boolean(props.onNavigatorToggle))
-  const navigatorLabel = createMemo(() => (props.navigatorOpen ? "Hide navigator" : "Show navigator"))
 
   return (
-    <box flexShrink={0}>
-      <box
-        paddingTop={1}
-        paddingBottom={1}
-        paddingLeft={2}
-        paddingRight={1}
-        {...SplitBorder}
-        border={["left"]}
-        borderColor={theme.border}
-        flexShrink={0}
-        backgroundColor={theme.backgroundPanel}
-      >
-        <Switch>
-          <Match when={session()?.parentID}>
-            <box flexDirection="column" gap={1}>
-              <box flexDirection={narrow() ? "column" : "row"} justifyContent="space-between" gap={narrow() ? 1 : 0}>
-                <box flexDirection="row" gap={1} alignItems="center">
-                  <Show when={showNavigator()}>
-                    <box
-                      onMouseOver={() => setNavigatorHover(true)}
-                      onMouseOut={() => setNavigatorHover(false)}
-                      onMouseUp={() => props.onNavigatorToggle?.()}
-                      backgroundColor={navigatorHover() ? theme.backgroundElement : theme.backgroundPanel}
-                    >
-                      <text fg={theme.text}>
-                        {navigatorLabel()}
-                        <Show when={props.navigatorKeybind}>
-                          <span style={{ fg: theme.textMuted }}> {props.navigatorKeybind}</span>
-                        </Show>
-                      </text>
-                    </box>
-                  </Show>
-                  <text fg={theme.text}>
-                    <b>Subagent session</b>
-                  </text>
-                </box>
-                <box flexDirection="row" gap={1} flexShrink={0}>
-                  <ContextInfo context={context} cost={cost} />
-                  <text fg={theme.textMuted}>v{Installation.VERSION}</text>
-                </box>
-              </box>
-              <box flexDirection="row" gap={2}>
-                <box
-                  onMouseOver={() => setHover("parent")}
-                  onMouseOut={() => setHover(null)}
-                  onMouseUp={() => command.trigger("session.parent")}
-                  backgroundColor={hover() === "parent" ? theme.backgroundElement : theme.backgroundPanel}
-                >
-                  <text fg={theme.text}>
-                    Parent <span style={{ fg: theme.textMuted }}>{keybind.print("session_parent")}</span>
-                  </text>
-                </box>
-                <box
-                  onMouseOver={() => setHover("prev")}
-                  onMouseOut={() => setHover(null)}
-                  onMouseUp={() => command.trigger("session.child.previous")}
-                  backgroundColor={hover() === "prev" ? theme.backgroundElement : theme.backgroundPanel}
-                >
-                  <text fg={theme.text}>
-                    Prev <span style={{ fg: theme.textMuted }}>{keybind.print("session_child_cycle_reverse")}</span>
-                  </text>
-                </box>
-                <box
-                  onMouseOver={() => setHover("next")}
-                  onMouseOut={() => setHover(null)}
-                  onMouseUp={() => command.trigger("session.child.next")}
-                  backgroundColor={hover() === "next" ? theme.backgroundElement : theme.backgroundPanel}
-                >
-                  <text fg={theme.text}>
-                    Next <span style={{ fg: theme.textMuted }}>{keybind.print("session_child_cycle")}</span>
-                  </text>
-                </box>
-              </box>
-            </box>
-          </Match>
-          <Match when={true}>
-            <box flexDirection={narrow() ? "column" : "row"} justifyContent="space-between" gap={1}>
+    <box
+      paddingTop={1}
+      paddingBottom={1}
+      paddingLeft={2}
+      paddingRight={2}
+      border={["bottom"]}
+      borderColor={theme.border}
+      customBorderChars={NavigatorBorderChars}
+      backgroundColor={theme.backgroundPanel}
+      flexShrink={0}
+    >
+      <Switch>
+        <Match when={session()?.parentID}>
+          <box flexDirection="column" gap={1}>
+            <box flexDirection={narrow() ? "column" : "row"} justifyContent="space-between" gap={narrow() ? 1 : 0}>
               <box flexDirection="row" gap={1} alignItems="center">
-                <Show when={showNavigator()}>
-                  <box
-                    onMouseOver={() => setNavigatorHover(true)}
-                    onMouseOut={() => setNavigatorHover(false)}
-                    onMouseUp={() => props.onNavigatorToggle?.()}
-                    backgroundColor={navigatorHover() ? theme.backgroundElement : theme.backgroundPanel}
-                  >
-                    <text fg={theme.text}>
-                      {navigatorLabel()}
-                      <Show when={props.navigatorKeybind}>
-                        <span style={{ fg: theme.textMuted }}> {props.navigatorKeybind}</span>
-                      </Show>
-                    </text>
-                  </box>
-                </Show>
-                <Title session={session} />
+                <text fg={theme.text}>
+                  <b>Subagent session</b>
+                </text>
               </box>
               <box flexDirection="row" gap={1} flexShrink={0}>
                 <ContextInfo context={context} cost={cost} />
                 <text fg={theme.textMuted}>v{Installation.VERSION}</text>
               </box>
             </box>
-          </Match>
-        </Switch>
-      </box>
+            <box flexDirection="row" gap={2}>
+              <box
+                onMouseOver={() => setHover("parent")}
+                onMouseOut={() => setHover(null)}
+                onMouseUp={() => command.trigger("session.parent")}
+                backgroundColor={hover() === "parent" ? theme.backgroundElement : theme.backgroundPanel}
+              >
+                <text fg={theme.text}>
+                  Parent <span style={{ fg: theme.textMuted }}>{keybind.print("session_parent")}</span>
+                </text>
+              </box>
+              <box
+                onMouseOver={() => setHover("prev")}
+                onMouseOut={() => setHover(null)}
+                onMouseUp={() => command.trigger("session.child.previous")}
+                backgroundColor={hover() === "prev" ? theme.backgroundElement : theme.backgroundPanel}
+              >
+                <text fg={theme.text}>
+                  Prev <span style={{ fg: theme.textMuted }}>{keybind.print("session_child_cycle_reverse")}</span>
+                </text>
+              </box>
+              <box
+                onMouseOver={() => setHover("next")}
+                onMouseOut={() => setHover(null)}
+                onMouseUp={() => command.trigger("session.child.next")}
+                backgroundColor={hover() === "next" ? theme.backgroundElement : theme.backgroundPanel}
+              >
+                <text fg={theme.text}>
+                  Next <span style={{ fg: theme.textMuted }}>{keybind.print("session_child_cycle")}</span>
+                </text>
+              </box>
+            </box>
+          </box>
+        </Match>
+        <Match when={true}>
+          <box flexDirection={narrow() ? "column" : "row"} justifyContent="space-between" gap={1}>
+            <box flexDirection="row" gap={1} alignItems="center">
+              <Title session={session} />
+            </box>
+            <box flexDirection="row" gap={1} flexShrink={0}>
+              <ContextInfo context={context} cost={cost} />
+              <text fg={theme.textMuted}>v{Installation.VERSION}</text>
+            </box>
+          </box>
+        </Match>
+      </Switch>
     </box>
   )
 }

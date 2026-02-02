@@ -1023,27 +1023,18 @@ export function Session() {
           />
         }
         chat={
-          <box
-            height="100%"
-            paddingBottom={1}
-            paddingTop={1}
-            paddingLeft={2}
-            paddingRight={2}
-            gap={1}
-            onMouseUp={() => promptRef.current?.focus()}
-          >
+          <box height="100%" paddingBottom={1} gap={1} onMouseUp={() => promptRef.current?.focus()}>
             <Show when={session()}>
-              <Show when={!(layout.getPanelByType("viewer")?.visible && wide())}>
-                <Header
-                  navigatorOpen={layout.getPanelByType("explorer")?.visible ?? false}
-                  navigatorKeybind={keybind.print("navigator_toggle")}
-                  onNavigatorToggle={layoutHelpers.toggleNavigator}
-                />
-              </Show>
+              <Header
+                navigatorOpen={layout.getPanelByType("explorer")?.visible ?? false}
+                navigatorKeybind={keybind.print("navigator_toggle")}
+                onNavigatorToggle={layoutHelpers.toggleNavigator}
+              />
               <scrollbox
                 ref={(r) => setScroll(r)}
                 viewportOptions={{
-                  paddingRight: showScrollbar() ? 1 : 0,
+                  paddingLeft: 2,
+                  paddingRight: showScrollbar() ? 3 : 2,
                 }}
                 verticalScrollbarOptions={{
                   paddingLeft: 1,
@@ -1155,7 +1146,7 @@ export function Session() {
                   )}
                 </For>
               </scrollbox>
-              <box flexShrink={0}>
+              <box flexShrink={0} paddingLeft={2} paddingRight={2}>
                 <Show when={permissions().length > 0}>
                   <PermissionPrompt request={permissions()[0]} />
                 </Show>

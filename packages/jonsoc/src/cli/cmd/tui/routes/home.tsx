@@ -1,41 +1,31 @@
 import { Prompt, type PromptRef } from "@tui/component/prompt"
-import { type MouseEvent } from "@opentui/core"
 import { useTerminalDimensions } from "@opentui/solid"
-import { batch, createEffect, createMemo, createSignal, Match, onMount, Show, Switch } from "solid-js"
+import { createMemo, createSignal, Match, onMount, Show, Switch } from "solid-js"
 import { useTheme } from "@tui/context/theme"
-import { useKeybind } from "@tui/context/keybind"
-import { Logo } from "../component/logo"
-import { Tips } from "../component/tips"
 import { Locale } from "@/util/locale"
 import { useSync } from "../context/sync"
-import { Toast, useToast } from "../ui/toast"
+import { Toast } from "../ui/toast"
 import { useArgs } from "../context/args"
-import { useDirectory } from "../context/directory"
 import { useRouteData } from "@tui/context/route"
 import { usePromptRef } from "../context/prompt"
 import { Installation } from "@/installation"
-import { useKV } from "../context/kv"
-import { useCommandDialog } from "../component/dialog-command"
 import { ExplorerPanel } from "./session/panel-explorer"
 import { FileViewerPanel } from "./session/panel-viewer"
 import { DynamicLayout } from "@tui/component/dynamic-layout"
 import { useLayout } from "@tui/context/layout"
 import { useCommandRegistry } from "../hooks/use-command-registry"
+import { NavigatorBorderChars } from "./session/navigator-ui"
 
 // TODO: what is the best way to do this?
 let once = false
 
 export function Home() {
   const sync = useSync()
-  const kv = useKV()
   const { theme } = useTheme()
   const route = useRouteData("home")
   const promptRef = usePromptRef()
-  const command = useCommandDialog()
-  const toast = useToast()
   const layout = useLayout()
   const [selectedFilePath, setSelectedFilePath] = createSignal<string | null>(null)
-  const mcp = createMemo(() => Object.keys(sync.data.mcp).length > 0)
   const mcpError = createMemo(() => {
     return Object.values(sync.data.mcp).some((x) => x.status === "failed")
   })
@@ -44,37 +34,13 @@ export function Home() {
     return Object.values(sync.data.mcp).filter((x) => x.status === "connected").length
   })
 
-  const isFirstTimeUser = createMemo(() => sync.data.session.length === 0)
-  const tipsHidden = createMemo(() => kv.get("tips_hidden", false))
-  const showTips = createMemo(() => {
-    // Don't show tips for first-time users
-    if (isFirstTimeUser()) return false
-    return !tipsHidden()
-  })
-
   const dimensions = useTerminalDimensions()
-
-  const closeNavigator = () => {
-    // Just focus the prompt, layout controls visibility now
-    promptRef.current?.focus()
-  }
+  const narrow = createMemo(() => dimensions().width < 80)
 
   // Register commands through centralized registry
   useCommandRegistry({
-    groups: ["layout", "system"], // Include layout and system commands
+    groups: ["layout", "system"],
     returnTo: { type: "home" },
-    additionalCommands: [
-      {
-        title: tipsHidden() ? "Show tips" : "Hide tips",
-        value: "tips.toggle",
-        keybind: "tips_toggle",
-        category: "System",
-        onSelect: (dialog) => {
-          kv.set("tips_hidden", !tipsHidden())
-          dialog.clear()
-        },
-      },
-    ],
   })
 
   const Hint = (
@@ -109,10 +75,6 @@ export function Home() {
       prompt.submit()
     }
   })
-  const directory = useDirectory()
-
-  const keybind = useKeybind()
-
   // Reactive panel widths that update when layout store changes
   const explorerWidth = createMemo(() => {
     const panel = layout.getPanelByType("explorer")
@@ -139,57 +101,36 @@ export function Home() {
         />
       }
       chat={
-        <box height="100%" flexDirection="column" onMouseUp={() => promptRef.current?.focus()}>
-          <box flexGrow={1} justifyContent="center" alignItems="center" paddingLeft={2} paddingRight={2} gap={1}>
-            <box height={3} />
-            <Logo />
-            <box width="100%" maxWidth={75} zIndex={1000} paddingTop={1}>
-              <Prompt
-                ref={(r) => {
-                  prompt = r
-                  promptRef.set(r)
-                }}
-                hint={Hint}
-              />
-            </box>
-            <box height={3} width="100%" maxWidth={75} alignItems="center" paddingTop={2}>
-              <Show when={showTips()}>
-                <Tips />
-              </Show>
-            </box>
-            <Toast />
-          </box>
+        <box height="100%" paddingBottom={1} gap={1} onMouseUp={() => promptRef.current?.focus()}>
           <box
             paddingTop={1}
             paddingBottom={1}
             paddingLeft={2}
             paddingRight={2}
-            flexDirection="row"
+            border={["bottom"]}
+            borderColor={theme.border}
+            customBorderChars={NavigatorBorderChars}
+            backgroundColor={theme.backgroundPanel}
             flexShrink={0}
-            gap={2}
           >
-            <text fg={theme.textMuted}>{directory()}</text>
-            <box gap={1} flexDirection="row" flexShrink={0}>
-              <Show when={mcp()}>
-                <text fg={theme.text}>
-                  <Switch>
-                    <Match when={mcpError()}>
-                      <span style={{ fg: theme.error }}>⊙ </span>
-                    </Match>
-                    <Match when={true}>
-                      <span style={{ fg: connectedMcpCount() > 0 ? theme.success : theme.textMuted }}>⊙ </span>
-                    </Match>
-                  </Switch>
-                  {connectedMcpCount()} MCP
-                </text>
-                <text fg={theme.textMuted}>/status</text>
-              </Show>
-            </box>
-            <box flexGrow={1} />
-            <box flexShrink={0}>
-              <text fg={theme.textMuted}>{Installation.VERSION}</text>
+            <box flexDirection={narrow() ? "column" : "row"} justifyContent="space-between" gap={1}>
+              <text fg={theme.text}>
+                <span style={{ bold: true }}>Send a message to start a new session</span>
+              </text>
+              <text fg={theme.textMuted}>v{Installation.VERSION}</text>
             </box>
           </box>
+          <box flexGrow={1} paddingLeft={2} paddingRight={2} />
+          <box flexShrink={0} paddingLeft={2} paddingRight={2}>
+            <Prompt
+              ref={(r) => {
+                prompt = r
+                promptRef.set(r)
+              }}
+              hint={Hint}
+            />
+          </box>
+          <Toast />
         </box>
       }
       viewer={<FileViewerPanel width={viewerWidth()} filePath={selectedFilePath()} />}
