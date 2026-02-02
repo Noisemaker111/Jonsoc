@@ -197,12 +197,18 @@ if (!supported.has(`${platform}-${arch}`)) {
 }
 
 const pkgJsonPath = join(pkgDir, "package.json")
-const version = (() => {
-  if (!existsSync(pkgJsonPath)) return "latest"
+let _version = null
+function getVersion() {
+  if (_version !== null) return _version
+  if (!existsSync(pkgJsonPath)) {
+    _version = "latest"
+    return _version
+  }
   const raw = readFileSync(pkgJsonPath, "utf8")
   const data = JSON.parse(raw)
-  return typeof data.version === "string" ? data.version : "latest"
-})()
+  _version = typeof data.version === "string" ? data.version : "latest"
+  return _version
+}
 
 const repo = (process.env.JONSOC_REPO ?? process.env.OPENCODE_REPO ?? "Noisemaker111/Jonsoc").replace(
   /^https?:\/\/github\.com\//,
@@ -223,10 +229,10 @@ function versionMatch() {
   if (!existsSync(binaryPath)) return false
   if (!existsSync(versionFile)) return false
   const stored = readFileSync(versionFile, "utf8").trim()
-  return stored === version
+  return stored === getVersion()
 }
 
-function releaseUrl(targetVersion = version) {
+function releaseUrl(targetVersion = getVersion()) {
   const asset = platform === "linux" ? `${base}.tar.gz` : `${base}.zip`
   const releasePath = targetVersion === "latest" ? "latest/download" : `download/v${targetVersion}`
   return {
@@ -275,10 +281,11 @@ function ensureBinary() {
   if (versionMatch()) return binaryPath
   ensureDir(binDir)
 
-  let targetVersion = version
+  const currentVersion = getVersion()
+  let targetVersion = currentVersion
   let targetUrl = releaseUrl(targetVersion)
 
-  if (version !== "latest" && !checkReleaseExists(targetVersion)) {
+  if (currentVersion !== "latest" && !checkReleaseExists(targetVersion)) {
     console.error(`[jonsoc] Release v${targetVersion} not found, trying latest...`)
     targetVersion = "latest"
     targetUrl = releaseUrl(targetVersion)
