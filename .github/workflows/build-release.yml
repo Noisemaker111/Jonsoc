@@ -171,6 +171,7 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: "20"
+          registry-url: "https://registry.npmjs.org"
 
       - name: Prepare for publish
         run: bun run scripts/prepare-for-publish.ts
@@ -268,6 +269,7 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: "20"
+          registry-url: "https://registry.npmjs.org"
 
       - name: Prepare for publish
         run: bun run scripts/prepare-for-publish.ts
