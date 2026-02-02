@@ -58,7 +58,7 @@ export function FileViewerPanel(props: FileViewerPanelProps) {
   const [loadNonce, setLoadNonce] = createSignal(0)
 
   const viewportOptions = createMemo(() => ({
-    paddingRight: showScrollbar() ? 1 : 0,
+    paddingRight: showScrollbar() ? 2 : 1,
   }))
 
   const verticalScrollbarOptions = createMemo(() => ({
@@ -259,128 +259,111 @@ export function FileViewerPanel(props: FileViewerPanelProps) {
   })
 
   return (
-    <box width={props.width} height="100%" flexDirection="column" backgroundColor={theme.theme.background}>
-      {/* Header with file path and status */}
-      <box
-        flexDirection="row"
-        paddingLeft={1}
-        paddingRight={1}
-        paddingTop={1}
-        paddingBottom={1}
-        backgroundColor={theme.theme.backgroundPanel}
-        border={["bottom"]}
-        borderColor={theme.theme.border}
-        customBorderChars={NavigatorBorderChars}
-      >
-        <text fg={theme.theme.text} wrapMode="none" attributes={TextAttributes.BOLD} flexGrow={1}>
-          {props.filePath ?? "No file selected"}
-        </text>
-        <Show when={statusText()}>
-          <text fg={statusColor()} wrapMode="none">
-            {statusText()}
+    <box width={props.width} height="100%" flexDirection="row">
+      {/* Left side: header + content */}
+      <box flexDirection="column" flexGrow={1} backgroundColor={theme.theme.background}>
+        {/* Header with file path and status */}
+        <box
+          flexDirection="row"
+          paddingLeft={1}
+          paddingRight={1}
+          paddingTop={0}
+          paddingBottom={0}
+          backgroundColor={theme.theme.backgroundPanel}
+        >
+          <text fg={theme.theme.text} wrapMode="none" attributes={TextAttributes.BOLD} flexGrow={1}>
+            {props.filePath ?? "No file selected"}
           </text>
-        </Show>
+        </box>
+
+        {/* File content viewer */}
+        <box flexDirection="row" flexGrow={1} height="100%">
+          <scrollbox
+            ref={(r) => setScrollRef(r)}
+            flexGrow={1}
+            height="100%"
+            paddingTop={1}
+            viewportOptions={viewportOptions()}
+            verticalScrollbarOptions={verticalScrollbarOptions()}
+            scrollAcceleration={new CustomSpeedScroll(3)}
+          >
+            <Switch>
+              <Match when={viewerState().type === "empty"}>
+                <text fg={theme.theme.textMuted}>Select a file to edit</text>
+              </Match>
+              <Match when={viewerState().type === "loading"}>
+                <text fg={theme.theme.textMuted}>Loading...</text>
+              </Match>
+              <Match when={viewerState().type === "error"}>
+                <text fg={theme.theme.textMuted}>Unable to read file</text>
+              </Match>
+              <Match when={viewerState().type === "no-content"}>
+                <text fg={theme.theme.textMuted}>No content</text>
+              </Match>
+              <Match when={viewerState().type === "binary"}>
+                <BinaryPreview content={(viewerState() as { type: "binary"; data: FileContent }).data} />
+              </Match>
+              <Match when={viewerState().type === "text"}>
+                <box flexDirection="column" flexGrow={1} onMouseUp={focusEditor}>
+                  <line_number
+                    fg={theme.theme.textMuted}
+                    bg={theme.theme.background}
+                    paddingRight={1}
+                    minWidth={3}
+                    showLineNumbers={true}
+                    flexGrow={1}
+                  >
+                    <textarea
+                      ref={(r: TextareaRenderable) => {
+                        editorRef = r
+                        // Set initial content when ref is assigned
+                        const state = viewerState()
+                        if (
+                          state.type === "text" &&
+                          state.data.content !== undefined &&
+                          r.plainText !== state.data.content
+                        ) {
+                          r.setText(state.data.content ?? "")
+                        }
+                      }}
+                      textColor={theme.theme.text}
+                      focusedTextColor={theme.theme.text}
+                      cursorColor={theme.theme.text}
+                      focusedBackgroundColor={theme.theme.background}
+                      minHeight={10}
+                      flexGrow={1}
+                      wrapMode={props.wrapMode ?? "none"}
+                      syntaxStyle={theme.syntax()}
+                      onContentChange={handleEditorChange}
+                      onKeyDown={(e: { name: string; ctrl?: boolean; meta?: boolean; preventDefault: () => void }) => {
+                        // Ctrl+S / Cmd+S to save
+                        if ((e.ctrl || e.meta) && e.name === "s") {
+                          e.preventDefault()
+                          void saveFile()
+                        }
+                        // Escape to blur
+                        if (e.name === "escape") {
+                          editorRef?.blur()
+                        }
+                      }}
+                    />
+                  </line_number>
+                  <Show when={fileContent()?.diff}>
+                    <VcsDiffViewer
+                      diff={() => fileContent()!.diff!}
+                      fileType={fileType(props.filePath ?? undefined)}
+                      wrapMode={props.wrapMode ?? "none"}
+                    />
+                  </Show>
+                </box>
+              </Match>
+            </Switch>
+          </scrollbox>
+        </box>
       </box>
 
-      {/* File content viewer */}
-      <scrollbox
-        ref={(r) => setScrollRef(r)}
-        flexGrow={1}
-        height="100%"
-        paddingTop={1}
-        viewportOptions={viewportOptions()}
-        verticalScrollbarOptions={verticalScrollbarOptions()}
-        scrollAcceleration={new CustomSpeedScroll(3)}
-      >
-        <Switch>
-          <Match when={viewerState().type === "empty"}>
-            <text fg={theme.theme.textMuted}>Select a file to edit</text>
-          </Match>
-          <Match when={viewerState().type === "loading"}>
-            <text fg={theme.theme.textMuted}>Loading...</text>
-          </Match>
-          <Match when={viewerState().type === "error"}>
-            <text fg={theme.theme.textMuted}>Unable to read file</text>
-          </Match>
-          <Match when={viewerState().type === "no-content"}>
-            <text fg={theme.theme.textMuted}>No content</text>
-          </Match>
-          <Match when={viewerState().type === "binary"}>
-            <BinaryPreview content={(viewerState() as { type: "binary"; data: FileContent }).data} />
-          </Match>
-          <Match when={viewerState().type === "text"}>
-            <box flexDirection="column" flexGrow={1} onMouseUp={focusEditor}>
-              <line_number
-                fg={theme.theme.textMuted}
-                bg={theme.theme.background}
-                paddingRight={1}
-                minWidth={3}
-                showLineNumbers={true}
-                flexGrow={1}
-              >
-                <textarea
-                  ref={(r: TextareaRenderable) => {
-                    editorRef = r
-                    // Set initial content when ref is assigned
-                    const state = viewerState()
-                    if (
-                      state.type === "text" &&
-                      state.data.content !== undefined &&
-                      r.plainText !== state.data.content
-                    ) {
-                      r.setText(state.data.content ?? "")
-                    }
-                  }}
-                  textColor={theme.theme.text}
-                  focusedTextColor={theme.theme.text}
-                  cursorColor={theme.theme.text}
-                  focusedBackgroundColor={theme.theme.background}
-                  minHeight={10}
-                  flexGrow={1}
-                  wrapMode={props.wrapMode ?? "none"}
-                  syntaxStyle={theme.syntax()}
-                  onContentChange={handleEditorChange}
-                  onKeyDown={(e: { name: string; ctrl?: boolean; meta?: boolean; preventDefault: () => void }) => {
-                    // Ctrl+S / Cmd+S to save
-                    if ((e.ctrl || e.meta) && e.name === "s") {
-                      e.preventDefault()
-                      void saveFile()
-                    }
-                    // Escape to blur
-                    if (e.name === "escape") {
-                      editorRef?.blur()
-                    }
-                  }}
-                />
-              </line_number>
-              <Show when={fileContent()?.diff}>
-                <VcsDiffViewer
-                  diff={() => fileContent()!.diff!}
-                  fileType={fileType(props.filePath ?? undefined)}
-                  wrapMode={props.wrapMode ?? "none"}
-                />
-              </Show>
-            </box>
-          </Match>
-        </Switch>
-      </scrollbox>
-
-      {/* Footer with save hint */}
-      <box
-        flexDirection="row"
-        paddingLeft={1}
-        paddingRight={1}
-        paddingTop={1}
-        paddingBottom={1}
-        backgroundColor={theme.theme.backgroundPanel}
-        border={["top"]}
-        borderColor={theme.theme.border}
-        customBorderChars={NavigatorBorderChars}
-      >
-        <text fg={theme.theme.textMuted} wrapMode="none" flexGrow={1}>
-          Ctrl+S to save • Escape to blur
-        </text>
-      </box>
+      {/* Right border - spans full height from top to bottom */}
+      <box width={1} height="100%" border={["right"]} borderColor={theme.theme.border} />
     </box>
   )
 }
