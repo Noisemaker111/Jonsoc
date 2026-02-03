@@ -54,6 +54,7 @@ export function FileViewerPanel(props: FileViewerPanelProps) {
   let editorRef: TextareaRenderable | undefined
   const [scrollRef, setScrollRef] = createSignal<ScrollBoxRenderable | undefined>(undefined)
   const [currentFilePath, setCurrentFilePath] = createSignal<string | null>(null)
+  const [autosaveTimer, setAutosaveTimer] = createSignal<ReturnType<typeof setTimeout> | undefined>(undefined)
 
   const [currentLoadFile, setCurrentLoadFile] = createSignal<string | undefined>(undefined)
   const [loadNonce, setLoadNonce] = createSignal(0)
@@ -75,6 +76,12 @@ export function FileViewerPanel(props: FileViewerPanelProps) {
   const saveFile = async () => {
     const filePath = props.filePath
     if (!filePath || !editorRef || !isDirty() || saveStatus() === "saving") return
+
+    const pendingAutosave = autosaveTimer()
+    if (pendingAutosave) {
+      clearTimeout(pendingAutosave)
+      setAutosaveTimer(undefined)
+    }
 
     const content = editorRef.plainText
     setSaveStatus("saving")
@@ -100,9 +107,23 @@ export function FileViewerPanel(props: FileViewerPanelProps) {
   const handleEditorChange = () => {
     setIsDirty(true)
     setSaveStatus("idle")
+
+    const pendingAutosave = autosaveTimer()
+    if (pendingAutosave) {
+      clearTimeout(pendingAutosave)
+    }
+    const nextTimer = setTimeout(() => {
+      setAutosaveTimer(undefined)
+      void saveFile()
+    }, 1000)
+    setAutosaveTimer(nextTimer)
   }
 
   onCleanup(() => {
+    const pendingAutosave = autosaveTimer()
+    if (pendingAutosave) {
+      clearTimeout(pendingAutosave)
+    }
     if (isDirty()) {
       void saveFile()
     }
