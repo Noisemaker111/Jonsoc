@@ -50,6 +50,10 @@ Keywords: `Edit`, `File`, `at`, `in`, `see`, `check`, `open`, `view`, `read`
 
 **Auto-versioning**: Do NOT manually bump versions in package.json files.
 
+## Release Automation (master)
+
+**Goal:** A single push to `master` publishes and creates a GitHub release.
+
 **CI/CD Flow**:
 
 1. Push to `master` triggers GitHub Actions
