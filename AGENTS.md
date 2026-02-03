@@ -42,6 +42,24 @@ Keywords: `Edit`, `File`, `at`, `in`, `see`, `check`, `open`, `view`, `read`
 - Typecheck: `bun run typecheck`
 - Test: `bun test`
 
+## Release Automation (dev)
+
+**Goal:** A push to `dev` automatically publishes and creates a GitHub release.
+
+**End-to-end flow (agent run):**
+
+1. Implement changes on `dev`.
+2. Run `bun run typecheck` (and tests when relevant).
+3. Commit.
+4. Push to `origin/dev`.
+5. GitHub Actions runs `.github/workflows/build-release.yml` to:
+   - bump version
+   - publish npm packages
+   - build binaries
+   - create a GitHub release
+
+**Agent responsibility:** When the user says "ship" or "release", do steps 1-4 and confirm the CI run URL and release tag.
+
 ## Code Style
 
 - Avoid `any`, use strict types
