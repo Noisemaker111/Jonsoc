@@ -69,12 +69,12 @@ export function ActionButton(props: {
       paddingLeft={1}
       paddingRight={1}
       backgroundColor={bg()}
-      onMouseDown={(event) => event.stopPropagation()}
-      onMouseUp={(event) => {
+      onMouseDown={(event) => {
         event.stopPropagation()
         if (props.disabled) return
         props.onSelect()
       }}
+      onMouseUp={(event) => event.stopPropagation()}
       justifyContent="center"
     >
       <text fg={fg()} wrapMode="none" attributes={props.primary ? TextAttributes.BOLD : undefined}>
@@ -217,10 +217,11 @@ export function GitRow(props: {
             paddingLeft={1}
             paddingRight={1}
             backgroundColor={props.active ? theme.theme.primary : theme.theme.backgroundElement}
-            onMouseUp={(e) => {
+            onMouseDown={(e) => {
               e.stopPropagation()
               props.onAction?.()
             }}
+            onMouseUp={(e) => e.stopPropagation()}
           >
             <text
               fg={props.active ? selectedForeground(theme.theme, theme.theme.primary) : theme.theme.textMuted}

@@ -88,12 +88,15 @@ export function ExplorerPanel(props: ExplorerPanelProps) {
   const [gitScroll, setGitScroll] = createSignal<ScrollBoxRenderable | undefined>(undefined)
   const [commitMessage, setCommitMessage] = createSignal("")
 
-  const [status, { refetch: refreshStatus }] = createResource(
+  const [status, { refetch: refreshStatus, mutate: mutateStatus }] = createResource(
     () => (loaded() ? "open" : undefined),
     async () => {
       const result = await sdk.client.file.status().catch(() => undefined)
       if (!result?.data) return []
-      return result.data
+      return result.data.map((entry) => {
+        const staged = "staged" in entry && typeof entry.staged === "boolean" ? entry.staged : false
+        return { ...entry, staged }
+      })
     },
   )
 
@@ -115,7 +118,7 @@ export function ExplorerPanel(props: ExplorerPanelProps) {
 
   const branch = createMemo(() => sync.data.vcs?.branch)
 
-  const statusEntries = createMemo(() => (status() ?? []) as FileStatusWithStaged[])
+  const statusEntries = createMemo(() => status() ?? [])
   const statusMap = createMemo(() => {
     const map = new Map<string, FileStatusWithStaged>()
     for (const entry of statusEntries()) {
@@ -327,6 +330,35 @@ export function ExplorerPanel(props: ExplorerPanelProps) {
     refreshHistory()
   }
 
+  const cloneStatusEntries = (entries: FileStatusWithStaged[]) => entries.map((entry) => ({ ...entry }))
+
+  const updateStatusEntries = (updater: (entries: FileStatusWithStaged[]) => FileStatusWithStaged[]) => {
+    mutateStatus((entries) => {
+      if (!entries) return entries
+      return updater(entries)
+    })
+  }
+
+  const applyOptimisticStage = (path: string, staged: boolean) => {
+    const current = statusEntries()
+    if (!current.length) return () => {}
+    const snapshot = cloneStatusEntries(current)
+    updateStatusEntries((entries) => entries.map((entry) => (entry.path === path ? { ...entry, staged } : entry)))
+    return () => mutateStatus(snapshot)
+  }
+
+  const applyOptimisticStageAll = (staged: boolean) => {
+    const current = statusEntries()
+    if (!current.length) return () => {}
+    const snapshot = cloneStatusEntries(current)
+    updateStatusEntries((entries) =>
+      entries.map((entry) =>
+        staged ? { ...entry, staged: true } : entry.staged ? { ...entry, staged: false } : entry,
+      ),
+    )
+    return () => mutateStatus(snapshot)
+  }
+
   type VcsRequest = (options: {
     url: string
     method: "POST"
@@ -363,19 +395,23 @@ export function ExplorerPanel(props: ExplorerPanelProps) {
   }
 
   const handleStage = async (path: string) => {
+    const revert = applyOptimisticStage(path, true)
     try {
       await runVcsRequest("/vcs/stage", path)
-      refreshStatus()
+      void refreshStatus()
     } catch (err: any) {
+      revert()
       toast.show({ variant: "error", message: `Failed to stage: ${err.message}` })
     }
   }
 
   const handleUnstage = async (path: string) => {
+    const revert = applyOptimisticStage(path, false)
     try {
       await runVcsRequest("/vcs/unstage", path)
-      refreshStatus()
+      void refreshStatus()
     } catch (err: any) {
+      revert()
       toast.show({ variant: "error", message: `Failed to unstage: ${err.message}` })
     }
   }
@@ -383,13 +419,15 @@ export function ExplorerPanel(props: ExplorerPanelProps) {
   const handleStageAll = async () => {
     const entries = unstagedEntries()
     if (entries.length === 0) return
+    const revert = applyOptimisticStageAll(true)
     try {
       for (const entry of entries) {
         await runVcsRequest("/vcs/stage", entry.path)
       }
-      refreshStatus()
+      void refreshStatus()
       toast.show({ variant: "success", message: `Staged ${entries.length} file${entries.length === 1 ? "" : "s"}` })
     } catch (err: any) {
+      revert()
       toast.show({ variant: "error", message: `Failed to stage all: ${err.message}` })
     }
   }
@@ -397,13 +435,15 @@ export function ExplorerPanel(props: ExplorerPanelProps) {
   const handleUnstageAll = async () => {
     const entries = stagedEntries()
     if (entries.length === 0) return
+    const revert = applyOptimisticStageAll(false)
     try {
       for (const entry of entries) {
         await runVcsRequest("/vcs/unstage", entry.path)
       }
-      refreshStatus()
+      void refreshStatus()
       toast.show({ variant: "success", message: `Unstaged ${entries.length} file${entries.length === 1 ? "" : "s"}` })
     } catch (err: any) {
+      revert()
       toast.show({ variant: "error", message: `Failed to unstage all: ${err.message}` })
     }
   }
