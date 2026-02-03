@@ -61,8 +61,8 @@ export function DialogModel(props: { providerID?: string }) {
               title: model.name ?? item.modelID,
               description: provider.name,
               category: "Favorites",
-              disabled: provider.id === "jonsoc" && model.id.includes("-nano"),
-              footer: model.cost?.input === 0 && provider.id === "jonsoc" ? "Free" : undefined,
+              disabled: provider.id === "opencode" && model.id.includes("-nano"),
+              footer: model.cost?.input === 0 && provider.id === "opencode" ? "Free" : undefined,
               onSelect: () => {
                 dialog.clear()
                 local.model.set(
@@ -94,8 +94,8 @@ export function DialogModel(props: { providerID?: string }) {
               title: model.name ?? item.modelID,
               description: provider.name,
               category: "Recent",
-              disabled: provider.id === "jonsoc" && model.id.includes("-nano"),
-              footer: model.cost?.input === 0 && provider.id === "jonsoc" ? "Free" : undefined,
+              disabled: provider.id === "opencode" && model.id.includes("-nano"),
+              footer: model.cost?.input === 0 && provider.id === "opencode" ? "Free" : undefined,
               onSelect: () => {
                 dialog.clear()
                 local.model.set(
@@ -137,8 +137,8 @@ export function DialogModel(props: { providerID?: string }) {
                 ? "(Favorite)"
                 : undefined,
               category: connected() ? provider.name : undefined,
-              disabled: provider.id === "jonsoc" && model.includes("-nano"),
-              footer: info.cost?.input === 0 && provider.id === "jonsoc" ? "Free" : undefined,
+              disabled: provider.id === "opencode" && model.includes("-nano"),
+              footer: info.cost?.input === 0 && provider.id === "opencode" ? "Free" : undefined,
               onSelect() {
                 dialog.clear()
                 local.model.set(

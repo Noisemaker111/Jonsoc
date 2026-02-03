@@ -25,9 +25,11 @@ import { SplitBorder } from "@tui/component/border"
 import { Locale } from "@/util/locale"
 import { Global } from "@/global"
 import type { File as FileStatus, FileNode } from "@jonsoc/sdk/v2"
+
+type FileStatusWithStaged = FileStatus & { staged: boolean }
 import { GitCommit } from "./git-commit"
 import { GitHistory } from "./git-history"
-import { NavigatorBorderChars, Tab, ExplorerRow, GitRow } from "./navigator-ui"
+import { NavigatorBorderChars, Tab, ExplorerRow, GitRow, ActionButton } from "./navigator-ui"
 
 class CustomSpeedScroll implements ScrollAcceleration {
   constructor(private speed: number) {}
@@ -48,7 +50,7 @@ type ExplorerTab = "explorer" | "git"
 
 interface ExplorerPanelProps {
   width: number
-  onSelect: (path: string, type: "file" | "directory") => void
+  onSelect: (path: string, type: "file" | "directory" | "diff") => void
 }
 
 export function ExplorerPanel(props: ExplorerPanelProps) {
@@ -113,9 +115,9 @@ export function ExplorerPanel(props: ExplorerPanelProps) {
 
   const branch = createMemo(() => sync.data.vcs?.branch)
 
-  const statusEntries = createMemo(() => status() ?? [])
+  const statusEntries = createMemo(() => (status() ?? []) as FileStatusWithStaged[])
   const statusMap = createMemo(() => {
-    const map = new Map<string, FileStatus>()
+    const map = new Map<string, FileStatusWithStaged>()
     for (const entry of statusEntries()) {
       map.set(entry.path, entry)
     }
@@ -139,8 +141,22 @@ export function ExplorerPanel(props: ExplorerPanelProps) {
     return result
   })
 
-  const gitEntries = createMemo(() => {
-    const entries = [...statusEntries()]
+  const stagedEntries = createMemo(() => {
+    const entries = statusEntries().filter((e) => e.staged)
+    const order = {
+      added: 0,
+      modified: 1,
+      deleted: 2,
+    }
+    return entries.toSorted((a, b) => {
+      const orderDiff = order[a.status] - order[b.status]
+      if (orderDiff !== 0) return orderDiff
+      return a.path.localeCompare(b.path)
+    })
+  })
+
+  const unstagedEntries = createMemo(() => {
+    const entries = statusEntries().filter((e) => !e.staged)
     const order = {
       added: 0,
       modified: 1,
@@ -154,10 +170,21 @@ export function ExplorerPanel(props: ExplorerPanelProps) {
   })
 
   const hasExplorerEntries = createMemo(() => explorerEntries().length > 0)
-  const hasGitEntries = createMemo(() => gitEntries().length > 0)
+  const hasStagedEntries = createMemo(() => stagedEntries().length > 0)
+  const hasUnstagedEntries = createMemo(() => unstagedEntries().length > 0)
+  const hasGitEntries = createMemo(() => statusEntries().length > 0)
+
+  const allGitEntries = createMemo(() => {
+    return [...stagedEntries(), ...unstagedEntries()]
+  })
 
   const historyEntries = createMemo(() => history() ?? [])
   const historyHeight = createMemo(() => Math.max(8, Math.floor(term().height * 0.35)))
+
+  const hasCommitsToPush = createMemo(() => {
+    const hist = historyEntries()
+    return hist.length > 0
+  })
 
   const viewportOptions = createMemo(() => ({
     paddingLeft: 1,
@@ -207,7 +234,7 @@ export function ExplorerPanel(props: ExplorerPanelProps) {
   })
 
   const selectedGitEntry = createMemo(() => {
-    const list = gitEntries()
+    const list = allGitEntries()
     if (list.length === 0) return undefined
     const index = selectedGit()
     if (index < 0) return undefined
@@ -235,7 +262,7 @@ export function ExplorerPanel(props: ExplorerPanelProps) {
   }
 
   const selectGitIndex = (index: number) => {
-    const list = gitEntries()
+    const list = allGitEntries()
     if (list.length === 0) return
     const next = Math.min(Math.max(index, 0), list.length - 1)
     setSelectedGit(() => next)
@@ -292,7 +319,7 @@ export function ExplorerPanel(props: ExplorerPanelProps) {
   const handleGitSelect = () => {
     const entry = selectedGitEntry()
     if (!entry) return
-    props.onSelect(entry.path, "file")
+    props.onSelect(entry.path, "diff")
   }
 
   const refreshGit = () => {
@@ -300,20 +327,97 @@ export function ExplorerPanel(props: ExplorerPanelProps) {
     refreshHistory()
   }
 
+  type VcsRequest = (options: {
+    url: string
+    method: "POST"
+    body: { path: string }
+    headers: Record<string, string>
+    responseStyle: "data"
+    throwOnError: true
+  }) => Promise<unknown>
+
+  const getVcsRequest = (): VcsRequest | undefined => {
+    const rawClient = Reflect.get(sdk.client, "client")
+    if (!rawClient || typeof rawClient !== "object") return undefined
+    const request = Reflect.get(rawClient, "request")
+    if (typeof request !== "function") return undefined
+    return (options) => request(options)
+  }
+
+  const runVcsRequest = async (url: string, path: string) => {
+    const request = getVcsRequest()
+    if (!request) {
+      throw new Error("SDK client unavailable")
+    }
+    const result = await request({
+      url,
+      method: "POST",
+      body: { path },
+      headers: { "Content-Type": "application/json" },
+      responseStyle: "data",
+      throwOnError: true,
+    })
+    if (result === false) {
+      throw new Error("VCS operation failed")
+    }
+  }
+
+  const handleStage = async (path: string) => {
+    try {
+      await runVcsRequest("/vcs/stage", path)
+      refreshStatus()
+    } catch (err: any) {
+      toast.show({ variant: "error", message: `Failed to stage: ${err.message}` })
+    }
+  }
+
+  const handleUnstage = async (path: string) => {
+    try {
+      await runVcsRequest("/vcs/unstage", path)
+      refreshStatus()
+    } catch (err: any) {
+      toast.show({ variant: "error", message: `Failed to unstage: ${err.message}` })
+    }
+  }
+
+  const handleStageAll = async () => {
+    const entries = unstagedEntries()
+    if (entries.length === 0) return
+    try {
+      for (const entry of entries) {
+        await runVcsRequest("/vcs/stage", entry.path)
+      }
+      refreshStatus()
+      toast.show({ variant: "success", message: `Staged ${entries.length} file${entries.length === 1 ? "" : "s"}` })
+    } catch (err: any) {
+      toast.show({ variant: "error", message: `Failed to stage all: ${err.message}` })
+    }
+  }
+
+  const handleUnstageAll = async () => {
+    const entries = stagedEntries()
+    if (entries.length === 0) return
+    try {
+      for (const entry of entries) {
+        await runVcsRequest("/vcs/unstage", entry.path)
+      }
+      refreshStatus()
+      toast.show({ variant: "success", message: `Unstaged ${entries.length} file${entries.length === 1 ? "" : "s"}` })
+    } catch (err: any) {
+      toast.show({ variant: "error", message: `Failed to unstage all: ${err.message}` })
+    }
+  }
+
   const handleCommit = async () => {
     const msg = commitMessage().trim()
     if (!msg) return
+    if (!hasStagedEntries()) {
+      toast.show({ variant: "error", message: "No staged files to commit" })
+      return
+    }
 
     const directory = sync.data.path.directory
     try {
-      const proc = Bun.spawn({
-        cmd: ["git", "add", "."],
-        cwd: directory,
-        stdout: "pipe",
-        stderr: "pipe",
-      })
-      await proc.exited
-
       const commitProc = Bun.spawn({
         cmd: ["git", "commit", "-m", msg],
         cwd: directory,
@@ -334,6 +438,16 @@ export function ExplorerPanel(props: ExplorerPanelProps) {
     }
 
     setCommitMessage("")
+  }
+
+  const handlePush = async () => {
+    try {
+      await fetch(`${sdk.url}/vcs/push`, { method: "POST" })
+      toast.show({ variant: "success", message: "Pushed to remote" })
+      refreshGit()
+    } catch (err: any) {
+      toast.show({ variant: "error", message: `Push failed: ${err.message}` })
+    }
   }
 
   const openBranchSwitcher = async () => {
@@ -406,11 +520,22 @@ export function ExplorerPanel(props: ExplorerPanelProps) {
         return
       }
       if (evt.name === "end") {
-        selectGitIndex(gitEntries().length - 1)
+        selectGitIndex(allGitEntries().length - 1)
         return
       }
       if (evt.name === "return") {
         handleGitSelect()
+        return
+      }
+      if (evt.name === "s") {
+        const entry = selectedGitEntry()
+        if (!entry) return
+        if (entry.staged) {
+          handleUnstage(entry.path)
+        } else {
+          handleStage(entry.path)
+        }
+        return
       }
     }
   })
@@ -470,7 +595,13 @@ export function ExplorerPanel(props: ExplorerPanelProps) {
 
       <Switch>
         <Match when={tab() === "git"}>
-          <GitCommit commitMessage={commitMessage} setCommitMessage={setCommitMessage} onCommit={handleCommit} />
+          <GitCommit
+            commitMessage={commitMessage}
+            setCommitMessage={setCommitMessage}
+            onCommit={handleCommit}
+            onPush={handlePush}
+            hasCommitsToPush={hasCommitsToPush}
+          />
           <Show
             when={hasGitEntries()}
             fallback={
@@ -487,19 +618,88 @@ export function ExplorerPanel(props: ExplorerPanelProps) {
               verticalScrollbarOptions={verticalScrollbarOptions()}
               scrollAcceleration={new CustomSpeedScroll(3)}
             >
-              <For each={gitEntries()}>
-                {(entry, index) => (
-                  <GitRow
-                    entry={entry}
-                    width={props.width}
-                    active={index() === selectedGit()}
-                    onSelect={() => {
-                      setSelectedGit(() => index())
-                      props.onSelect(entry.path, "file")
-                    }}
-                  />
-                )}
-              </For>
+              {/* Staged Section */}
+              <Show when={hasStagedEntries()}>
+                <box
+                  flexDirection="row"
+                  justifyContent="space-between"
+                  paddingLeft={1}
+                  paddingRight={1}
+                  paddingTop={1}
+                  paddingBottom={1}
+                  backgroundColor={theme.theme.backgroundPanel}
+                >
+                  <text fg={theme.theme.textMuted} attributes={TextAttributes.BOLD}>
+                    Staged
+                  </text>
+                  <box flexDirection="row" gap={1}>
+                    <ActionButton
+                      label="Unstage All"
+                      onSelect={handleUnstageAll}
+                      disabled={!hasStagedEntries()}
+                      flexGrow={0}
+                    />
+                  </box>
+                </box>
+                <For each={stagedEntries()}>
+                  {(entry, index) => (
+                    <GitRow
+                      entry={entry}
+                      width={props.width}
+                      active={index() === selectedGit()}
+                      onSelect={() => {
+                        setSelectedGit(() => index())
+                        props.onSelect(entry.path, "file")
+                      }}
+                      onAction={() => handleUnstage(entry.path)}
+                      actionLabel="-"
+                    />
+                  )}
+                </For>
+              </Show>
+
+              {/* Unstaged Section */}
+              <Show when={hasUnstagedEntries()}>
+                <box
+                  flexDirection="row"
+                  justifyContent="space-between"
+                  paddingLeft={1}
+                  paddingRight={1}
+                  paddingTop={1}
+                  paddingBottom={1}
+                  backgroundColor={theme.theme.backgroundPanel}
+                >
+                  <text fg={theme.theme.textMuted} attributes={TextAttributes.BOLD}>
+                    Changes
+                  </text>
+                  <box flexDirection="row" gap={1}>
+                    <ActionButton
+                      label="Stage All"
+                      onSelect={handleStageAll}
+                      disabled={!hasUnstagedEntries()}
+                      flexGrow={0}
+                    />
+                  </box>
+                </box>
+                <For each={unstagedEntries()}>
+                  {(entry, index) => {
+                    const offsetIndex = () => stagedEntries().length + index()
+                    return (
+                      <GitRow
+                        entry={entry}
+                        width={props.width}
+                        active={offsetIndex() === selectedGit()}
+                        onSelect={() => {
+                          setSelectedGit(() => offsetIndex())
+                          props.onSelect(entry.path, "diff")
+                        }}
+                        onAction={() => handleStage(entry.path)}
+                        actionLabel="+"
+                      />
+                    )
+                  }}
+                </For>
+              </Show>
             </scrollbox>
           </Show>
           <GitHistory

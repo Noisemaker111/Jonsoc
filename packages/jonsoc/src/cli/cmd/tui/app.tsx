@@ -877,6 +877,7 @@ function ErrorComponent(props: {
     // Keyboard context not available - will exit without handler
   }
   const [copied, setCopied] = createSignal(false)
+  const [errorCopied, setErrorCopied] = createSignal(false)
   const [showLog, setShowLog] = createSignal(false)
 
   const repo = (process.env.JONSOC_REPO ?? process.env.OPENCODE_REPO ?? "Noisemaker111/Jonsoc").replace(
@@ -914,6 +915,35 @@ function ErrorComponent(props: {
     })
   }
 
+  const copyError = () => {
+    const errors = errorLog.errors
+    const details = [
+      `JonsOC Version: ${Installation.VERSION}`,
+      `Timestamp: ${new Date().toISOString()}`,
+      "",
+      "=== Fatal Error ===",
+      `Message: ${props.error.message}`,
+      "",
+      props.error.stack ?? "(no stack trace)",
+    ]
+
+    if (errors.length > 0) {
+      details.push("", "=== Error Log ===")
+      for (const entry of errors) {
+        details.push(
+          `[${entry.source ?? "unknown"}] ${new Date(entry.timestamp).toLocaleTimeString()}`,
+          entry.message,
+          entry.stack ?? "(no stack)",
+          "",
+        )
+      }
+    }
+
+    Clipboard.copy(details.join("\n")).then(() => {
+      setErrorCopied(true)
+    })
+  }
+
   const termWidth = term?.().width ?? 80
   const termHeight = term?.().height ?? 24
 
@@ -941,6 +971,10 @@ function ErrorComponent(props: {
         <box onMouseUp={() => setShowLog(!showLog())} backgroundColor={colors.primary} padding={1}>
           <text fg={colors.bg}>{showLog() ? "Show Fatal Error" : `Show Error Log (${errorLog.count})`}</text>
         </box>
+        <box onMouseUp={copyError} backgroundColor={colors.primary} padding={1}>
+          <text fg={colors.bg}>Copy Error</text>
+        </box>
+        {errorCopied() && <text fg={colors.muted}>Copied</text>}
       </box>
       <Show
         when={showLog()}

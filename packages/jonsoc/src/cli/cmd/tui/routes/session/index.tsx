@@ -122,6 +122,7 @@ export function Session() {
   const promptRef = usePromptRef()
   const layout = useLayout()
   const [selectedFilePath, setSelectedFilePath] = createSignal<string | null>(null)
+  const [selectedFileMode, setSelectedFileMode] = createSignal<"file" | "diff">("file")
 
   // Declare scroll ref as signal for reactivity
   const [scroll, setScroll] = createSignal<ScrollBoxRenderable | undefined>(undefined)
@@ -1018,12 +1019,17 @@ export function Session() {
             onSelect={(path, type) => {
               if (type === "file") {
                 setSelectedFilePath(path)
+                setSelectedFileMode("file")
+              }
+              if (type === "diff") {
+                setSelectedFilePath(path)
+                setSelectedFileMode("diff")
               }
             }}
           />
         }
         chat={
-          <box height="100%" paddingBottom={1} gap={1} onMouseUp={() => promptRef.current?.focus()}>
+          <box height="100%" gap={1} onMouseUp={() => promptRef.current?.focus()}>
             <Show when={session()}>
               <Header
                 navigatorOpen={layout.getPanelByType("explorer")?.visible ?? false}
@@ -1146,7 +1152,7 @@ export function Session() {
                   )}
                 </For>
               </scrollbox>
-              <box flexShrink={0} paddingLeft={2} paddingRight={2}>
+              <box flexShrink={0} paddingLeft={1} paddingRight={1}>
                 <Show when={permissions().length > 0}>
                   <PermissionPrompt request={permissions()[0]} />
                 </Show>
@@ -1170,7 +1176,14 @@ export function Session() {
             <Toast />
           </box>
         }
-        viewer={<FileViewerPanel width={viewerWidth()} filePath={selectedFilePath()} wrapMode={navigatorWrapMode()} />}
+        viewer={
+          <FileViewerPanel
+            width={viewerWidth()}
+            filePath={selectedFilePath()}
+            wrapMode={navigatorWrapMode()}
+            viewMode={selectedFileMode()}
+          />
+        }
       />
     </context.Provider>
   )

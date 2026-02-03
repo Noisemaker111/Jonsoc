@@ -806,12 +806,12 @@ describe("ProviderTransform.message - strip openai metadata when store=false", (
   })
 
   test("preserves metadata using providerID key when store is false", () => {
-    const jonsocModel = {
+    const opencodeModel = {
       ...openaiModel,
-      providerID: "jonsoc",
+      providerID: "opencode",
       api: {
-        id: "jonsoc-test",
-        url: "https://api.jonsoc.com",
+        id: "opencode-test",
+        url: "https://api.opencode.ai",
         npm: "@ai-sdk/openai-compatible",
       },
     }
@@ -823,7 +823,7 @@ describe("ProviderTransform.message - strip openai metadata when store=false", (
             type: "text",
             text: "Hello",
             providerOptions: {
-              jonsoc: {
+              opencode: {
                 itemId: "msg_123",
                 otherOption: "value",
               },
@@ -833,19 +833,19 @@ describe("ProviderTransform.message - strip openai metadata when store=false", (
       },
     ] as any[]
 
-    const result = ProviderTransform.message(msgs, jonsocModel, { store: false }) as any[]
+    const result = ProviderTransform.message(msgs, opencodeModel, { store: false }) as any[]
 
-    expect(result[0].content[0].providerOptions?.jonsoc?.itemId).toBe("msg_123")
-    expect(result[0].content[0].providerOptions?.jonsoc?.otherOption).toBe("value")
+    expect(result[0].content[0].providerOptions?.opencode?.itemId).toBe("msg_123")
+    expect(result[0].content[0].providerOptions?.opencode?.otherOption).toBe("value")
   })
 
   test("preserves itemId across all providerOptions keys", () => {
-    const jonsocModel = {
+    const opencodeModel = {
       ...openaiModel,
-      providerID: "jonsoc",
+      providerID: "opencode",
       api: {
-        id: "jonsoc-test",
-        url: "https://api.jonsoc.com",
+        id: "opencode-test",
+        url: "https://api.opencode.ai",
         npm: "@ai-sdk/openai-compatible",
       },
     }
@@ -854,7 +854,7 @@ describe("ProviderTransform.message - strip openai metadata when store=false", (
         role: "assistant",
         providerOptions: {
           openai: { itemId: "msg_root" },
-          jonsoc: { itemId: "msg_jonsoc" },
+          opencode: { itemId: "msg_opencode" },
           extra: { itemId: "msg_extra" },
         },
         content: [
@@ -863,7 +863,7 @@ describe("ProviderTransform.message - strip openai metadata when store=false", (
             text: "Hello",
             providerOptions: {
               openai: { itemId: "msg_openai_part" },
-              jonsoc: { itemId: "msg_jonsoc_part" },
+              opencode: { itemId: "msg_opencode_part" },
               extra: { itemId: "msg_extra_part" },
             },
           },
@@ -871,13 +871,13 @@ describe("ProviderTransform.message - strip openai metadata when store=false", (
       },
     ] as any[]
 
-    const result = ProviderTransform.message(msgs, jonsocModel, { store: false }) as any[]
+    const result = ProviderTransform.message(msgs, opencodeModel, { store: false }) as any[]
 
     expect(result[0].providerOptions?.openai?.itemId).toBe("msg_root")
-    expect(result[0].providerOptions?.jonsoc?.itemId).toBe("msg_jonsoc")
+    expect(result[0].providerOptions?.opencode?.itemId).toBe("msg_opencode")
     expect(result[0].providerOptions?.extra?.itemId).toBe("msg_extra")
     expect(result[0].content[0].providerOptions?.openai?.itemId).toBe("msg_openai_part")
-    expect(result[0].content[0].providerOptions?.jonsoc?.itemId).toBe("msg_jonsoc_part")
+    expect(result[0].content[0].providerOptions?.opencode?.itemId).toBe("msg_opencode_part")
     expect(result[0].content[0].providerOptions?.extra?.itemId).toBe("msg_extra_part")
   })
 

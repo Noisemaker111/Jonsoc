@@ -1,4 +1,4 @@
-import { type Accessor } from "solid-js"
+import { type Accessor, Show } from "solid-js"
 import type { InputRenderable } from "@opentui/core"
 import { useTheme } from "@tui/context/theme"
 import { ActionButton } from "./navigator-ui"
@@ -7,6 +7,8 @@ export type GitCommitProps = {
   commitMessage: Accessor<string>
   setCommitMessage: (msg: string) => void
   onCommit: () => void
+  onPush?: () => void
+  hasCommitsToPush?: Accessor<boolean>
 }
 
 export function GitCommit(props: GitCommitProps) {
@@ -54,6 +56,9 @@ export function GitCommit(props: GitCommitProps) {
         primary
         flexGrow={0}
       />
+      <Show when={props.onPush}>
+        <ActionButton label="Push" onSelect={props.onPush!} disabled={!props.hasCommitsToPush?.()} flexGrow={0} />
+      </Show>
     </box>
   )
 }

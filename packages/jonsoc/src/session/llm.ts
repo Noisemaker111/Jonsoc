@@ -213,12 +213,12 @@ export namespace LLM {
       maxOutputTokens,
       abortSignal: input.abort,
       headers: {
-        ...(input.model.providerID.startsWith("jonsoc")
+        ...(input.model.providerID.startsWith("opencode")
           ? {
-              "x-jonsoc-project": Instance.project.id,
-              "x-jonsoc-session": input.sessionID,
-              "x-jonsoc-request": input.user.id,
-              "x-jonsoc-client": Flag.OPENCODE_CLIENT,
+              "x-opencode-project": Instance.project.id,
+              "x-opencode-session": input.sessionID,
+              "x-opencode-request": input.user.id,
+              "x-opencode-client": Flag.OPENCODE_CLIENT,
             }
           : input.model.providerID !== "anthropic"
             ? {

@@ -23,6 +23,7 @@ export namespace File {
       added: z.number().int(),
       removed: z.number().int(),
       status: z.enum(["added", "deleted", "modified"]),
+      staged: z.boolean(),
     })
     .meta({
       ref: "File",
@@ -207,23 +208,70 @@ export namespace File {
     const project = Instance.project
     if (project.vcs !== "git") return []
 
-    const diffOutput = await $`git diff --numstat HEAD`.cwd(Instance.directory).quiet().nothrow().text()
-
     const changedFiles: Info[] = []
+    const stagedFiles = new Set<string>()
 
-    if (diffOutput.trim()) {
-      const lines = diffOutput.trim().split("\n")
+    // Get staged changes (cached/index)
+    const stagedOutput = await $`git diff --cached --numstat HEAD`.cwd(Instance.directory).quiet().nothrow().text()
+
+    if (stagedOutput.trim()) {
+      const lines = stagedOutput.trim().split("\n")
       for (const line of lines) {
         const [added, removed, filepath] = line.split("\t")
+        stagedFiles.add(filepath)
         changedFiles.push({
           path: filepath,
           added: added === "-" ? 0 : parseInt(added, 10),
           removed: removed === "-" ? 0 : parseInt(removed, 10),
           status: "modified",
+          staged: true,
         })
       }
     }
 
+    // Get staged deleted files
+    const stagedDeletedOutput = await $`git diff --cached --name-only --diff-filter=D HEAD`
+      .cwd(Instance.directory)
+      .quiet()
+      .nothrow()
+      .text()
+
+    if (stagedDeletedOutput.trim()) {
+      const deletedFiles = stagedDeletedOutput.trim().split("\n")
+      for (const filepath of deletedFiles) {
+        if (!stagedFiles.has(filepath)) {
+          stagedFiles.add(filepath)
+          changedFiles.push({
+            path: filepath,
+            added: 0,
+            removed: 0,
+            status: "deleted",
+            staged: true,
+          })
+        }
+      }
+    }
+
+    // Get unstaged changes
+    const unstagedOutput = await $`git diff --numstat`.cwd(Instance.directory).quiet().nothrow().text()
+
+    if (unstagedOutput.trim()) {
+      const lines = unstagedOutput.trim().split("\n")
+      for (const line of lines) {
+        const [added, removed, filepath] = line.split("\t")
+        if (!stagedFiles.has(filepath)) {
+          changedFiles.push({
+            path: filepath,
+            added: added === "-" ? 0 : parseInt(added, 10),
+            removed: removed === "-" ? 0 : parseInt(removed, 10),
+            status: "modified",
+            staged: false,
+          })
+        }
+      }
+    }
+
+    // Get untracked files (always unstaged)
     const untrackedOutput = await $`git ls-files --others --exclude-standard`
       .cwd(Instance.directory)
       .quiet()
@@ -241,6 +289,7 @@ export namespace File {
             added: lines,
             removed: 0,
             status: "added",
+            staged: false,
           })
         } catch {
           continue
@@ -248,22 +297,21 @@ export namespace File {
       }
     }
 
-    // Get deleted files
-    const deletedOutput = await $`git diff --name-only --diff-filter=D HEAD`
-      .cwd(Instance.directory)
-      .quiet()
-      .nothrow()
-      .text()
+    // Get unstaged deleted files
+    const deletedOutput = await $`git diff --name-only --diff-filter=D`.cwd(Instance.directory).quiet().nothrow().text()
 
     if (deletedOutput.trim()) {
       const deletedFiles = deletedOutput.trim().split("\n")
       for (const filepath of deletedFiles) {
-        changedFiles.push({
-          path: filepath,
-          added: 0,
-          removed: 0, // Could get original line count but would require another git command
-          status: "deleted",
-        })
+        if (!stagedFiles.has(filepath)) {
+          changedFiles.push({
+            path: filepath,
+            added: 0,
+            removed: 0,
+            status: "deleted",
+            staged: false,
+          })
+        }
       }
     }
 

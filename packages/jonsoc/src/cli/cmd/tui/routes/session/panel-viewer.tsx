@@ -31,6 +31,7 @@ interface FileViewerPanelProps {
   width: number
   filePath: string | null
   wrapMode?: "word" | "none"
+  viewMode?: "file" | "diff"
 }
 
 export function FileViewerPanel(props: FileViewerPanelProps) {
@@ -56,6 +57,7 @@ export function FileViewerPanel(props: FileViewerPanelProps) {
 
   const [currentLoadFile, setCurrentLoadFile] = createSignal<string | undefined>(undefined)
   const [loadNonce, setLoadNonce] = createSignal(0)
+  const viewMode = createMemo(() => props.viewMode ?? "file")
 
   const viewportOptions = createMemo(() => ({
     paddingRight: showScrollbar() ? 2 : 1,
@@ -308,58 +310,73 @@ export function FileViewerPanel(props: FileViewerPanelProps) {
                 <BinaryPreview content={(viewerState() as { type: "binary"; data: FileContent }).data} />
               </Match>
               <Match when={viewerState().type === "text"}>
-                <box flexDirection="column" flexGrow={1} onMouseUp={focusEditor}>
-                  <line_number
-                    fg={theme.theme.textMuted}
-                    bg={theme.theme.background}
-                    paddingRight={1}
-                    minWidth={3}
-                    showLineNumbers={true}
-                    flexGrow={1}
-                  >
-                    <textarea
-                      ref={(r: TextareaRenderable) => {
-                        editorRef = r
-                        // Set initial content when ref is assigned
-                        const state = viewerState()
-                        if (
-                          state.type === "text" &&
-                          state.data.content !== undefined &&
-                          r.plainText !== state.data.content
-                        ) {
-                          r.setText(state.data.content ?? "")
-                        }
-                      }}
-                      textColor={theme.theme.text}
-                      focusedTextColor={theme.theme.text}
-                      cursorColor={theme.theme.text}
-                      focusedBackgroundColor={theme.theme.background}
-                      minHeight={10}
-                      flexGrow={1}
-                      wrapMode={props.wrapMode ?? "none"}
-                      syntaxStyle={theme.syntax()}
-                      onContentChange={handleEditorChange}
-                      onKeyDown={(e: { name: string; ctrl?: boolean; meta?: boolean; preventDefault: () => void }) => {
-                        // Ctrl+S / Cmd+S to save
-                        if ((e.ctrl || e.meta) && e.name === "s") {
-                          e.preventDefault()
-                          void saveFile()
-                        }
-                        // Escape to blur
-                        if (e.name === "escape") {
-                          editorRef?.blur()
-                        }
-                      }}
-                    />
-                  </line_number>
-                  <Show when={fileContent()?.diff}>
+                <Show
+                  when={viewMode() === "diff"}
+                  fallback={
+                    <box flexDirection="column" flexGrow={1} onMouseUp={focusEditor}>
+                      <line_number
+                        fg={theme.theme.textMuted}
+                        bg={theme.theme.background}
+                        paddingRight={1}
+                        minWidth={3}
+                        showLineNumbers={true}
+                        flexGrow={1}
+                      >
+                        <textarea
+                          ref={(r: TextareaRenderable) => {
+                            editorRef = r
+                            const state = viewerState()
+                            if (
+                              state.type === "text" &&
+                              state.data.content !== undefined &&
+                              r.plainText !== state.data.content
+                            ) {
+                              r.setText(state.data.content ?? "")
+                            }
+                          }}
+                          textColor={theme.theme.text}
+                          focusedTextColor={theme.theme.text}
+                          cursorColor={theme.theme.text}
+                          focusedBackgroundColor={theme.theme.background}
+                          minHeight={10}
+                          flexGrow={1}
+                          wrapMode={props.wrapMode ?? "none"}
+                          syntaxStyle={theme.syntax()}
+                          onContentChange={handleEditorChange}
+                          onKeyDown={(e: {
+                            name: string
+                            ctrl?: boolean
+                            meta?: boolean
+                            preventDefault: () => void
+                          }) => {
+                            if ((e.ctrl || e.meta) && e.name === "s") {
+                              e.preventDefault()
+                              void saveFile()
+                            }
+                            if (e.name === "escape") {
+                              editorRef?.blur()
+                            }
+                          }}
+                        />
+                      </line_number>
+                      <Show when={fileContent()?.diff}>
+                        <VcsDiffViewer
+                          diff={() => fileContent()!.diff!}
+                          fileType={fileType(props.filePath ?? undefined)}
+                          wrapMode={props.wrapMode ?? "none"}
+                        />
+                      </Show>
+                    </box>
+                  }
+                >
+                  <Show when={fileContent()?.diff} fallback={<text fg={theme.theme.textMuted}>No diff available</text>}>
                     <VcsDiffViewer
                       diff={() => fileContent()!.diff!}
                       fileType={fileType(props.filePath ?? undefined)}
                       wrapMode={props.wrapMode ?? "none"}
                     />
                   </Show>
-                </box>
+                </Show>
               </Match>
             </Switch>
           </scrollbox>

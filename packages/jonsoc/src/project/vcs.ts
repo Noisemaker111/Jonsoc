@@ -148,4 +148,22 @@ export namespace Vcs {
       .map((x) => x.trim())
       .filter(Boolean)
   }
+
+  export async function stage(filePath: string) {
+    if (Instance.project.vcs !== "git") return false
+    const result = await $`git add ${filePath}`.quiet().nothrow().cwd(Instance.worktree)
+    return result.exitCode === 0
+  }
+
+  export async function unstage(filePath: string) {
+    if (Instance.project.vcs !== "git") return false
+    const result = await $`git reset HEAD ${filePath}`.quiet().nothrow().cwd(Instance.worktree)
+    return result.exitCode === 0
+  }
+
+  export async function push() {
+    if (Instance.project.vcs !== "git") return false
+    const result = await $`git push`.quiet().nothrow().cwd(Instance.worktree)
+    return result.exitCode === 0
+  }
 }

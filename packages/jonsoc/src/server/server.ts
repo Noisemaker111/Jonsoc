@@ -338,6 +338,76 @@ export namespace Server {
             return c.json(true)
           },
         )
+        .post(
+          "/vcs/stage",
+          describeRoute({
+            summary: "Stage file",
+            description: "Stage a file for commit.",
+            operationId: "vcs.stage",
+            responses: {
+              200: {
+                description: "Success",
+                content: {
+                  "application/json": {
+                    schema: resolver(z.boolean()),
+                  },
+                },
+              },
+            },
+          }),
+          validator("json", z.object({ path: z.string() })),
+          async (c) => {
+            const { path } = c.req.valid("json")
+            const result = await Vcs.stage(path)
+            return c.json(result)
+          },
+        )
+        .post(
+          "/vcs/unstage",
+          describeRoute({
+            summary: "Unstage file",
+            description: "Unstage a file from the commit index.",
+            operationId: "vcs.unstage",
+            responses: {
+              200: {
+                description: "Success",
+                content: {
+                  "application/json": {
+                    schema: resolver(z.boolean()),
+                  },
+                },
+              },
+            },
+          }),
+          validator("json", z.object({ path: z.string() })),
+          async (c) => {
+            const { path } = c.req.valid("json")
+            const result = await Vcs.unstage(path)
+            return c.json(result)
+          },
+        )
+        .post(
+          "/vcs/push",
+          describeRoute({
+            summary: "Push commits",
+            description: "Push commits to the remote repository.",
+            operationId: "vcs.push",
+            responses: {
+              200: {
+                description: "Success",
+                content: {
+                  "application/json": {
+                    schema: resolver(z.boolean()),
+                  },
+                },
+              },
+            },
+          }),
+          async (c) => {
+            const result = await Vcs.push()
+            return c.json(result)
+          },
+        )
         .get(
           "/command",
           describeRoute({

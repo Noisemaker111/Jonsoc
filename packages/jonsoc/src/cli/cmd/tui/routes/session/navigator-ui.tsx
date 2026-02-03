@@ -69,7 +69,12 @@ export function ActionButton(props: {
       paddingLeft={1}
       paddingRight={1}
       backgroundColor={bg()}
-      onMouseUp={() => !props.disabled && props.onSelect()}
+      onMouseDown={(event) => event.stopPropagation()}
+      onMouseUp={(event) => {
+        event.stopPropagation()
+        if (props.disabled) return
+        props.onSelect()
+      }}
       justifyContent="center"
     >
       <text fg={fg()} wrapMode="none" attributes={props.primary ? TextAttributes.BOLD : undefined}>
@@ -146,11 +151,23 @@ export function ExplorerRow(props: {
   )
 }
 
-export function GitRow(props: { entry: FileStatus; active: boolean; width: number; onSelect: () => void }) {
+export function GitRow(props: {
+  entry: FileStatus & { staged?: boolean }
+  active: boolean
+  width: number
+  onSelect: () => void
+  onAction?: () => void
+  actionLabel?: string
+}) {
   const theme = useTheme()
   const fg = createMemo(() => {
     if (props.active) return selectedForeground(theme.theme, theme.theme.primary)
     return theme.theme.text
+  })
+  const stats = createMemo(() => {
+    const added = String(props.entry.added).padStart(3, " ")
+    const removed = String(props.entry.removed).padStart(3, " ")
+    return { added, removed }
   })
   const statusColor = createMemo(() => {
     if (props.entry.status === "added") return theme.theme.diffAdded
@@ -164,7 +181,10 @@ export function GitRow(props: { entry: FileStatus; active: boolean; width: numbe
     modified: "M",
   }
 
-  const pathWidth = createMemo(() => Math.max(10, props.width - 14))
+  const pathWidth = createMemo(() => {
+    const actionWidth = props.onAction ? 4 : 0
+    return Math.max(10, props.width - 14 - actionWidth)
+  })
 
   return (
     <box
@@ -184,10 +204,34 @@ export function GitRow(props: { entry: FileStatus; active: boolean; width: numbe
           {Locale.truncateMiddle(props.entry.path, pathWidth())}
         </text>
       </box>
-      <text fg={props.active ? fg() : theme.theme.textMuted} wrapMode="none" flexShrink={0}>
-        <span style={{ fg: theme.theme.diffAdded }}>+{props.entry.added}</span>
-        <span style={{ fg: theme.theme.diffRemoved }}> -{props.entry.removed}</span>
-      </text>
+      <box flexDirection="row" gap={1} flexShrink={0}>
+        <box width={9} justifyContent="flex-end" flexShrink={0}>
+          <text fg={props.active ? fg() : theme.theme.textMuted} wrapMode="none" flexShrink={0}>
+            <span style={{ fg: theme.theme.diffAdded }}>+{stats().added}</span>
+            <span style={{ fg: theme.theme.diffRemoved }}> -{stats().removed}</span>
+          </text>
+        </box>
+        <Show when={props.onAction && props.actionLabel}>
+          <box
+            width={3}
+            paddingLeft={1}
+            paddingRight={1}
+            backgroundColor={props.active ? theme.theme.primary : theme.theme.backgroundElement}
+            onMouseUp={(e) => {
+              e.stopPropagation()
+              props.onAction?.()
+            }}
+          >
+            <text
+              fg={props.active ? selectedForeground(theme.theme, theme.theme.primary) : theme.theme.textMuted}
+              wrapMode="none"
+              attributes={TextAttributes.BOLD}
+            >
+              {props.actionLabel}
+            </text>
+          </box>
+        </Show>
+      </box>
     </box>
   )
 }

@@ -1020,14 +1020,14 @@ export function Prompt(props: PromptProps) {
             <Switch>
               <Match when={store.mode === "normal"}>
                 <Show when={local.model.variant.list().length > 0}>
-                  <text fg={theme.text}>
+                  <text fg={theme.textMuted}>
                     {keybind.print("variant_cycle")} <span style={{ fg: theme.textMuted }}>variants</span>
                   </text>
                 </Show>
-                <text fg={theme.text}>
+                <text fg={theme.textMuted}>
                   {keybind.print("agent_cycle")} <span style={{ fg: theme.textMuted }}>agents</span>
                 </text>
-                <text fg={theme.text}>
+                <text fg={theme.textMuted}>
                   {keybind.print("command_list")} <span style={{ fg: theme.textMuted }}>commands</span>
                 </text>
               </Match>
@@ -1049,8 +1049,8 @@ export function Prompt(props: PromptProps) {
           }}
         >
           <box
-            paddingLeft={2}
-            paddingRight={2}
+            paddingLeft={1}
+            paddingRight={1}
             paddingTop={1}
             flexShrink={0}
             backgroundColor={theme.backgroundElement}
@@ -1060,8 +1060,8 @@ export function Prompt(props: PromptProps) {
               placeholder={props.sessionID ? undefined : `Ask anything... "${PLACEHOLDERS[store.placeholder]}"`}
               textColor={keybind.leader ? theme.textMuted : theme.text}
               focusedTextColor={keybind.leader ? theme.textMuted : theme.text}
-              minHeight={1}
-              maxHeight={6}
+              minHeight={3}
+              maxHeight={10}
               onContentChange={() => {
                 const value = input.plainText
                 setStore("prompt", "input", value)
