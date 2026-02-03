@@ -1,0 +1,382 @@
+name: Build and Release Binaries
+
+on:
+  push:
+    branches:
+      - dev
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version to build (e.g., 1.1.43)"
+        required: true
+        type: string
+
+permissions:
+  contents: write
+  id-token: write # Required for trusted publishing to npm
+
+jobs:
+  determine-version:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          registry-url: "https://registry.npmjs.org"
+
+      - name: Update npm for trusted publishing
+        run: npm install -g npm@11.5.1
+
+      - name: Resolve publish version
+        id: version
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "version=${{ github.event.inputs.version }}" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+          if [[ "${GITHUB_REF}" == refs/tags/v* ]]; then
+            echo "version=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+          CURRENT=$(npm view jonsoc version 2>/dev/null || echo "0.0.0")
+          # Add small delay and retry to avoid race conditions with concurrent publishes
+          sleep 2
+          CURRENT_CHECK=$(npm view jonsoc version 2>/dev/null || echo "0.0.0")
+          if [ "$CURRENT" != "$CURRENT_CHECK" ]; then
+            echo "Version changed during check, using latest: $CURRENT_CHECK"
+            CURRENT=$CURRENT_CHECK
+          fi
+          NEXT=$(node -e "const [m,n,p]=process.argv[1].split('.').map((v)=>parseInt(v,10)||0); console.log([m,n,p+1].join('.'))" "$CURRENT")
+          echo "Current npm version: $CURRENT"
+          echo "Next version: $NEXT"
+          echo "version=$NEXT" >> $GITHUB_OUTPUT
+
+  build-linux:
+    runs-on: ubuntu-latest
+    needs: [determine-version]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v1
+        with:
+          bun-version: 1.3.5
+
+      - name: Install dependencies
+        run: bun install
+
+      - name: Prepare for publish
+        run: bun run scripts/prepare-for-publish.ts
+        env:
+          PUBLISH_VERSION: ${{ needs.determine-version.outputs.version }}
+
+      - name: Build binary
+        working-directory: packages/jonsoc
+        run: |
+          bun run script/build.ts --single
+          cd dist/jonsoc-linux-x64/bin
+          tar -czf ../../../jonsoc-linux-x64.tar.gz jonsoc
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: jonsoc-linux-x64
+          path: packages/jonsoc/jonsoc-linux-x64.tar.gz
+
+  build-macos:
+    runs-on: macos-latest
+    needs: [determine-version]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v1
+        with:
+          bun-version: 1.3.5
+
+      - name: Install dependencies
+        run: bun install
+
+      - name: Prepare for publish
+        run: bun run scripts/prepare-for-publish.ts
+        env:
+          PUBLISH_VERSION: ${{ needs.determine-version.outputs.version }}
+
+      - name: Build binary
+        working-directory: packages/jonsoc
+        run: |
+          bun run script/build.ts --single
+          cd dist/jonsoc-darwin-arm64/bin
+          zip -j ../../../jonsoc-darwin-arm64.zip jonsoc
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: jonsoc-darwin-arm64
+          path: packages/jonsoc/jonsoc-darwin-arm64.zip
+
+  build-windows:
+    runs-on: windows-latest
+    needs: [determine-version]
+    steps:
+      - name: Configure Git for Windows
+        run: |
+          git config --global core.longpaths true
+          git config --global core.symlinks false
+
+      - uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v1
+        with:
+          bun-version: 1.3.5
+
+      - name: Install dependencies
+        run: bun install
+
+      - name: Prepare for publish
+        run: bun run scripts/prepare-for-publish.ts
+        env:
+          PUBLISH_VERSION: ${{ needs.determine-version.outputs.version }}
+
+      - name: Build binary
+        working-directory: packages/jonsoc
+        run: |
+          bun run script/build.ts --single
+          Compress-Archive -Path dist/jonsoc-windows-x64/bin/jonsoc.exe -DestinationPath jonsoc-windows-x64.zip
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: jonsoc-windows-x64
+          path: packages/jonsoc/jonsoc-windows-x64.zip
+
+  publish-scoped-packages:
+    runs-on: ubuntu-latest
+    needs: [determine-version]
+    if: github.ref == 'refs/heads/dev' || startsWith(github.ref, 'refs/tags/v')
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          registry-url: "https://registry.npmjs.org"
+
+      - name: Update npm for trusted publishing
+        run: npm install -g npm@11.5.1
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v1
+        with:
+          bun-version: 1.3.5
+
+      - name: Install dependencies
+        run: bun install
+
+      - name: Prepare for publish
+        run: bun run scripts/prepare-for-publish.ts
+        env:
+          PUBLISH_VERSION: ${{ needs.determine-version.outputs.version }}
+
+      - name: Publish @jonsoc/util
+        working-directory: packages/util
+        run: |
+          VERSION=$(jq -r '.version' package.json)
+          npm view @jonsoc/util@$VERSION version > /dev/null 2>&1 || npm publish --provenance --access public
+
+      - name: Publish @jonsoc/env
+        working-directory: packages/env
+        run: |
+          VERSION=$(jq -r '.version' package.json)
+          npm view @jonsoc/env@$VERSION version > /dev/null 2>&1 || npm publish --provenance --access public
+
+      - name: Publish @jonsoc/sdk
+        working-directory: packages/sdk/js
+        run: |
+          VERSION=$(jq -r '.version' package.json)
+          npm view @jonsoc/sdk@$VERSION version > /dev/null 2>&1 || npm publish --provenance --access public
+
+      - name: Publish @jonsoc/script
+        working-directory: packages/script
+        run: |
+          VERSION=$(jq -r '.version' package.json)
+          npm view @jonsoc/script@$VERSION version > /dev/null 2>&1 || npm publish --provenance --access public
+
+      - name: Publish @jonsoc/plugin
+        working-directory: packages/plugin
+        run: |
+          VERSION=$(jq -r '.version' package.json)
+          npm view @jonsoc/plugin@$VERSION version > /dev/null 2>&1 || npm publish --provenance --access public
+
+      - name: Publish @jonsoc/slack
+        working-directory: packages/slack
+        run: |
+          VERSION=$(jq -r '.version' package.json)
+          npm view @jonsoc/slack@$VERSION version > /dev/null 2>&1 || npm publish --provenance --access public
+
+      - name: Publish @jonsoc/convex
+        working-directory: packages/convex
+        run: |
+          VERSION=$(jq -r '.version' package.json)
+          npm view @jonsoc/convex@$VERSION version > /dev/null 2>&1 || npm publish --provenance --access public
+
+      - name: Publish @jonsoc/ui
+        working-directory: packages/ui
+        run: |
+          VERSION=$(jq -r '.version' package.json)
+          npm view @jonsoc/ui@$VERSION version > /dev/null 2>&1 || npm publish --provenance --access public
+
+      - name: Publish @jonsoc/app
+        working-directory: packages/app
+        run: |
+          VERSION=$(jq -r '.version' package.json)
+          npm view @jonsoc/app@$VERSION version > /dev/null 2>&1 || npm publish --provenance --access public
+
+      - name: Publish @jonsoc/web
+        working-directory: packages/web
+        run: |
+          VERSION=$(jq -r '.version' package.json)
+          npm view @jonsoc/web@$VERSION version > /dev/null 2>&1 || npm publish --provenance --access public
+
+      - name: Publish @jonsoc/console-resource
+        working-directory: packages/console/resource
+        run: |
+          VERSION=$(jq -r '.version' package.json)
+          npm view @jonsoc/console-resource@$VERSION version > /dev/null 2>&1 || npm publish --provenance --access public
+
+      - name: Publish @jonsoc/console-app
+        working-directory: packages/console/app
+        run: |
+          VERSION=$(jq -r '.version' package.json)
+          npm view @jonsoc/console-app@$VERSION version > /dev/null 2>&1 || npm publish --provenance --access public
+
+  publish-main:
+    needs: [publish-scoped-packages, determine-version]
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/dev' || startsWith(github.ref, 'refs/tags/v')
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          registry-url: "https://registry.npmjs.org"
+
+      - name: Update npm for trusted publishing
+        run: npm install -g npm@11.5.1
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v1
+        with:
+          bun-version: 1.3.5
+
+      - name: Install dependencies
+        run: bun install
+
+      - name: Prepare for publish
+        run: bun run scripts/prepare-for-publish.ts
+        env:
+          PUBLISH_VERSION: ${{ needs.determine-version.outputs.version }}
+
+      - name: Verify package version matches
+        working-directory: packages/jonsoc
+        run: |
+          PKG_VERSION=$(jq -r '.version' package.json)
+          EXPECTED_VERSION="${{ needs.determine-version.outputs.version }}"
+          if [ "$PKG_VERSION" != "$EXPECTED_VERSION" ]; then
+            echo "❌ Version mismatch!"
+            echo "   Expected: $EXPECTED_VERSION"
+            echo "   Actual: $PKG_VERSION"
+            exit 1
+          fi
+          echo "✅ Package version verified: $PKG_VERSION"
+
+      - name: Check if version exists
+        id: check-version
+        working-directory: packages/jonsoc
+        run: |
+          VERSION=$(jq -r '.version' package.json)
+          if npm view jonsoc@$VERSION version > /dev/null 2>&1; then
+            echo "Version $VERSION already published"
+            echo "exists=true" >> $GITHUB_OUTPUT
+          else
+            echo "Version $VERSION not published yet"
+            echo "exists=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Publish jonsoc
+        if: steps.check-version.outputs.exists == 'false'
+        working-directory: packages/jonsoc
+        run: npm publish --provenance --access public
+
+  release:
+    needs: [determine-version, build-linux, build-macos, build-windows, publish-scoped-packages, publish-main]
+    runs-on: ubuntu-latest
+    # Create GitHub releases on dev pushes and version tags
+    if: github.ref == 'refs/heads/dev' || startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
+    steps:
+      - name: Determine version
+        id: version
+        run: |
+          if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
+            echo "version=${{ github.event.inputs.version }}" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+          if [[ "${GITHUB_REF}" == refs/tags/v* ]]; then
+            echo "version=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+          echo "version=${{ needs.determine-version.outputs.version }}" >> $GITHUB_OUTPUT
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          pattern: jonsoc-*
+          merge-multiple: true
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: v${{ steps.version.outputs.version }}
+          name: Release v${{ steps.version.outputs.version }}
+          files: artifacts/*
+          draft: false
+          prerelease: false
+          body: |
+            ## JonsOC v${{ steps.version.outputs.version }}
+
+            An open source fork of [OpenCode](https://opencode.ai) 💐
+
+            ### Installation
+
+            ```bash
+            npm install -g jonsoc@latest
+            # or
+            bun add -g jonsoc
+            ```
+
+            ### What's Changed
+
+            See [CHANGELOG.md](./CHANGELOG.md) for details.
+
+            ### Attribution
+
+            This release is built on the amazing work of the [OpenCode](https://github.com/opencode-ai/opencode) team.
+            Please consider supporting the original project!
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
