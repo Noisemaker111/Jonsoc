@@ -86,6 +86,15 @@ const updateDeps = (
   }
 }
 
+// Update root package.json version (used by build script fallback)
+if (publishVersion) {
+  if (rootPkg.version !== publishVersion) {
+    rootPkg.version = publishVersion
+    await Bun.file(rootPkgPath).write(`${JSON.stringify(rootPkg, null, 2)}\n`)
+    console.log(`Updated root package.json version to ${publishVersion}`)
+  }
+}
+
 for (const filePath of workspaceFiles) {
   const pkg = await readJson(filePath)
   if (!isRecord(pkg)) continue
