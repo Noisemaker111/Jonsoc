@@ -90,6 +90,21 @@ const COMMAND_DEFINITIONS: Record<CommandGroup, (ctx: CommandContext) => Command
         dialog.clear()
       },
     },
+    {
+      title: "Usage",
+      value: "app.usage",
+      category: "System",
+      slash: {
+        name: "usage",
+      },
+      onSelect: (dialog) => {
+        dialog.clear()
+        ctx.navigate({
+          type: "usage",
+          returnTo: ctx.returnTo,
+        })
+      },
+    },
   ],
 }
 

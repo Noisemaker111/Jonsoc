@@ -36,6 +36,7 @@ import { ThemeProvider, useTheme } from "@tui/context/theme"
 import { Home } from "@tui/routes/home"
 import { Session } from "@tui/routes/session"
 import { UISettings } from "@tui/routes/ui-settings"
+import { Usage } from "@tui/routes/usage"
 import { LayoutProvider } from "@tui/context/layout"
 import { PromptHistoryProvider } from "./component/prompt/history"
 import { FrecencyProvider } from "./component/prompt/frecency"
@@ -55,6 +56,8 @@ import { ArgsProvider, useArgs, type Args } from "./context/args"
 import open from "open"
 import { writeHeapSnapshot } from "v8"
 import { PromptRefProvider, usePromptRef } from "./context/prompt"
+import { SessionStatus as LocalSessionStatus } from "@/session/status"
+import { mergeRateLimit, parseUsageCache, type UsageCache } from "./util/usage"
 
 async function getTerminalBackgroundColor(): Promise<"dark" | "light"> {
   // can't set raw mode if not a TTY
@@ -264,6 +267,7 @@ function App() {
   const sync = useSync()
   const exit = useExit()
   const promptRef = usePromptRef()
+  const [, setUsageCache] = kv.signal<UsageCache>("usage_provider_cache", {})
 
   // Wire up console copy-to-clipboard via opentui's onCopySelection callback
   renderer.console.onCopySelection = async (text: string) => {
@@ -314,6 +318,50 @@ function App() {
         console.error("Error count changed:", count, prev)
         dialog.setSize("large")
         dialog.replace(() => <DialogErrorLog />)
+      },
+    ),
+  )
+
+  createEffect(
+    on(
+      () => sync.data.session_status,
+      (statusMap) => {
+        const updates: UsageCache = {}
+        for (const status of Object.values(statusMap)) {
+          const parsed = LocalSessionStatus.Info.safeParse(status)
+          if (!parsed.success) continue
+          const data = parsed.data
+          if (data.type !== "retry" && data.type !== "rate-limited") continue
+          if (!data.providerID) continue
+          if (!data.rateLimit && data.type !== "rate-limited") continue
+          updates[data.providerID] = {
+            providerID: data.providerID,
+            modelID: data.modelID,
+            message: data.message,
+            status: data.type,
+            updatedAt: Date.now(),
+            rateLimit: data.rateLimit,
+          }
+        }
+
+        if (Object.keys(updates).length === 0) return
+
+        setUsageCache((prev) => {
+          const base = parseUsageCache(prev)
+          const next: UsageCache = { ...base }
+          for (const [providerID, update] of Object.entries(updates)) {
+            const existing = base[providerID]
+            next[providerID] = {
+              providerID,
+              modelID: update.modelID ?? existing?.modelID,
+              message: update.message ?? existing?.message,
+              status: update.status,
+              updatedAt: update.updatedAt,
+              rateLimit: mergeRateLimit(existing?.rateLimit, update.rateLimit),
+            }
+          }
+          return next
+        })
       },
     ),
   )
@@ -771,6 +819,9 @@ function App() {
         </Match>
         <Match when={route.data.type === "ui-settings"}>
           <UISettings />
+        </Match>
+        <Match when={route.data.type === "usage"}>
+          <Usage />
         </Match>
       </Switch>
       <InspectorOverlay />

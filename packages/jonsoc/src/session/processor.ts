@@ -345,12 +345,34 @@ export namespace SessionProcessor {
             const retry = SessionRetry.retryable(error)
             if (retry !== undefined) {
               attempt++
-              const delay = SessionRetry.delay(attempt, error.name === "APIError" ? error : undefined)
+              const rateLimit = SessionRetry.rateLimitInfo(error)
+              const delay =
+                rateLimit?.retryAfterMs ?? SessionRetry.delay(attempt, error.name === "APIError" ? error : undefined)
+              const shouldStop = SessionRetry.shouldStopRetry(delay, error, rateLimit)
+              if (shouldStop) {
+                SessionStatus.set(input.sessionID, {
+                  type: "rate-limited",
+                  attempt,
+                  message: retry,
+                  rateLimit,
+                  providerID: input.model.providerID,
+                  modelID: input.model.id,
+                })
+                input.assistantMessage.error = error
+                Bus.publish(Session.Event.Error, {
+                  sessionID: input.assistantMessage.sessionID,
+                  error: input.assistantMessage.error,
+                })
+                return "stop"
+              }
               SessionStatus.set(input.sessionID, {
                 type: "retry",
                 attempt,
                 message: retry,
                 next: Date.now() + delay,
+                rateLimit,
+                providerID: input.model.providerID,
+                modelID: input.model.id,
               })
               await SessionRetry.sleep(delay, input.abort).catch(() => {})
               continue

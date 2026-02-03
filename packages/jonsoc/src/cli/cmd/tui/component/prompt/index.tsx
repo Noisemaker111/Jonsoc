@@ -33,6 +33,7 @@ import { useTextareaKeybindings } from "../textarea-keybindings"
 import path from "path"
 import { mkdir } from "fs/promises"
 import { tmpdir } from "os"
+import type { SessionStatus as LocalSessionStatus } from "@/session/status"
 
 export type PromptProps = {
   sessionID?: string
@@ -68,14 +69,16 @@ export function Prompt(props: PromptProps) {
   const sync = useSync()
   const dialog = useDialog()
   const toast = useToast()
-  const status = createMemo(() => sync.data.session_status?.[props.sessionID ?? ""] ?? { type: "idle" })
-  const retry = createMemo(() => {
+  const status = createMemo<LocalSessionStatus.Info>(
+    () => sync.data.session_status?.[props.sessionID ?? ""] ?? { type: "idle" },
+  )
+  const retryStatus = createMemo(() => {
     const current = status()
-    if (current.type !== "retry") return
+    if (current.type !== "retry" && current.type !== "rate-limited") return
     return current
   })
   const retryToast = createMemo(() => {
-    const current = retry()
+    const current = retryStatus()
     if (!current) return
     let message = current.message
     if (message.includes("exceeded your current quota") && message.includes("gemini")) {
@@ -84,19 +87,35 @@ export function Prompt(props: PromptProps) {
       message = message.slice(0, 117) + "..."
     }
     const attempt = typeof current.attempt === "number" && current.attempt > 0 ? current.attempt : undefined
+    const now = Date.now()
+    const rateLimit = current.rateLimit
+    const retryAfterMs =
+      rateLimit?.retryAfterMs ?? (rateLimit?.resetAt ? Math.max(0, rateLimit.resetAt - now) : undefined)
     const nextSeconds =
-      typeof current.next === "number" ? Math.max(0, Math.round((current.next - Date.now()) / 1000)) : undefined
+      retryAfterMs !== undefined
+        ? Math.max(0, Math.round(retryAfterMs / 1000))
+        : current.type === "retry"
+          ? Math.max(0, Math.round((current.next - now) / 1000))
+          : undefined
     if (nextSeconds !== undefined && nextSeconds > 0) {
       const retryIn = formatDuration(nextSeconds)
-      message += attempt ? ` (retrying in ${retryIn}, attempt #${attempt})` : ` (retrying in ${retryIn})`
+      const retryLabel = current.type === "rate-limited" ? "try again in" : "retrying in"
+      message += attempt ? ` (${retryLabel} ${retryIn}, attempt #${attempt})` : ` (${retryLabel} ${retryIn})`
     } else if (attempt) {
-      message += ` (retrying, attempt #${attempt})`
-    } else {
+      const retryLabel = current.type === "rate-limited" ? "try again" : "retrying"
+      message += ` (${retryLabel}, attempt #${attempt})`
+    } else if (current.type === "retry") {
       message += " (retrying)"
     }
     let duration = 8000
-    if (typeof current.next === "number") {
-      const nextMs = current.next - Date.now()
+    if (current.type === "retry" && typeof current.next === "number") {
+      const nextMs = current.next - now
+      if (Number.isFinite(nextMs)) {
+        duration = Math.max(5000, Math.min(30000, Math.round(nextMs)))
+      }
+    }
+    if (current.type === "rate-limited" && retryAfterMs !== undefined) {
+      const nextMs = retryAfterMs
       if (Number.isFinite(nextMs)) {
         duration = Math.max(5000, Math.min(30000, Math.round(nextMs)))
       }

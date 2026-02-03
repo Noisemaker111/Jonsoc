@@ -18,7 +18,12 @@ export type UISettingsRoute = {
   returnTo?: Route
 }
 
-export type Route = HomeRoute | SessionRoute | UISettingsRoute
+export type UsageRoute = {
+  type: "usage"
+  returnTo?: Route
+}
+
+export type Route = HomeRoute | SessionRoute | UISettingsRoute | UsageRoute
 
 export const { use: useRoute, provider: RouteProvider } = createSimpleContext({
   name: "Route",

@@ -4,6 +4,16 @@ import { Instance } from "@/project/instance"
 import z from "zod"
 
 export namespace SessionStatus {
+  export const RateLimit = z.object({
+    retryAfterMs: z.number().optional(),
+    resetAt: z.number().optional(),
+    limit: z.number().optional(),
+    remaining: z.number().optional(),
+    scope: z.string().optional(),
+  })
+
+  export type RateLimit = z.infer<typeof RateLimit>
+
   export const Info = z
     .union([
       z.object({
@@ -14,6 +24,17 @@ export namespace SessionStatus {
         attempt: z.number(),
         message: z.string(),
         next: z.number(),
+        rateLimit: RateLimit.optional(),
+        providerID: z.string().optional(),
+        modelID: z.string().optional(),
+      }),
+      z.object({
+        type: z.literal("rate-limited"),
+        message: z.string(),
+        attempt: z.number().optional(),
+        rateLimit: RateLimit.optional(),
+        providerID: z.string().optional(),
+        modelID: z.string().optional(),
       }),
       z.object({
         type: z.literal("busy"),
