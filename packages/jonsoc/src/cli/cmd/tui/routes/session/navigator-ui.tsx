@@ -84,6 +84,34 @@ export function ActionButton(props: {
   )
 }
 
+export function IconButton(props: { icon: string; onSelect: () => void; disabled?: boolean; title?: string }) {
+  const theme = useTheme()
+  const fg = createMemo(() => {
+    if (props.disabled) return theme.theme.textMuted
+    return theme.theme.text
+  })
+
+  return (
+    <box
+      flexShrink={0}
+      paddingLeft={1}
+      paddingRight={1}
+      backgroundColor={theme.theme.backgroundElement}
+      onMouseDown={(event) => {
+        event.stopPropagation()
+        if (props.disabled) return
+        props.onSelect()
+      }}
+      onMouseUp={(event) => event.stopPropagation()}
+      justifyContent="center"
+    >
+      <text fg={fg()} wrapMode="none" attributes={TextAttributes.BOLD}>
+        {props.icon}
+      </text>
+    </box>
+  )
+}
+
 export function ExplorerRow(props: {
   entry: { node: FileNode; depth: number }
   active: boolean

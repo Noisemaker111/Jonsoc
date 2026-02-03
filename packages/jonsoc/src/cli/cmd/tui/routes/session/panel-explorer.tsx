@@ -29,7 +29,8 @@ import type { File as FileStatus, FileNode } from "@jonsoc/sdk/v2"
 type FileStatusWithStaged = FileStatus & { staged: boolean }
 import { GitCommit } from "./git-commit"
 import { GitHistory } from "./git-history"
-import { NavigatorBorderChars, Tab, ExplorerRow, GitRow, ActionButton } from "./navigator-ui"
+import { NavigatorBorderChars, Tab, ExplorerRow, GitRow, ActionButton, IconButton } from "./navigator-ui"
+import { DialogGitStash } from "../../component/dialog-git-stash"
 
 class CustomSpeedScroll implements ScrollAcceleration {
   constructor(private speed: number) {}
@@ -110,6 +111,29 @@ export function ExplorerPanel(props: ExplorerPanelProps) {
     },
   )
 
+  const [stashList, setStashList] = createSignal<string[]>([])
+  const stashCount = createMemo(() => stashList().length)
+
+  const refreshStashList = async () => {
+    const rawClient = Reflect.get(sdk.client, "client")
+    if (!rawClient || typeof rawClient !== "object") return
+    const request = Reflect.get(rawClient, "request")
+    if (typeof request !== "function") return
+    try {
+      const result = (await request({
+        url: "/vcs/stash/list",
+        method: "POST",
+        body: {},
+        headers: { "Content-Type": "application/json" },
+        responseStyle: "data",
+        throwOnError: true,
+      })) as { data?: string[] }
+      setStashList(result?.data ?? [])
+    } catch {
+      setStashList([])
+    }
+  }
+
   const displayRoot = createMemo(() => {
     const directory = sync.data.path.directory || process.cwd()
     const replaced = directory.replace(Global.Path.home, "~")
@@ -118,7 +142,24 @@ export function ExplorerPanel(props: ExplorerPanelProps) {
 
   const branch = createMemo(() => sync.data.vcs?.branch)
 
-  const statusEntries = createMemo(() => status() ?? [])
+  const statusEntries = createMemo(() => {
+    const entries = (status() ?? []).filter((entry) => {
+      if (entry.status !== "modified") return true
+      return entry.added !== 0 || entry.removed !== 0
+    })
+    const byPath = new Map<string, FileStatusWithStaged>()
+    for (const entry of entries) {
+      const existing = byPath.get(entry.path)
+      if (!existing) {
+        byPath.set(entry.path, entry)
+        continue
+      }
+      if (entry.staged && !existing.staged) {
+        byPath.set(entry.path, entry)
+      }
+    }
+    return Array.from(byPath.values())
+  })
   const statusMap = createMemo(() => {
     const map = new Map<string, FileStatusWithStaged>()
     for (const entry of statusEntries()) {
@@ -328,41 +369,56 @@ export function ExplorerPanel(props: ExplorerPanelProps) {
   const refreshGit = () => {
     refreshStatus()
     refreshHistory()
+    refreshStashList()
   }
 
   const cloneStatusEntries = (entries: FileStatusWithStaged[]) => entries.map((entry) => ({ ...entry }))
 
   const updateStatusEntries = (updater: (entries: FileStatusWithStaged[]) => FileStatusWithStaged[]) => {
-    mutateStatus((entries) => {
-      if (!entries) return entries
-      return updater(entries)
-    })
+    const current = status()
+    if (!current) return
+    mutateStatus(updater(current))
+  }
+
+  const setEntryStaged = (entries: FileStatusWithStaged[], path: string, staged: boolean) => {
+    const matches = entries.filter((entry) => entry.path === path)
+    if (matches.length === 0) return entries
+    const fallback = matches.find((entry) => entry.staged === staged) ?? matches[0]
+    const nextEntry: FileStatusWithStaged = { ...fallback, staged }
+    return [...entries.filter((entry) => entry.path !== path), nextEntry]
   }
 
   const applyOptimisticStage = (path: string, staged: boolean) => {
-    const current = statusEntries()
-    if (!current.length) return () => {}
+    const current = status()
+    if (!current || current.length === 0) return () => {}
     const snapshot = cloneStatusEntries(current)
-    updateStatusEntries((entries) => entries.map((entry) => (entry.path === path ? { ...entry, staged } : entry)))
+    updateStatusEntries((entries) => setEntryStaged(entries, path, staged))
     return () => mutateStatus(snapshot)
   }
 
   const applyOptimisticStageAll = (staged: boolean) => {
-    const current = statusEntries()
-    if (!current.length) return () => {}
+    const current = status()
+    if (!current || current.length === 0) return () => {}
     const snapshot = cloneStatusEntries(current)
-    updateStatusEntries((entries) =>
-      entries.map((entry) =>
-        staged ? { ...entry, staged: true } : entry.staged ? { ...entry, staged: false } : entry,
-      ),
-    )
+    updateStatusEntries((entries) => {
+      const paths = new Set(entries.map((entry) => entry.path))
+      let next = entries
+      for (const path of paths) {
+        const needsUpdate = staged
+          ? entries.some((entry) => entry.path === path && !entry.staged)
+          : entries.some((entry) => entry.path === path && entry.staged)
+        if (!needsUpdate) continue
+        next = setEntryStaged(next, path, staged)
+      }
+      return next
+    })
     return () => mutateStatus(snapshot)
   }
 
   type VcsRequest = (options: {
     url: string
     method: "POST"
-    body: { path: string }
+    body?: { path: string }
     headers: Record<string, string>
     responseStyle: "data"
     throwOnError: true
@@ -391,6 +447,31 @@ export function ExplorerPanel(props: ExplorerPanelProps) {
     })
     if (result === false) {
       throw new Error("VCS operation failed")
+    }
+  }
+
+  const runVcsRequestNoBody = async (url: string) => {
+    const request = getVcsRequest()
+    if (!request) {
+      throw new Error("SDK client unavailable")
+    }
+    const result = (await request({
+      url,
+      method: "POST",
+      headers: {},
+      responseStyle: "data",
+      throwOnError: true,
+    })) as
+      | {
+          ok: boolean
+          error?: string
+        }
+      | undefined
+    if (!result) {
+      throw new Error("VCS operation failed")
+    }
+    if (typeof result === "object" && !result.ok) {
+      throw new Error(result.error || "VCS operation failed")
     }
   }
 
@@ -448,6 +529,32 @@ export function ExplorerPanel(props: ExplorerPanelProps) {
     }
   }
 
+  const handleStash = async () => {
+    const entries = unstagedEntries()
+    if (entries.length === 0) return
+    try {
+      await runVcsRequestNoBody("/vcs/stash")
+      void refreshStatus()
+      toast.show({ variant: "success", message: `Stashed ${entries.length} file${entries.length === 1 ? "" : "s"}` })
+    } catch (err: any) {
+      toast.show({ variant: "error", message: `Failed to stash: ${err.message}` })
+    }
+  }
+
+  const handleDiscardAll = async () => {
+    const entries = unstagedEntries()
+    if (entries.length === 0) return
+    try {
+      for (const entry of entries) {
+        await runVcsRequest("/vcs/discard", entry.path)
+      }
+      void refreshStatus()
+      toast.show({ variant: "success", message: `Discarded ${entries.length} file${entries.length === 1 ? "" : "s"}` })
+    } catch (err: any) {
+      toast.show({ variant: "error", message: `Failed to discard: ${err.message}` })
+    }
+  }
+
   const handleCommit = async () => {
     const msg = commitMessage().trim()
     if (!msg) return
@@ -482,7 +589,7 @@ export function ExplorerPanel(props: ExplorerPanelProps) {
 
   const handlePush = async () => {
     try {
-      await fetch(`${sdk.url}/vcs/push`, { method: "POST" })
+      await runVcsRequestNoBody("/vcs/push")
       toast.show({ variant: "success", message: "Pushed to remote" })
       refreshGit()
     } catch (err: any) {
@@ -499,6 +606,20 @@ export function ExplorerPanel(props: ExplorerPanelProps) {
     const current = branch()
     // Branch switcher would need dialog context, skipping for now
     // This is a simplified version without dialog support
+  }
+
+  const openStashView = () => {
+    const stashes = stashList()
+    if (stashes.length === 0) return
+    dialog.replace(() =>
+      DialogGitStash({
+        stashList: stashes,
+        onPop: () => {},
+        onApply: () => {},
+        onDrop: () => {},
+        onRefresh: refreshStashList,
+      }),
+    )
   }
 
   const dialog = useDialog()
@@ -597,7 +718,11 @@ export function ExplorerPanel(props: ExplorerPanelProps) {
   // Auto-refresh Git status periodically
   createEffect(() => {
     if (tab() !== "git") return
-    const id = setInterval(refreshGit, 10000)
+    refreshStashList()
+    const id = setInterval(() => {
+      refreshGit()
+      refreshStashList()
+    }, 10000)
     onCleanup(() => clearInterval(id))
   })
 
@@ -665,8 +790,6 @@ export function ExplorerPanel(props: ExplorerPanelProps) {
                   justifyContent="space-between"
                   paddingLeft={1}
                   paddingRight={1}
-                  paddingTop={1}
-                  paddingBottom={1}
                   backgroundColor={theme.theme.backgroundPanel}
                 >
                   <text fg={theme.theme.textMuted} attributes={TextAttributes.BOLD}>
@@ -705,19 +828,29 @@ export function ExplorerPanel(props: ExplorerPanelProps) {
                   justifyContent="space-between"
                   paddingLeft={1}
                   paddingRight={1}
-                  paddingTop={1}
-                  paddingBottom={1}
                   backgroundColor={theme.theme.backgroundPanel}
                 >
                   <text fg={theme.theme.textMuted} attributes={TextAttributes.BOLD}>
                     Changes
                   </text>
                   <box flexDirection="row" gap={1}>
+                    <IconButton
+                      icon="🗑"
+                      onSelect={handleDiscardAll}
+                      disabled={!hasUnstagedEntries()}
+                      title="Discard all changes"
+                    />
                     <ActionButton
                       label="Stage All"
                       onSelect={handleStageAll}
                       disabled={!hasUnstagedEntries()}
                       flexGrow={0}
+                    />
+                    <IconButton
+                      icon="📦"
+                      onSelect={handleStash}
+                      disabled={!hasUnstagedEntries()}
+                      title="Stash changes"
                     />
                   </box>
                 </box>
@@ -747,6 +880,8 @@ export function ExplorerPanel(props: ExplorerPanelProps) {
             historyEntries={historyEntries}
             historyHeight={historyHeight}
             onBranchSwitcher={openBranchSwitcher}
+            onStashView={openStashView}
+            stashCount={stashCount}
             viewportOptions={viewportOptions()}
             verticalScrollbarOptions={verticalScrollbarOptions()}
           />

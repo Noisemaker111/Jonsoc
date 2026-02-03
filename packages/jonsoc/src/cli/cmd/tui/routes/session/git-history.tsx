@@ -20,6 +20,8 @@ export type GitHistoryProps = {
   historyEntries: Accessor<VcsHistoryLine[]>
   historyHeight: Accessor<number>
   onBranchSwitcher: () => void
+  onStashView: () => void
+  stashCount: Accessor<number>
   viewportOptions: any
   verticalScrollbarOptions: any
 }
@@ -52,7 +54,21 @@ export function GitHistory(props: GitHistoryProps) {
             </box>
           </Show>
         </box>
-        <text fg={theme.theme.textMuted}>{props.historyEntries().length} commits</text>
+        <box flexDirection="row" gap={1}>
+          <Show when={props.stashCount() > 0}>
+            <box
+              backgroundColor={theme.theme.backgroundElement}
+              paddingLeft={1}
+              paddingRight={1}
+              onMouseUp={props.onStashView}
+            >
+              <text fg={theme.theme.text} wrapMode="none">
+                📦 {props.stashCount()}
+              </text>
+            </box>
+          </Show>
+          <text fg={theme.theme.textMuted}>{props.historyEntries().length} commits</text>
+        </box>
       </box>
       <scrollbox
         flexGrow={1}

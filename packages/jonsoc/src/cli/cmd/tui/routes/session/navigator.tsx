@@ -144,10 +144,17 @@ export function Navigator(props: NavigatorProps) {
   const [saveStatus, setSaveStatus] = createSignal<"idle" | "saving" | "saved" | "error">("idle")
   let editorRef: TextareaRenderable | undefined
   const [currentFilePath, setCurrentFilePath] = createSignal<string | null>(null)
+  const [autosaveTimer, setAutosaveTimer] = createSignal<ReturnType<typeof setTimeout> | undefined>(undefined)
 
   const saveFile = async () => {
     const filePath = activePath()
     if (!filePath || !editorRef || !isDirty() || saveStatus() === "saving") return
+
+    const pendingAutosave = autosaveTimer()
+    if (pendingAutosave) {
+      clearTimeout(pendingAutosave)
+      setAutosaveTimer(undefined)
+    }
 
     const content = editorRef.plainText
     setSaveStatus("saving")
@@ -173,9 +180,23 @@ export function Navigator(props: NavigatorProps) {
   const handleEditorChange = () => {
     setIsDirty(true)
     setSaveStatus("idle")
+
+    const pendingAutosave = autosaveTimer()
+    if (pendingAutosave) {
+      clearTimeout(pendingAutosave)
+    }
+    const nextTimer = setTimeout(() => {
+      setAutosaveTimer(undefined)
+      void saveFile()
+    }, 1000)
+    setAutosaveTimer(nextTimer)
   }
 
   onCleanup(() => {
+    const pendingAutosave = autosaveTimer()
+    if (pendingAutosave) {
+      clearTimeout(pendingAutosave)
+    }
     if (isDirty()) {
       void saveFile()
     }
@@ -940,6 +961,8 @@ export function Navigator(props: NavigatorProps) {
       historyEntries={historyEntries}
       historyHeight={historyHeight}
       onBranchSwitcher={openBranchSwitcher}
+      onStashView={() => {}}
+      stashCount={() => 0}
       viewportOptions={viewportOptions()}
       verticalScrollbarOptions={verticalScrollbarOptions()}
     />
