@@ -28,6 +28,16 @@ export namespace Vcs {
     })
   export type Info = z.infer<typeof Info>
 
+  export const PushResult = z
+    .object({
+      ok: z.boolean(),
+      error: z.string().optional(),
+    })
+    .meta({
+      ref: "VcsPushResult",
+    })
+  export type PushResult = z.infer<typeof PushResult>
+
   export const HistoryLine = z
     .object({
       graph: z.string(),
@@ -164,6 +174,12 @@ export namespace Vcs {
   export async function push() {
     if (Instance.project.vcs !== "git") return false
     const result = await $`git push`.quiet().nothrow().cwd(Instance.worktree)
-    return result.exitCode === 0
+    if (result.exitCode === 0) return { ok: true }
+    const outputText = (input: Uint8Array | undefined) => {
+      if (!input?.length) return ""
+      return new TextDecoder().decode(input).trim()
+    }
+    const error = [outputText(result.stderr), outputText(result.stdout)].filter(Boolean).join("\n")
+    return { ok: false, error: error || "Failed to push" }
   }
 }

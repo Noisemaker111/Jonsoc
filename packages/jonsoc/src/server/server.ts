@@ -397,7 +397,7 @@ export namespace Server {
                 description: "Success",
                 content: {
                   "application/json": {
-                    schema: resolver(z.boolean()),
+                    schema: resolver(Vcs.PushResult),
                   },
                 },
               },

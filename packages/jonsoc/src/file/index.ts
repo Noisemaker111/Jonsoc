@@ -261,7 +261,7 @@ export namespace File {
         if (index === "?" && worktree === "?") {
           changedFiles.push({
             path: filePath,
-            added: 0,
+            added: 1,
             removed: 0,
             status: "added",
             staged: false,
