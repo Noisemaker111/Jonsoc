@@ -8,7 +8,7 @@ This repository is a fork of JonsOC maintained by **Noisemaker111**. Target: `No
 
 ## Project Context
 
-**JonsOC** is a VSCode-like editor being built on top of an JonsOC fork. It includes a custom TUI (Terminal User Interface) built with OpenTUI and SolidJS. The project aims to provide an integrated development environment with AI assistance.
+**JonsOC** is a VSCode-like editor being built on top of a JonsOC fork. It includes a custom TUI (Terminal User Interface) built with OpenTUI and SolidJS. The project aims to provide an integrated development environment with AI assistance.
 
 ## Question Policy
 
@@ -19,7 +19,7 @@ This repository is a fork of JonsOC maintained by **Noisemaker111**. Target: `No
 - Use this for yes/no questions, choices, and any clarification
 - Never ask questions in prose without using the tool
 
-## File References please can i edit this
+## File References
 
 **When referencing files, prefix with a context keyword to make them clickable:**
 
@@ -215,6 +215,11 @@ const targets = Brand.CONFIG_TARGETS // [".jonsoc", ".jonsoc"]
 Check `.jj/` dir first → use `jj`, else `git`.
 
 Target: `Noisemaker111/jonsoc` on `dev` branch.
+
+## Branching & Precedence
+
+- Development PRs target `dev`; release automation runs on `master`.
+- When project rules conflict with global agent rules, project rules take precedence for this repo.
 
 ## Quick Reference
 

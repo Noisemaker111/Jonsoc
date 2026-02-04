@@ -204,6 +204,24 @@ export namespace Config {
 
     result.plugin = deduplicatePlugins(result.plugin ?? [])
 
+    if (!Flag.OPENCODE_DISABLE_V1) {
+      result.mcp ??= {}
+      const v1Entry = result.mcp.v1
+      if (!v1Entry) {
+        result.mcp.v1 = {
+          type: "remote",
+          url: "https://api.v1.run/mcp",
+        }
+      } else if (typeof v1Entry === "object" && v1Entry !== null && !("type" in v1Entry)) {
+        const enabled = "enabled" in v1Entry ? Boolean(v1Entry.enabled) : true
+        result.mcp.v1 = {
+          type: "remote",
+          url: "https://api.v1.run/mcp",
+          ...(enabled ? {} : { enabled: false }),
+        }
+      }
+    }
+
     return {
       config: result,
       directories,

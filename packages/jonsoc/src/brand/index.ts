@@ -82,7 +82,7 @@ export namespace Brand {
   export const CONFIG_TARGETS: string[] = (() => {
     const targets = [`.${BRAND_LOWER}`]
     if (ALLOW_LEGACY_OPENCODE_CONFIGS) {
-      targets.unshift(".jonsoc")
+      targets.unshift(".opencode", ".jonsoc")
     }
     return targets
   })()

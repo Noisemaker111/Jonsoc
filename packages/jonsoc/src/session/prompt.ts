@@ -646,6 +646,38 @@ export namespace SessionPrompt {
     return Provider.defaultModel()
   }
 
+  function formatMcpToolError(tool: string, error: unknown): Error {
+    if (error instanceof Error) {
+      if (tool.startsWith("v1_")) {
+        const message = formatV1ErrorMessage(error.message)
+        if (message) {
+          return new Error(message)
+        }
+      }
+      return error
+    }
+    return new Error(String(error))
+  }
+
+  function formatV1ErrorMessage(message: string): string | undefined {
+    const titleMatch = message.match(/<title>([^<]+)<\/title>/i)
+    if (titleMatch) {
+      const cleaned = titleMatch[1].replace(/v1\.run\s*\|\s*/i, "").trim()
+      return `v1.run request failed: ${cleaned}`
+    }
+    const codeMatch = message.match(/Error code\s*(\d+)/i)
+    if (codeMatch) {
+      return `v1.run request failed with HTTP ${codeMatch[1]}.`
+    }
+    if (message.includes("Streamable HTTP error")) {
+      return "v1.run request failed; please retry."
+    }
+    if (message.includes("<html")) {
+      return "v1.run request failed with an upstream error response."
+    }
+    return undefined
+  }
+
   async function resolveTools(input: {
     agent: Agent.Info
     model: Provider.Model
@@ -755,7 +787,12 @@ export namespace SessionPrompt {
           always: ["*"],
         })
 
-        const result = await execute(args, opts)
+        let result: Awaited<ReturnType<typeof execute>>
+        try {
+          result = await execute(args, opts)
+        } catch (error) {
+          throw formatMcpToolError(key, error)
+        }
 
         await Plugin.trigger(
           "tool.execute.after",

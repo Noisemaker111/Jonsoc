@@ -1721,6 +1721,9 @@ function ToolPart(props: { last: boolean; part: ToolPart; message: AssistantMess
         <Match when={props.part.tool === "question"}>
           <Question {...toolprops} />
         </Match>
+        <Match when={props.part.tool.startsWith("v1_")}>
+          <V1Tool {...toolprops} />
+        </Match>
         <Match when={true}>
           <GenericTool {...toolprops} />
         </Match>
@@ -1741,6 +1744,17 @@ function GenericTool(props: ToolProps<any>) {
   return (
     <InlineTool icon="⚙" pending="Writing command..." complete={true} part={props.part}>
       {props.tool} {input(props.input)}
+    </InlineTool>
+  )
+}
+
+function V1Tool(props: ToolProps<any>) {
+  const complete = createMemo(() => props.part.state.status === "completed" || props.part.state.status === "error")
+  const toolName = createMemo(() => props.tool.replace(/^v1_/, ""))
+  const summary = createMemo(() => formatV1Input(props.input))
+  return (
+    <InlineTool icon="N" pending="Gathering NPM Packages from v1.run" complete={complete()} part={props.part}>
+      v1.run {toolName()} {summary()}
     </InlineTool>
   )
 }
@@ -2356,6 +2370,81 @@ function input(input: Record<string, any>, omit?: string[]): string {
   })
   if (primitives.length === 0) return ""
   return `[${primitives.map(([key, value]) => `${key}=${value}`).join(", ")}]`
+}
+
+function formatV1Input(input: Record<string, any>): string {
+  const entries: Array<[string, string | number | boolean]> = []
+  const omit = new Set(["packageJson", "packageJsonText", "packageLock", "packageLockText", "lockfile"])
+
+  for (const [key, value] of Object.entries(input)) {
+    if (omit.has(key)) continue
+    if (typeof value === "string" || typeof value === "number" || typeof value === "boolean") {
+      entries.push([key, value])
+    }
+  }
+
+  const summary = summarizePackageJson(input.packageJson)
+  if (summary.length) {
+    entries.push(...summary)
+  }
+
+  if (entries.length === 0) return ""
+  return `[${entries.map(([key, value]) => `${key}=${value}`).join(", ")}]`
+}
+
+function summarizePackageJson(raw: unknown): Array<[string, string | number | boolean]> {
+  if (!raw) return []
+  const parsed = parsePackageJson(raw)
+  if (!parsed) {
+    if (typeof raw === "string") {
+      return [["packageJsonBytes", raw.length]]
+    }
+    return []
+  }
+  const entries: Array<[string, string | number | boolean]> = []
+  if (typeof parsed.name === "string") {
+    entries.push(["package", parsed.name])
+  }
+  const depCount = countKeys(parsed.dependencies)
+  const devCount = countKeys(parsed.devDependencies)
+  const peerCount = countKeys(parsed.peerDependencies)
+  const optionalCount = countKeys(parsed.optionalDependencies)
+
+  if (depCount) entries.push(["deps", depCount])
+  if (devCount) entries.push(["devDeps", devCount])
+  if (peerCount) entries.push(["peerDeps", peerCount])
+  if (optionalCount) entries.push(["optionalDeps", optionalCount])
+
+  return entries
+}
+
+function parsePackageJson(raw: unknown): Record<string, unknown> | undefined {
+  if (typeof raw === "string") {
+    try {
+      const parsed = JSON.parse(raw)
+      if (isRecord(parsed)) {
+        return parsed
+      }
+    } catch {
+      return undefined
+    }
+    return undefined
+  }
+
+  if (isRecord(raw)) {
+    return raw
+  }
+
+  return undefined
+}
+
+function countKeys(value: unknown): number {
+  if (!value || typeof value !== "object") return 0
+  return Object.keys(value).length
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value)
 }
 
 function filetype(input?: string) {
