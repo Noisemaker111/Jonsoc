@@ -1,30 +1,36 @@
-## Debugging
+# packages/app
 
-- NEVER try to restart the app, or the server process, EVER.
+## OVERVIEW
 
-## Local Dev
+SolidJS/OpenTUI TUI client for the JonsOC CLI.
 
-- `jonsoc dev web` proxies `https://app.jonsoc.com`, so local UI/CSS changes will not show there.
-- For local UI changes, run the backend and app dev servers separately.
-- Backend (from `packages/jonsoc`): `bun run --conditions=browser ./src/index.ts serve --port 4096`
-- App (from `packages/app`): `bun dev -- --port 4444`
-- Open `http://localhost:4444` to verify UI changes (it targets the backend at `http://localhost:4096`).
+## STRUCTURE
 
-## SolidJS
+- src/pages: route-level views
+- src/components: TUI components and composites
+- src/context: app-wide state providers
+- src/hooks: Solid hooks
+- src/utils: DOM, persistence, worktree helpers
+- src/i18n: locale dictionaries
+- e2e: Playwright specs
+- script: dev helpers
 
-- Always prefer `createStore` over multiple `createSignal` calls
+## WHERE TO LOOK
 
-## Tool Calling
+- Edit packages/app/src/app.tsx: app root + providers
+- Edit packages/app/src/entry.tsx: web bootstrap and platform adapter
+- Edit packages/app/src/pages/layout.tsx: shell layout
+- Edit packages/app/src/pages/session.tsx: terminal session UI
+- Edit packages/app/src/context/platform.tsx: platform contract
+- Edit packages/app/src/index.ts: public exports
 
-- ALWAYS USE PARALLEL TOOLS WHEN APPLICABLE.
+## CONVENTIONS
 
-## Browser Automation
+- Prefer `createStore` over multiple `createSignal` calls
+- Local UI work: run backend `bun run --conditions=browser ./src/index.ts serve --port 4096` in `packages/jonsoc`
+- Local UI work: run app `bun dev -- --port 4444` in `packages/app`
 
-Use `agent-browser` for web automation. Run `agent-browser --help` for all commands.
+## ANTI-PATTERNS
 
-Core workflow:
-
-1. `agent-browser open <url>` - Navigate to page
-2. `agent-browser snapshot -i` - Get interactive elements with refs (@e1, @e2)
-3. `agent-browser click @e1` / `fill @e2 "text"` - Interact using refs
-4. Re-snapshot after page changes
+- Restarting app or server during debugging
+- Using `jonsoc dev web` for UI changes (proxies prod UI)

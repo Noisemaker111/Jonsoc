@@ -1,0 +1,31 @@
+# Utilities
+Shared helpers for the core workspace packages.
+---
+## Review overview
+This package provides small, single-purpose utilities for reuse.
+---
+## Check where to look
+- `src/` core utility implementations for per-file exports.
+- `.turbo/` local typecheck cache, generated.
+- `node_modules/` workspace-local dependencies, generated.
+- `src/binary.ts` binary search and sorted insert helpers.
+- `src/encode.ts` base64url encode/decode, hashing, checksums.
+- `src/error.ts` `NamedError` factory with zod schema metadata.
+- `src/fn.ts` schema-validated wrapper for functions.
+- `src/identifier.ts` monotonic, sortable id generator.
+- `src/iife.ts` immediate invocation helper.
+- `src/lazy.ts` memoized initializer.
+- `src/path.ts` filename, directory, extension helpers.
+- `src/retry.ts` retry with backoff and transient detection.
+- `src/slug.ts` adjective-noun slug generator.
+---
+## Follow conventions
+- Import by file path, e.g. `@jonsoc/util/retry`.
+- Use named exports and namespaces (`Binary`, `Slug`, `Identifier`).
+- Keep modules dependency-light; only `zod` is shared.
+- Prefer pure helpers with minimal runtime state.
+---
+## Avoid anti-patterns
+- Do not add default exports or barrel re-exports.
+- Avoid mutating inputs unless the helper documents it.
+- Avoid cross-imports between utility files.
