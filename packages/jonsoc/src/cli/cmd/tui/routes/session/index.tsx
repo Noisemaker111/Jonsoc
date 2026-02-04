@@ -83,6 +83,7 @@ import { QuestionPrompt } from "./question"
 import { DialogExportOptions } from "../../ui/dialog-export-options"
 import { formatTranscript } from "../../util/transcript"
 import { createColors, createFrames } from "../../ui/spinner.ts"
+import { openFileInNavigator } from "./open-file"
 
 addDefaultParsers(parsers.parsers)
 
@@ -123,6 +124,7 @@ export function Session() {
   const layout = useLayout()
   const [selectedFilePath, setSelectedFilePath] = createSignal<string | null>(null)
   const [selectedFileMode, setSelectedFileMode] = createSignal<"file" | "diff">("file")
+  const [activePanel, setActivePanel] = createSignal<"explorer" | "viewer" | "chat">("explorer")
 
   // Declare scroll ref as signal for reactivity
   const [scroll, setScroll] = createSignal<ScrollBoxRenderable | undefined>(undefined)
@@ -1016,6 +1018,8 @@ export function Session() {
         explorer={
           <ExplorerPanel
             width={explorerWidth()}
+            isActive={() => activePanel() === "explorer"}
+            onFocus={() => setActivePanel("explorer")}
             onSelect={(path, type) => {
               if (type === "file") {
                 setSelectedFilePath(path)
@@ -1029,7 +1033,14 @@ export function Session() {
           />
         }
         chat={
-          <box height="100%" gap={1} onMouseUp={() => promptRef.current?.focus()}>
+          <box
+            height="100%"
+            gap={1}
+            onMouseUp={() => {
+              setActivePanel("chat")
+              promptRef.current?.focus()
+            }}
+          >
             <Show when={session()}>
               <Header
                 navigatorOpen={layout.getPanelByType("explorer")?.visible ?? false}
@@ -1182,6 +1193,7 @@ export function Session() {
             filePath={selectedFilePath()}
             wrapMode={navigatorWrapMode()}
             viewMode={selectedFileMode()}
+            onFocus={() => setActivePanel("viewer")}
           />
         }
       />
@@ -1525,24 +1537,7 @@ function FileReferenceText(props: { last: boolean; part: TextPart; message: Assi
   })
 
   const handleFileClick = (path?: string, line?: number) => {
-    if (!path) return
-    void (async () => {
-      const normalizedPath = path.replace(/\\/g, "/")
-      const file = await sdk.client.file.read({ path: normalizedPath }).catch(() => undefined)
-      if (!file?.data) return
-      if (file.data.encoding === "base64") return
-      const content = file.data.content ?? ""
-      const lines = content.split("\n")
-      let charOffset = 0
-      if (line && line > 0 && line <= lines.length) {
-        const lineIndex = line - 1
-        const linesBefore = lines.slice(0, lineIndex)
-        charOffset = linesBefore.join("\n").length
-      }
-      kv.set("navigator_open", true)
-      kv.set("navigator_active_path", normalizedPath)
-      kv.set("navigator_open_file", { path: normalizedPath, line: charOffset })
-    })()
+    void openFileInNavigator(kv, sdk, path, line)
   }
 
   return (
@@ -1567,9 +1562,7 @@ function FileReferenceText(props: { last: boolean; part: TextPart; message: Assi
               <Switch>
                 <Match when={part.type === "fileref" && (part.exists ?? true)}>
                   <text fg={theme.markdownLink} onMouseUp={() => handleFileClick(part.path!, part.line)}>
-                    <span style={{ fg: theme.textMuted }}>[</span>
                     {part.content}
-                    <span style={{ fg: theme.textMuted }}>]</span>
                   </text>
                 </Match>
                 <Match when={part.type === "fileref" && !part.exists}>
@@ -1777,11 +1770,13 @@ function InlineTool(props: {
   pending: string
   children: JSX.Element
   part: ToolPart
+  onClick?: () => void
 }) {
   const [margin, setMargin] = createSignal(0)
   const { theme } = useTheme()
   const ctx = use()
   const sync = useSync()
+  const renderer = useRenderer()
 
   const permission = createMemo(() => {
     const callID = sync.data.permission[ctx.sessionID]?.at(0)?.tool?.callID
@@ -1791,6 +1786,7 @@ function InlineTool(props: {
 
   const fg = createMemo(() => {
     if (permission()) return theme.warning
+    if (props.onClick) return theme.markdownLink
     if (props.complete) return theme.textMuted
     return theme.text
   })
@@ -1831,7 +1827,15 @@ function InlineTool(props: {
         }
       }}
     >
-      <text paddingLeft={3} fg={fg()} attributes={denied() ? TextAttributes.STRIKETHROUGH : undefined}>
+      <text
+        paddingLeft={3}
+        fg={fg()}
+        attributes={denied() ? TextAttributes.STRIKETHROUGH : undefined}
+        onMouseUp={() => {
+          if (renderer.getSelection()?.getSelectedText()) return
+          props.onClick?.()
+        }}
+      >
         <Show fallback={<>~ {props.pending}</>} when={props.complete}>
           <span style={{ fg: props.iconColor }}>{props.icon}</span> {props.children}
         </Show>
@@ -1848,12 +1852,14 @@ function BlockTool(props: {
   prefix?: JSX.Element
   children: JSX.Element
   onClick?: () => void
+  titleOnClick?: () => void
   part?: ToolPart
 }) {
   const { theme } = useTheme()
   const renderer = useRenderer()
   const [hover, setHover] = createSignal(false)
   const error = createMemo(() => (props.part?.state.status === "error" ? props.part.state.error : undefined))
+  const titleColor = createMemo(() => (props.titleOnClick ? theme.markdownLink : theme.textMuted))
   return (
     <box
       border={["left"]}
@@ -1874,7 +1880,15 @@ function BlockTool(props: {
     >
       <box flexDirection="row" paddingLeft={props.prefix ? 1 : 3} gap={1} alignItems="center">
         <Show when={props.prefix}>{props.prefix}</Show>
-        <text fg={theme.textMuted}>{props.title}</text>
+        <text
+          fg={titleColor()}
+          onMouseUp={() => {
+            if (renderer.getSelection()?.getSelectedText()) return
+            props.titleOnClick?.()
+          }}
+        >
+          {props.title}
+        </text>
       </box>
       {props.children}
       <Show when={error()}>
@@ -2154,6 +2168,8 @@ function Task(props: ToolProps<typeof TaskTool>) {
 function Edit(props: ToolProps<typeof EditTool>) {
   const ctx = use()
   const { theme, syntax } = useTheme()
+  const sdk = useSDK()
+  const kv = useKV()
 
   const view = createMemo(() => {
     const diffStyle = ctx.sync.data.config.tui?.diff_style
@@ -2175,7 +2191,11 @@ function Edit(props: ToolProps<typeof EditTool>) {
   return (
     <Switch>
       <Match when={props.metadata.diff !== undefined}>
-        <BlockTool title={"← Edit " + normalizePath(props.input.filePath!)} part={props.part}>
+        <BlockTool
+          title={"← Edit " + normalizePath(props.input.filePath!)}
+          part={props.part}
+          titleOnClick={() => openFileInNavigator(kv, sdk, props.input.filePath)}
+        >
           <box paddingLeft={1}>
             <diff
               diff={diffContent()}
@@ -2212,7 +2232,13 @@ function Edit(props: ToolProps<typeof EditTool>) {
         </BlockTool>
       </Match>
       <Match when={true}>
-        <InlineTool icon="←" pending="Preparing edit..." complete={props.input.filePath} part={props.part}>
+        <InlineTool
+          icon="←"
+          pending="Preparing edit..."
+          complete={props.input.filePath}
+          part={props.part}
+          onClick={() => openFileInNavigator(kv, sdk, props.input.filePath)}
+        >
           Edit {normalizePath(props.input.filePath!)} {input({ replaceAll: props.input.replaceAll })}
         </InlineTool>
       </Match>

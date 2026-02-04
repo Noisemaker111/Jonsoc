@@ -9,6 +9,8 @@ import { useSDK } from "../../context/sdk"
 import { SplitBorder } from "../../component/border"
 import { useSync } from "../../context/sync"
 import { useTextareaKeybindings } from "../../component/textarea-keybindings"
+import { useKV } from "../../context/kv"
+import { openFileInNavigator } from "./open-file"
 import path from "path"
 import { LANGUAGE_EXTENSIONS } from "@/lsp/language"
 import { Keybind } from "@/util/keybind"
@@ -49,6 +51,8 @@ function EditBody(props: { request: PermissionRequest }) {
   const syntax = themeState.syntax
   const sync = useSync()
   const dimensions = useTerminalDimensions()
+  const kv = useKV()
+  const sdk = useSDK()
 
   const filepath = createMemo(() => (props.request.metadata?.filepath as string) ?? "")
   const diff = createMemo(() => (props.request.metadata?.diff as string) ?? "")
@@ -65,7 +69,9 @@ function EditBody(props: { request: PermissionRequest }) {
     <box flexDirection="column" gap={1}>
       <box flexDirection="row" gap={1} paddingLeft={1}>
         <text fg={theme.textMuted}>{"→"}</text>
-        <text fg={theme.textMuted}>Edit {normalizePath(filepath())}</text>
+        <text fg={theme.markdownLink} onMouseUp={() => openFileInNavigator(kv, sdk, filepath())}>
+          Edit {normalizePath(filepath())}
+        </text>
       </box>
       <Show when={diff()}>
         <scrollbox height="100%">
