@@ -188,77 +188,8 @@ jobs:
         env:
           PUBLISH_VERSION: ${{ needs.determine-version.outputs.version }}
 
-      - name: Publish @jonsoc/util
-        working-directory: packages/util
-        run: |
-          VERSION=$(jq -r '.version' package.json)
-          npm view @jonsoc/util@$VERSION version > /dev/null 2>&1 || npm publish --provenance --access public
-
-      - name: Publish @jonsoc/env
-        working-directory: packages/env
-        run: |
-          VERSION=$(jq -r '.version' package.json)
-          npm view @jonsoc/env@$VERSION version > /dev/null 2>&1 || npm publish --provenance --access public
-
-      - name: Publish @jonsoc/sdk
-        working-directory: packages/sdk/js
-        run: |
-          VERSION=$(jq -r '.version' package.json)
-          npm view @jonsoc/sdk@$VERSION version > /dev/null 2>&1 || npm publish --provenance --access public
-
-      - name: Publish @jonsoc/script
-        working-directory: packages/script
-        run: |
-          VERSION=$(jq -r '.version' package.json)
-          npm view @jonsoc/script@$VERSION version > /dev/null 2>&1 || npm publish --provenance --access public
-
-      - name: Publish @jonsoc/plugin
-        working-directory: packages/plugin
-        run: |
-          VERSION=$(jq -r '.version' package.json)
-          npm view @jonsoc/plugin@$VERSION version > /dev/null 2>&1 || npm publish --provenance --access public
-
-      - name: Publish @jonsoc/slack
-        working-directory: packages/slack
-        run: |
-          VERSION=$(jq -r '.version' package.json)
-          npm view @jonsoc/slack@$VERSION version > /dev/null 2>&1 || npm publish --provenance --access public
-
-      - name: Publish @jonsoc/convex
-        working-directory: packages/convex
-        run: |
-          VERSION=$(jq -r '.version' package.json)
-          npm view @jonsoc/convex@$VERSION version > /dev/null 2>&1 || npm publish --provenance --access public
-
-      - name: Publish @jonsoc/ui
-        working-directory: packages/ui
-        run: |
-          VERSION=$(jq -r '.version' package.json)
-          npm view @jonsoc/ui@$VERSION version > /dev/null 2>&1 || npm publish --provenance --access public
-
-      - name: Publish @jonsoc/app
-        working-directory: packages/app
-        run: |
-          VERSION=$(jq -r '.version' package.json)
-          npm view @jonsoc/app@$VERSION version > /dev/null 2>&1 || npm publish --provenance --access public
-
-      - name: Publish @jonsoc/web
-        working-directory: packages/web
-        run: |
-          VERSION=$(jq -r '.version' package.json)
-          npm view @jonsoc/web@$VERSION version > /dev/null 2>&1 || npm publish --provenance --access public
-
-      - name: Publish @jonsoc/console-resource
-        working-directory: packages/console/resource
-        run: |
-          VERSION=$(jq -r '.version' package.json)
-          npm view @jonsoc/console-resource@$VERSION version > /dev/null 2>&1 || npm publish --provenance --access public
-
-      - name: Publish @jonsoc/console-app
-        working-directory: packages/console/app
-        run: |
-          VERSION=$(jq -r '.version' package.json)
-          npm view @jonsoc/console-app@$VERSION version > /dev/null 2>&1 || npm publish --provenance --access public
+      - name: Publish scoped packages
+        run: bash scripts/publish-scoped-packages.sh
 
   publish-main:
     needs: [publish-scoped-packages, determine-version]
