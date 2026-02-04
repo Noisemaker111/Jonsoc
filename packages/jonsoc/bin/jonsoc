@@ -44,6 +44,7 @@ const safeIsolated =
   hasFlag("--safe-isolated") ||
   process.env.JONSOC_SAFE_ISOLATE === "1" ||
   process.env.OPENCODE_SAFE_ISOLATE === "1"
+const noUpdate = hasFlag("-no-update") || hasFlag("--no-update")
 const flagSet = new Set([
   "-safe",
   "--safe",
@@ -57,6 +58,8 @@ const flagSet = new Set([
   "--check",
   "-safe-isolated",
   "--safe-isolated",
+  "-no-update",
+  "--no-update",
 ])
 const baseArgs = rawArgs.filter((arg) => !flagSet.has(arg))
 const appName = process.env.JONSOC_APP_NAME ?? process.env.OPENCODE_APP_NAME ?? "jonsoc"
@@ -182,6 +185,8 @@ if (!supported.has(`${platform}-${arch}`)) {
 
 const pkgJsonPath = join(pkgDir, "package.json")
 let _version = null
+let _latestVersion = null
+
 function getVersion() {
   if (_version !== null) return _version
   if (!existsSync(pkgJsonPath)) {
@@ -192,6 +197,68 @@ function getVersion() {
   const data = JSON.parse(raw)
   _version = typeof data.version === "string" ? data.version : "latest"
   return _version
+}
+
+function getNpmRegistry() {
+  const result = spawnSync("npm", ["config", "get", "registry"], {
+    encoding: "utf8",
+    shell: osPlatform() === "win32",
+  })
+  if (result.error || result.status !== 0) return "https://registry.npmjs.org"
+  const registry = (result.stdout || "https://registry.npmjs.org").trim()
+  return registry.endsWith("/") ? registry.slice(0, -1) : registry
+}
+
+function getLatestVersionFromNpm() {
+  if (_latestVersion !== null) return _latestVersion
+  
+  const registry = getNpmRegistry()
+  const pkgName = "jonsoc"
+  const url = `${registry}/${pkgName}/latest`
+  
+  const result = spawnSync("curl", ["-fsSL", "-H", "Accept: application/json", url], {
+    encoding: "utf8",
+    shell: osPlatform() === "win32",
+  })
+  
+  if (result.error || result.status !== 0) {
+    console.error(`[jonsoc] Failed to check for updates: ${result.stderr || result.error?.message}`)
+    return null
+  }
+  
+  try {
+    const data = JSON.parse(result.stdout)
+    _latestVersion = data.version || null
+    return _latestVersion
+  } catch {
+    return null
+  }
+}
+
+function getAutoUpdateSetting() {
+  const configPaths = [
+    join(dataDir, "jonsoc.json"),
+    join(homedir(), ".jonsoc", "jonsoc.json"),
+    join(homedir(), ".config", "jonsoc", "jonsoc.json"),
+    join(homedir(), ".opencode.json"),
+  ]
+  
+  for (const configPath of configPaths) {
+    if (existsSync(configPath)) {
+      try {
+        const raw = readFileSync(configPath, "utf8")
+        const config = JSON.parse(raw)
+        if (config.autoupdate !== undefined) {
+          return config.autoupdate
+        }
+      } catch {
+        // Continue to next config
+      }
+    }
+  }
+  
+  // Default to auto-update
+  return true
 }
 
 const repo = (process.env.JONSOC_REPO ?? process.env.OPENCODE_REPO ?? "Noisemaker111/Jonsoc").replace(
@@ -209,11 +276,53 @@ function ensureDir(dir) {
   mkdirSync(dir, { recursive: true })
 }
 
+function getInstalledVersion() {
+  if (!existsSync(versionFile)) return null
+  return readFileSync(versionFile, "utf8").trim()
+}
+
 function versionMatch() {
   if (!existsSync(binaryPath)) return false
-  if (!existsSync(versionFile)) return false
-  const stored = readFileSync(versionFile, "utf8").trim()
-  return stored === getVersion()
+  const stored = getInstalledVersion()
+  if (!stored) return false
+  
+  const autoUpdate = getAutoUpdateSetting()
+  
+  // If auto-update is disabled, check against local package.json version
+  if (autoUpdate === false) {
+    return stored === getVersion()
+  }
+  
+  // Check against latest npm version
+  const latest = getLatestVersionFromNpm()
+  if (!latest) {
+    // Fall back to local version if npm check fails
+    return stored === getVersion()
+  }
+  
+  return stored === latest
+}
+
+function needsUpdate() {
+  if (!existsSync(binaryPath)) return true
+  
+  // Respect --no-update flag
+  if (noUpdate) {
+    return false
+  }
+  
+  const autoUpdate = getAutoUpdateSetting()
+  if (autoUpdate === false) {
+    return false
+  }
+  
+  const stored = getInstalledVersion()
+  const latest = getLatestVersionFromNpm()
+  
+  if (!latest) return false
+  if (!stored) return true
+  
+  return stored !== latest
 }
 
 function releaseUrl(targetVersion = getVersion()) {
@@ -264,14 +373,46 @@ function bundledBinary() {
 function ensureBinary() {
   const bundle = bundledBinary()
   if (bundle) return bundle
-  if (versionMatch()) return binaryPath
+  
+  const autoUpdate = getAutoUpdateSetting()
+  
+  // Check if we need to update
+  const shouldUpdate = needsUpdate()
+  
+  if (!shouldUpdate && versionMatch()) {
+    return binaryPath
+  }
+  
+  // Handle "notify" setting - just show message and continue with current binary
+  if (autoUpdate === "notify" && shouldUpdate) {
+    const latest = getLatestVersionFromNpm()
+    const current = getInstalledVersion() || getVersion()
+    console.error(`[jonsoc] Update available: ${current} → ${latest}`)
+    console.error(`[jonsoc] Run with autoupdate enabled to update automatically`)
+    if (existsSync(binaryPath)) {
+      return binaryPath
+    }
+  }
+  
+  // If auto-update is disabled and binary exists, use it
+  if (autoUpdate === false && existsSync(binaryPath)) {
+    return binaryPath
+  }
+  
   ensureDir(binDir)
 
-  const currentVersion = getVersion()
-  let targetVersion = currentVersion
+  // Get target version - prefer latest from npm
+  let targetVersion = getLatestVersionFromNpm()
+  
+  // Fall back to local package.json version if npm check fails
+  if (!targetVersion) {
+    targetVersion = getVersion()
+    console.error(`[jonsoc] Could not check for updates, using local version ${targetVersion}`)
+  }
+  
   let targetUrl = releaseUrl(targetVersion)
 
-  if (currentVersion !== "latest" && !checkReleaseExists(targetVersion)) {
+  if (targetVersion !== "latest" && !checkReleaseExists(targetVersion)) {
     console.error(`[jonsoc] Release v${targetVersion} not found, trying latest...`)
     targetVersion = "latest"
     targetUrl = releaseUrl(targetVersion)
@@ -285,7 +426,7 @@ function ensureBinary() {
 
   const { asset, url } = targetUrl
   const archivePath = join(dataDir, asset)
-  console.error(`[jonsoc] Downloading ${url}...`)
+  console.error(`[jonsoc] Downloading jonsoc ${targetVersion}...`)
   const code = run("curl", ["-fL", "-o", archivePath, url], { env })
   if (code !== 0) {
     console.error(`[jonsoc] Failed to download ${url}`)
