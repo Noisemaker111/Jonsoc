@@ -1,4 +1,4 @@
-import { type Accessor, Show } from "solid-js"
+import { type Accessor, onCleanup, Show } from "solid-js"
 import type { InputRenderable } from "@opentui/core"
 import { useTheme } from "@tui/context/theme"
 import { ActionButton } from "./navigator-ui"
@@ -9,11 +9,16 @@ export type GitCommitProps = {
   onCommit: () => void
   onPush?: () => void
   hasCommitsToPush?: Accessor<boolean>
+  onInputRef?: (input: InputRenderable | undefined) => void
 }
 
 export function GitCommit(props: GitCommitProps) {
   const theme = useTheme()
   let input: InputRenderable
+
+  onCleanup(() => {
+    props.onInputRef?.(undefined)
+  })
 
   return (
     <box
@@ -35,7 +40,10 @@ export function GitCommit(props: GitCommitProps) {
         onMouseUp={() => input?.focus()}
       >
         <input
-          ref={(el) => (input = el)}
+          ref={(el) => {
+            input = el
+            props.onInputRef?.(el)
+          }}
           placeholder="Message..."
           value={props.commitMessage()}
           onInput={props.setCommitMessage}

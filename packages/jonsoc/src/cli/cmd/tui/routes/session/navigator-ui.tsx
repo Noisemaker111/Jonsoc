@@ -69,12 +69,12 @@ export function ActionButton(props: {
       paddingLeft={1}
       paddingRight={1}
       backgroundColor={bg()}
-      onMouseDown={(event) => {
+      onMouseDown={(event) => event.stopPropagation()}
+      onMouseUp={(event) => {
         event.stopPropagation()
         if (props.disabled) return
         props.onSelect()
       }}
-      onMouseUp={(event) => event.stopPropagation()}
       justifyContent="center"
     >
       <text fg={fg()} wrapMode="none" attributes={props.primary ? TextAttributes.BOLD : undefined}>
@@ -97,12 +97,12 @@ export function IconButton(props: { icon: string; onSelect: () => void; disabled
       paddingLeft={1}
       paddingRight={1}
       backgroundColor={theme.theme.backgroundElement}
-      onMouseDown={(event) => {
+      onMouseDown={(event) => event.stopPropagation()}
+      onMouseUp={(event) => {
         event.stopPropagation()
         if (props.disabled) return
         props.onSelect()
       }}
-      onMouseUp={(event) => event.stopPropagation()}
       justifyContent="center"
     >
       <text fg={fg()} wrapMode="none" attributes={TextAttributes.BOLD}>
@@ -180,6 +180,7 @@ export function ExplorerRow(props: {
 }
 
 export function GitRow(props: {
+  id?: string
   entry: FileStatus & { staged?: boolean }
   active: boolean
   width: number
@@ -216,7 +217,7 @@ export function GitRow(props: {
 
   return (
     <box
-      id={props.entry.path}
+      id={props.id ?? props.entry.path}
       flexDirection="row"
       paddingLeft={1}
       paddingRight={1}
