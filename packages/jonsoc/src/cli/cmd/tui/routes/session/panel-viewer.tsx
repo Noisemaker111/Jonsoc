@@ -32,6 +32,7 @@ interface FileViewerPanelProps {
   filePath: string | null
   wrapMode?: "word" | "none"
   viewMode?: "file" | "diff"
+  onFocus?: () => void
 }
 
 export function FileViewerPanel(props: FileViewerPanelProps) {
@@ -282,7 +283,7 @@ export function FileViewerPanel(props: FileViewerPanelProps) {
   })
 
   return (
-    <box width={props.width} height="100%" flexDirection="row">
+    <box width={props.width} height="100%" flexDirection="row" onMouseUp={props.onFocus}>
       {/* Left side: header + content */}
       <box flexDirection="column" flexGrow={1} backgroundColor={theme.theme.background}>
         {/* Header with file path and status */}

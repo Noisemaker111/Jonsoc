@@ -1,5 +1,6 @@
 import {
   batch,
+  type Accessor,
   createEffect,
   createMemo,
   createResource,
@@ -11,7 +12,7 @@ import {
   Switch,
 } from "solid-js"
 import { createStore } from "solid-js/store"
-import type { ScrollBoxRenderable, ScrollAcceleration } from "@opentui/core"
+import type { InputRenderable, ScrollBoxRenderable, ScrollAcceleration } from "@opentui/core"
 import { TextAttributes } from "@opentui/core"
 import { useKeyboard, useTerminalDimensions } from "@opentui/solid"
 import { useTheme } from "@tui/context/theme"
@@ -21,6 +22,8 @@ import { useKV } from "@tui/context/kv"
 import { usePromptRef } from "@tui/context/prompt"
 import { useToast } from "@tui/ui/toast"
 import { useDialog } from "@tui/ui/dialog"
+import { DialogPrompt } from "@tui/ui/dialog-prompt"
+import { DialogSelect } from "@tui/ui/dialog-select"
 import { SplitBorder } from "@tui/component/border"
 import { Locale } from "@/util/locale"
 import { Global } from "@/global"
@@ -52,6 +55,8 @@ type ExplorerTab = "explorer" | "git"
 interface ExplorerPanelProps {
   width: number
   onSelect: (path: string, type: "file" | "directory" | "diff") => void
+  isActive?: Accessor<boolean>
+  onFocus?: () => void
 }
 
 export function ExplorerPanel(props: ExplorerPanelProps) {
@@ -88,6 +93,7 @@ export function ExplorerPanel(props: ExplorerPanelProps) {
   const [explorerScroll, setExplorerScroll] = createSignal<ScrollBoxRenderable | undefined>(undefined)
   const [gitScroll, setGitScroll] = createSignal<ScrollBoxRenderable | undefined>(undefined)
   const [commitMessage, setCommitMessage] = createSignal("")
+  const [commitInput, setCommitInput] = createSignal<InputRenderable | undefined>(undefined)
 
   const [status, { refetch: refreshStatus, mutate: mutateStatus }] = createResource(
     () => (loaded() ? "open" : undefined),
@@ -142,13 +148,16 @@ export function ExplorerPanel(props: ExplorerPanelProps) {
 
   const branch = createMemo(() => sync.data.vcs?.branch)
 
-  const statusEntries = createMemo(() => {
-    const entries = (status() ?? []).filter((entry) => {
+  const rawStatusEntries = createMemo(() => status() ?? [])
+  const filteredStatusEntries = createMemo(() =>
+    rawStatusEntries().filter((entry) => {
       if (entry.status !== "modified") return true
       return entry.added !== 0 || entry.removed !== 0
-    })
+    }),
+  )
+  const statusEntries = createMemo(() => {
     const byPath = new Map<string, FileStatusWithStaged>()
-    for (const entry of entries) {
+    for (const entry of filteredStatusEntries()) {
       const existing = byPath.get(entry.path)
       if (!existing) {
         byPath.set(entry.path, entry)
@@ -186,7 +195,7 @@ export function ExplorerPanel(props: ExplorerPanelProps) {
   })
 
   const stagedEntries = createMemo(() => {
-    const entries = statusEntries().filter((e) => e.staged)
+    const entries = filteredStatusEntries().filter((e) => e.staged)
     const order = {
       added: 0,
       modified: 1,
@@ -200,7 +209,7 @@ export function ExplorerPanel(props: ExplorerPanelProps) {
   })
 
   const unstagedEntries = createMemo(() => {
-    const entries = statusEntries().filter((e) => !e.staged)
+    const entries = filteredStatusEntries().filter((e) => !e.staged)
     const order = {
       added: 0,
       modified: 1,
@@ -216,11 +225,13 @@ export function ExplorerPanel(props: ExplorerPanelProps) {
   const hasExplorerEntries = createMemo(() => explorerEntries().length > 0)
   const hasStagedEntries = createMemo(() => stagedEntries().length > 0)
   const hasUnstagedEntries = createMemo(() => unstagedEntries().length > 0)
-  const hasGitEntries = createMemo(() => statusEntries().length > 0)
+  const hasGitEntries = createMemo(() => filteredStatusEntries().length > 0)
 
   const allGitEntries = createMemo(() => {
     return [...stagedEntries(), ...unstagedEntries()]
   })
+
+  const gitEntryId = (entry: FileStatusWithStaged) => `${entry.path}:${entry.staged ? "staged" : "unstaged"}`
 
   const historyEntries = createMemo(() => history() ?? [])
   const historyHeight = createMemo(() => Math.max(8, Math.floor(term().height * 0.35)))
@@ -265,7 +276,7 @@ export function ExplorerPanel(props: ExplorerPanelProps) {
     const scroll = gitScroll()
     const entry = selectedGitEntry()
     if (!scroll || !entry) return
-    ensureVisible(scroll, entry.path)
+    ensureVisible(scroll, gitEntryId(entry))
   })
 
   const selectedExplorerEntry = createMemo(() => {
@@ -312,7 +323,7 @@ export function ExplorerPanel(props: ExplorerPanelProps) {
     setSelectedGit(() => next)
     const entry = list[next]
     if (!entry) return
-    ensureVisible(gitScroll(), entry.path)
+    ensureVisible(gitScroll(), gitEntryId(entry))
   }
 
   const loadDirectory = async (dir: string) => {
@@ -370,6 +381,14 @@ export function ExplorerPanel(props: ExplorerPanelProps) {
     refreshStatus()
     refreshHistory()
     refreshStashList()
+  }
+
+  const runShell = (command: string) => {
+    const ref = promptRef.current
+    if (!ref) return
+    ref.set({ input: command, mode: "shell", parts: [] })
+    ref.focus()
+    ref.submit()
   }
 
   const cloneStatusEntries = (entries: FileStatusWithStaged[]) => entries.map((entry) => ({ ...entry }))
@@ -499,14 +518,15 @@ export function ExplorerPanel(props: ExplorerPanelProps) {
 
   const handleStageAll = async () => {
     const entries = unstagedEntries()
-    if (entries.length === 0) return
+    const paths = Array.from(new Set(entries.map((entry) => entry.path)))
+    if (paths.length === 0) return
     const revert = applyOptimisticStageAll(true)
     try {
-      for (const entry of entries) {
-        await runVcsRequest("/vcs/stage", entry.path)
+      for (const path of paths) {
+        await runVcsRequest("/vcs/stage", path)
       }
       void refreshStatus()
-      toast.show({ variant: "success", message: `Staged ${entries.length} file${entries.length === 1 ? "" : "s"}` })
+      toast.show({ variant: "success", message: `Staged ${paths.length} file${paths.length === 1 ? "" : "s"}` })
     } catch (err: any) {
       revert()
       toast.show({ variant: "error", message: `Failed to stage all: ${err.message}` })
@@ -515,14 +535,15 @@ export function ExplorerPanel(props: ExplorerPanelProps) {
 
   const handleUnstageAll = async () => {
     const entries = stagedEntries()
-    if (entries.length === 0) return
+    const paths = Array.from(new Set(entries.map((entry) => entry.path)))
+    if (paths.length === 0) return
     const revert = applyOptimisticStageAll(false)
     try {
-      for (const entry of entries) {
-        await runVcsRequest("/vcs/unstage", entry.path)
+      for (const path of paths) {
+        await runVcsRequest("/vcs/unstage", path)
       }
       void refreshStatus()
-      toast.show({ variant: "success", message: `Unstaged ${entries.length} file${entries.length === 1 ? "" : "s"}` })
+      toast.show({ variant: "success", message: `Unstaged ${paths.length} file${paths.length === 1 ? "" : "s"}` })
     } catch (err: any) {
       revert()
       toast.show({ variant: "error", message: `Failed to unstage all: ${err.message}` })
@@ -604,8 +625,45 @@ export function ExplorerPanel(props: ExplorerPanelProps) {
     if (!list || !Array.isArray(list)) return
 
     const current = branch()
-    // Branch switcher would need dialog context, skipping for now
-    // This is a simplified version without dialog support
+    dialog.replace(() => (
+      <DialogSelect
+        title="Switch branch"
+        options={[
+          { title: "+ New branch...", value: "__new__" },
+          ...list.map((b: string) => ({
+            title: b,
+            value: b,
+          })),
+        ]}
+        current={current}
+        onSelect={async (opt) => {
+          if (opt.value === "__new__") {
+            dialog.replace(() => (
+              <DialogPrompt
+                title="Create branch"
+                placeholder="branch-name"
+                onConfirm={(name) => {
+                  dialog.clear()
+                  const trimmed = name.trim()
+                  if (!trimmed) return
+                  runShell(`git checkout -b ${trimmed}`)
+                  refreshGit()
+                }}
+                onCancel={() => openBranchSwitcher()}
+              />
+            ))
+            return
+          }
+          dialog.clear()
+          await fetch(`${sdk.url}/vcs/checkout`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ branch: opt.value }),
+          })
+          refreshGit()
+        }}
+      />
+    ))
   }
 
   const openStashView = () => {
@@ -625,7 +683,9 @@ export function ExplorerPanel(props: ExplorerPanelProps) {
   const dialog = useDialog()
   useKeyboard((evt) => {
     if (dialog.isOpen()) return
+    if (props.isActive && !props.isActive()) return
     if (promptRef.current?.focused) return
+    if (commitInput()?.focused) return
     if (evt.name === "tab") {
       evt.preventDefault()
       setTab((value) => (value === "explorer" ? "git" : "explorer"))
@@ -727,7 +787,13 @@ export function ExplorerPanel(props: ExplorerPanelProps) {
   })
 
   return (
-    <box width={props.width} height="100%" flexDirection="column" backgroundColor={theme.theme.background}>
+    <box
+      width={props.width}
+      height="100%"
+      flexDirection="column"
+      backgroundColor={theme.theme.background}
+      onMouseUp={props.onFocus}
+    >
       <box
         paddingLeft={2}
         paddingRight={2}
@@ -766,6 +832,7 @@ export function ExplorerPanel(props: ExplorerPanelProps) {
             onCommit={handleCommit}
             onPush={handlePush}
             hasCommitsToPush={hasCommitsToPush}
+            onInputRef={setCommitInput}
           />
           <Show
             when={hasGitEntries()}
@@ -807,6 +874,7 @@ export function ExplorerPanel(props: ExplorerPanelProps) {
                 <For each={stagedEntries()}>
                   {(entry, index) => (
                     <GitRow
+                      id={gitEntryId(entry)}
                       entry={entry}
                       width={props.width}
                       active={index() === selectedGit()}
@@ -859,6 +927,7 @@ export function ExplorerPanel(props: ExplorerPanelProps) {
                     const offsetIndex = () => stagedEntries().length + index()
                     return (
                       <GitRow
+                        id={gitEntryId(entry)}
                         entry={entry}
                         width={props.width}
                         active={offsetIndex() === selectedGit()}

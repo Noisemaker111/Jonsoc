@@ -26,6 +26,7 @@ export function Home() {
   const promptRef = usePromptRef()
   const layout = useLayout()
   const [selectedFilePath, setSelectedFilePath] = createSignal<string | null>(null)
+  const [activePanel, setActivePanel] = createSignal<"explorer" | "viewer" | "chat">("explorer")
   const mcpError = createMemo(() => {
     return Object.values(sync.data.mcp).some((x) => x.status === "failed")
   })
@@ -93,6 +94,8 @@ export function Home() {
       explorer={
         <ExplorerPanel
           width={explorerWidth()}
+          isActive={() => activePanel() === "explorer"}
+          onFocus={() => setActivePanel("explorer")}
           onSelect={(path, type) => {
             if (type === "file") {
               setSelectedFilePath(path)
@@ -101,7 +104,15 @@ export function Home() {
         />
       }
       chat={
-        <box height="100%" paddingBottom={1} gap={1} onMouseUp={() => promptRef.current?.focus()}>
+        <box
+          height="100%"
+          paddingBottom={1}
+          gap={1}
+          onMouseUp={() => {
+            setActivePanel("chat")
+            promptRef.current?.focus()
+          }}
+        >
           <box
             paddingTop={1}
             paddingBottom={1}
@@ -133,7 +144,9 @@ export function Home() {
           <Toast />
         </box>
       }
-      viewer={<FileViewerPanel width={viewerWidth()} filePath={selectedFilePath()} />}
+      viewer={
+        <FileViewerPanel width={viewerWidth()} filePath={selectedFilePath()} onFocus={() => setActivePanel("viewer")} />
+      }
     />
   )
 }
