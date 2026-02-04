@@ -659,6 +659,54 @@ export namespace SessionPrompt {
     return new Error(String(error))
   }
 
+  function isV1RetryableError(error: unknown): boolean {
+    if (error instanceof Error) {
+      const message = error.message.toLowerCase()
+      return message.includes("502") || message.includes("bad gateway") || message.includes("streamable http error")
+    }
+    return false
+  }
+
+  async function retryV1Tool<T>(tool: string, execute: () => Promise<T>): Promise<T> {
+    if (!tool.startsWith("v1_")) {
+      return execute()
+    }
+
+    const delays = [400, 900]
+    let lastError: unknown
+    let attempt = 0
+    for (const delay of delays) {
+      try {
+        attempt += 1
+        return await execute()
+      } catch (error) {
+        lastError = error
+        if (!isV1RetryableError(error)) {
+          throw error
+        }
+        await sleep(delay)
+      }
+    }
+
+    attempt += 1
+    try {
+      return await execute()
+    } catch (error) {
+      lastError = error
+    }
+
+    if (lastError instanceof Error) {
+      throw new Error(`${lastError.message} (after ${attempt} attempts)`, { cause: lastError })
+    }
+    throw lastError
+  }
+
+  function sleep(ms: number) {
+    return new Promise<void>((resolve) => {
+      setTimeout(resolve, ms)
+    })
+  }
+
   function formatV1ErrorMessage(message: string): string | undefined {
     const titleMatch = message.match(/<title>([^<]+)<\/title>/i)
     if (titleMatch) {
@@ -789,7 +837,7 @@ export namespace SessionPrompt {
 
         let result: Awaited<ReturnType<typeof execute>>
         try {
-          result = await execute(args, opts)
+          result = await retryV1Tool(key, () => execute(args, opts))
         } catch (error) {
           throw formatMcpToolError(key, error)
         }
