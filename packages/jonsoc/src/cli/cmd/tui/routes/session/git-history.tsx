@@ -47,8 +47,8 @@ export function GitHistory(props: GitHistoryProps) {
             <b>History</b>
           </text>
           <Show when={props.branch()}>
-            <box backgroundColor={theme.theme.primary} paddingLeft={1} paddingRight={1}>
-              <text fg={selectedForeground(theme.theme, theme.theme.primary)} wrapMode="none">
+            <box backgroundColor={theme.theme.backgroundElement} paddingLeft={1} paddingRight={1}>
+              <text fg={theme.theme.text} wrapMode="none">
                 {props.branch()}
               </text>
             </box>
@@ -97,34 +97,43 @@ function HistoryRow(props: { entry: VcsHistoryLine & { author?: string } }) {
   const graph = () =>
     props.entry.graph.replace(/\*/g, "●").replace(/\|/g, "│").replace(/\//g, "╯").replace(/\\/g, "╰").replace(/_/g, "─")
 
-  const cleanedRefs = createMemo(() => {
-    if (!props.entry.refs) return []
-    return props.entry.refs.map((r) => r.replace("HEAD -> ", "● "))
+  const displayRefs = createMemo(() => {
+    const refs = props.entry.refs ?? []
+    const head = refs.find((ref) => ref.includes("HEAD -> "))
+    const tag = refs.find((ref) => ref.startsWith("tag: "))
+    const local = refs.find((ref) => !ref.includes("/") && !ref.startsWith("tag: ") && !ref.includes("HEAD -> "))
+    const remote = refs.find((ref) => ref.includes("/") && !ref.startsWith("tag: ") && !ref.includes("HEAD -> "))
+    const primary = head ?? local ?? remote
+    const result: string[] = []
+    if (primary) result.push(primary.replace("HEAD -> ", ""))
+    if (tag && tag !== primary) result.push(tag.replace("tag: ", "tag "))
+    return result
   })
 
   return (
     <box flexDirection="row" gap={1}>
-      <text wrapMode="none" fg={theme.theme.accent}>
+      <text wrapMode="none" fg={theme.theme.textMuted}>
         {graph()}
       </text>
       <box flexDirection="row" flexGrow={1} gap={1} overflow="hidden">
-        <text wrapMode="none" fg={theme.theme.text} flexGrow={1} flexShrink={1}>
+        <text wrapMode="none" fg={theme.theme.text} attributes={TextAttributes.BOLD} flexGrow={1} flexShrink={1}>
           {props.entry.subject}
         </text>
 
-        <Show when={cleanedRefs().length > 0}>
-          <box flexDirection="row" gap={1} flexShrink={0} backgroundColor={theme.theme.background} paddingLeft={1}>
-            <For each={cleanedRefs()}>
-              {(ref) => {
-                const isHead = createMemo(() => ref.includes("● ") || ref.includes("tag: "))
-                const bg = createMemo(() => (isHead() ? theme.theme.warning : theme.theme.backgroundElement))
+        <Show when={displayRefs().length > 0}>
+          <box flexDirection="row" gap={1} flexShrink={0} paddingLeft={1}>
+            <For each={displayRefs()}>
+              {(ref, index) => {
+                const isPrimary = createMemo(() => index() === 0)
+                const isTag = createMemo(() => ref.startsWith("tag "))
+                const bg = createMemo(() => (isPrimary() ? theme.theme.primary : theme.theme.backgroundElement))
                 const fg = createMemo(() =>
-                  isHead() ? selectedForeground(theme.theme, theme.theme.warning) : theme.theme.textMuted,
+                  isPrimary() ? selectedForeground(theme.theme, theme.theme.primary) : theme.theme.textMuted,
                 )
                 return (
                   <box backgroundColor={bg()} paddingLeft={1} paddingRight={1} flexShrink={0}>
-                    <text wrapMode="none" fg={fg()} attributes={isHead() ? TextAttributes.BOLD : undefined}>
-                      {ref.replace("tag: ", "🏷 ")}
+                    <text wrapMode="none" fg={fg()} attributes={isTag() ? TextAttributes.BOLD : undefined}>
+                      {ref}
                     </text>
                   </box>
                 )
