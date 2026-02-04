@@ -1,10 +1,271 @@
-Please analyze this codebase and create an AGENTS.md file containing:
-1. Build/lint/test commands - especially for running a single test
-2. Code style guidelines including imports, formatting, types, naming conventions, error handling, etc.
+# Deep Initialize - Hierarchical AGENTS.md Generation
 
-The file you create will be given to agentic coding agents (such as yourself) that operate in this repository. Make it about 150 lines long.
-If there are Cursor rules (in .cursor/rules/ or .cursorrules) or Copilot rules (in .github/copilot-instructions.md), make sure to include them.
+Generate hierarchical AGENTS.md files across the codebase. Creates root + complexity-scored subdirectory AGENTS.md files.
 
-If there's already an AGENTS.md, improve it if it's located in ${path}
+## Usage
+
+```
+init                      # Update mode: modify existing + create new where warranted
+init --create-new         # Read existing → remove all → regenerate from scratch  
+init --max-depth=2        # Limit directory depth (default: 3)
+```
+
+---
+
+## Workflow (High-Level)
+
+1. **Discovery + Analysis** (concurrent)
+   - Analyze project structure with bash commands
+   - Read existing AGENTS.md files
+   - Explore patterns and conventions
+2. **Score & Decide** - Determine AGENTS.md locations from findings
+3. **Generate** - Root first, then subdirs in parallel using Task tool
+4. **Review** - Deduplicate, trim, validate
+
+**TodoWrite ALL phases. Mark in_progress → completed in real-time.**
+
+```
+TodoWrite([
+  { id: "discovery", content: "Analyze structure + read existing AGENTS.md files", status: "pending", priority: "high" },
+  { id: "scoring", content: "Score directories, determine AGENTS.md locations", status: "pending", priority: "high" },
+  { id: "generate", content: "Generate AGENTS.md files (root + subdirs)", status: "pending", priority: "high" },
+  { id: "review", content: "Deduplicate, validate, trim", status: "pending", priority: "medium" }
+])
+```
+
+---
+
+## Phase 1: Discovery + Analysis
+
+**Mark "discovery" as in_progress.**
+
+### 1. Analyze Project Structure
+
+```bash
+# Directory depth + file counts (exclude node_modules, .git, dist, build)
+find . -type d -not -path '*/\.*' -not -path '*/node_modules/*' -not -path '*/dist/*' -not -path '*/build/*' | awk -F/ '{print NF-1}' | sort -n | uniq -c
+
+# Files per directory (top 30)
+find . -type f -not -path '*/\.*' -not -path '*/node_modules/*' | sed 's|/[^/]*$||' | sort | uniq -c | sort -rn | head -30
+
+# Code concentration by extension
+find . -type f \( -name "*.ts" -o -name "*.tsx" -o -name "*.js" -o -name "*.py" -o -name "*.go" -o -name "*.rs" \) -not -path '*/node_modules/*' | sed 's|/[^/]*$||' | sort | uniq -c | sort -rn | head -20
+```
+
+### 2. Find Existing AGENTS.md Files
+
+```bash
+find . -type f \( -name "AGENTS.md" -o -name "CLAUDE.md" -o -name "context.md" \) -not -path '*/node_modules/*' 2>/dev/null
+```
+
+**For each existing file found:**
+- Read(filePath=file)
+- Extract: key insights, conventions, anti-patterns, commands
+- Store findings
+
+**If `--create-new`:** Read all existing first (preserve context) → then note which to regenerate.
+
+### 3. Explore Project Patterns
+
+Use Grep and Read to understand:
+- **Entry points**: package.json main, src/index.ts, main.py, etc.
+- **Config files**: .eslintrc, tsconfig.json, pyproject.toml, .editorconfig
+- **Anti-patterns**: Search for "DO NOT", "NEVER", "ALWAYS", "DEPRECATED" in code comments
+- **Build/Test**: Look at package.json scripts, Makefile, .github/workflows
+- **Test patterns**: Test file organization and conventions
+
+**Mark "discovery" as completed.**
+
+---
+
+## Phase 2: Scoring & Location Decision
+
+**Mark "scoring" as in_progress.**
+
+### Scoring Matrix
+
+| Factor | Weight | High Threshold |
+|--------|--------|----------------|
+| File count | 3x | >20 files |
+| Subdir count | 2x | >5 subdirs |
+| Code ratio | 2x | >70% code files |
+| Unique patterns | 1x | Has own config/tsconfig/package.json |
+| Module boundary | 2x | Has index.ts/__init__.py/package.json |
+| Complexity | 2x | Large files, many exports |
+
+### Decision Rules
+
+| Score | Action |
+|-------|--------|
+| **Root (.)** | ALWAYS create |
+| **>15** | Create AGENTS.md |
+| **8-15** | Create if distinct domain |
+| **<8** | Skip (parent covers) |
+
+### Max Depth
+
+Respect `--max-depth` argument (default: 3). Don't create AGENTS.md deeper than this level.
+
+**Mark "scoring" as completed.**
+
+---
+
+## Phase 3: Generate AGENTS.md
+
+**Mark "generate" as in_progress.**
+
+### Root AGENTS.md (Full Treatment)
+
+Create comprehensive root AGENTS.md at `${path}`:
+
+```markdown
+# PROJECT KNOWLEDGE BASE
+
+**Generated:** {TIMESTAMP}
+**Commit:** {SHORT_SHA if git}
+
+## OVERVIEW
+{1-2 sentences: what the project does + core tech stack}
+
+## STRUCTURE
+```
+{root}/
+├── {dir}/    # {purpose if non-obvious}
+├── {dir}/    # {purpose}
+└── {file}    # {entry point}
+```
+
+## WHERE TO LOOK
+
+| Task | Location | Notes |
+|------|----------|-------|
+| {task} | {path} | {notes} |
+
+## CONVENTIONS
+
+{ONLY deviations from standard - be specific to this project}
+
+## ANTI-PATTERNS (THIS PROJECT)
+
+{Explicitly forbidden patterns found in codebase}
+
+## UNIQUE STYLES
+
+{Project-specific conventions}
+
+## COMMANDS
+
+```bash
+# Development
+{dev command}
+
+# Testing  
+{test command}
+
+# Build
+{build command}
+```
+
+## NOTES
+
+{Gotchas, important context}
+```
+
+**Quality gates**: 50-150 lines, no generic advice, only project-specific info.
+
+### Subdirectory AGENTS.md (Parallel with Task Tool)
+
+For each scored location (except root), spawn a Task:
+
+```
+Task(
+  subagent_type="general",
+  prompt=`
+    Generate AGENTS.md for directory: {dir_path}
+    
+    Context:
+    - Score: {score}
+    - Reason: {reason}
+    - Parent AGENTS.md path: {parent_path}
+    
+    Instructions:
+    1. Read parent AGENTS.md to avoid duplication
+    2. Analyze this directory specifically:
+       - List subdirectories and their purposes
+       - Identify key files and exports
+       - Find patterns unique to this dir
+    3. Write AGENTS.md with these sections:
+       - OVERVIEW (1 sentence what this dir contains)
+       - STRUCTURE (if >3 subdirs)
+       - WHERE TO LOOK (key files for tasks)
+       - CONVENTIONS (only if different from parent)
+       - ANTI-PATTERNS (only if different from parent)
+    
+    Constraints:
+    - 30-80 lines max
+    - NEVER repeat parent content
+    - Focus on what's unique to THIS directory
+    - Telegraphic style - concise, direct
+    
+    Write the AGENTS.md content directly.
+  `
+)
+```
+
+**Wait for all Tasks. Collect results. Mark "generate" as completed.**
+
+---
+
+## Phase 4: Review & Deduplicate
+
+**Mark "review" as in_progress.**
+
+For each generated file:
+- Remove generic advice that applies to all projects
+- Remove content duplicated from parent AGENTS.md
+- Trim to size limits (root: 150 lines max, subdirs: 80 lines max)
+- Verify telegraphic, concise style
+- Ensure file references use clickable format: `Edit path/to/file.ts`
+
+**Mark "review" as completed.**
+
+---
+
+## Final Report
+
+Output completion summary:
+
+```
+=== init-deep Complete ===
+
+Mode: {update | create-new}
+Max Depth: {N}
+
+Files Created/Updated:
+  [OK] ./AGENTS.md (root, {N} lines)
+  [OK] ./src/{dir}/AGENTS.md ({N} lines)
+  ...
+
+Dirs Analyzed: {N}
+AGENTS.md Created: {N}
+AGENTS.md Updated: {N}
+
+Hierarchy:
+  ./AGENTS.md
+  ├── src/{dir}/AGENTS.md
+  └── src/{dir}/AGENTS.md
+```
+
+---
+
+## Anti-Patterns to Avoid
+
+- **Static analysis only**: MUST explore dynamically, not just file listing
+- **Sequential execution**: MUST parallel subdirectory generation with Task tool
+- **Ignoring existing**: ALWAYS read existing AGENTS.md first, even with --create-new
+- **Over-documenting**: Not every dir needs AGENTS.md - use scoring
+- **Redundancy**: Child never repeats parent conventions
+- **Generic content**: Remove anything that applies to ALL projects of this type
+- **Verbose style**: Telegraphic and concise - no fluff
 
 $ARGUMENTS

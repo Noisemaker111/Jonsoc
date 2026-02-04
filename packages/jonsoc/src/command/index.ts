@@ -61,7 +61,7 @@ export namespace Command {
     const result: Record<string, Info> = {
       [Default.INIT]: {
         name: Default.INIT,
-        description: "create/update AGENTS.md",
+        description: "deep initialization - analyze codebase and create comprehensive AGENTS.md",
         get template() {
           return PROMPT_INITIALIZE.replace("${path}", Instance.worktree)
         },
