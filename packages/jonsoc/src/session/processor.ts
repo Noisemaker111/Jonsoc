@@ -9,6 +9,7 @@ import { Bus } from "@/bus"
 import { SessionRetry } from "./retry"
 import { SessionStatus } from "./status"
 import { Plugin } from "@/plugin"
+import { SessionCommit } from "./commit"
 import type { Provider } from "@/provider/provider"
 import { LLM } from "./llm"
 import { Config } from "@/config/config"
@@ -264,6 +265,11 @@ export namespace SessionProcessor {
                         hash: patch.hash,
                         files: patch.files,
                       })
+                      await SessionCommit.autoCommit({
+                        sessionID: input.sessionID,
+                        messageID: input.assistantMessage.parentID,
+                        files: patch.files,
+                      })
                     }
                     snapshot = undefined
                   }
@@ -392,6 +398,11 @@ export namespace SessionProcessor {
                 sessionID: input.sessionID,
                 type: "patch",
                 hash: patch.hash,
+                files: patch.files,
+              })
+              await SessionCommit.autoCommit({
+                sessionID: input.sessionID,
+                messageID: input.assistantMessage.parentID,
                 files: patch.files,
               })
             }

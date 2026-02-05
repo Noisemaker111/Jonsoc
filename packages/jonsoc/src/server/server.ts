@@ -24,6 +24,8 @@ import { Command } from "../command"
 import { Global } from "../global"
 import { ProjectRoutes } from "./routes/project"
 import { SessionRoutes } from "./routes/session"
+import { Session } from "../session"
+import { Project } from "../project/project"
 import { PtyRoutes } from "./routes/pty"
 import { McpRoutes } from "./routes/mcp"
 import { FileRoutes } from "./routes/file"
@@ -41,10 +43,21 @@ import { QuestionRoutes } from "./routes/question"
 import { PermissionRoutes } from "./routes/permission"
 import { GlobalRoutes } from "./routes/global"
 import { Brand } from "../brand"
+import { GlobalBus } from "@/bus/global"
 
 const appHost = process.env.JONSOC_APP_HOST ?? process.env.OPENCODE_APP_HOST ?? `app.${Brand.DOMAIN}`
 const appBaseUrl = process.env.JONSOC_APP_URL ?? process.env.OPENCODE_APP_URL ?? `https://${appHost}`
 import { MDNS } from "./mdns"
+
+function sessionIDFromPath(pathname: string) {
+  const match = pathname.match(/^\/session\/([^/]+)/)
+  if (!match) return undefined
+  try {
+    return decodeURIComponent(match[1])
+  } catch {
+    return match[1]
+  }
+}
 
 // @ts-ignore This global is needed to prevent ai-sdk from logging warnings to stdout https://github.com/vercel/ai/blob/2dc67e0ef538307f21368db32d5a12345d98831b/packages/ai/src/logger/log-warnings.ts#L85
 globalThis.AI_SDK_LOG_WARNINGS = false
@@ -143,6 +156,13 @@ export namespace Server {
             directory = decodeURIComponent(directory)
           } catch {
             // fallback to original value
+          }
+          const sessionID = sessionIDFromPath(c.req.path)
+          if (sessionID) {
+            const sessionDirectory = await Session.resolveDirectory(sessionID)
+            if (sessionDirectory) {
+              directory = sessionDirectory
+            }
           }
           return Instance.provide({
             directory,
@@ -620,6 +640,13 @@ export namespace Server {
           async (c) => {
             log.info("event connected")
             return streamSSE(c, async (stream) => {
+              const projectID = Instance.project.id
+              let sandboxes = new Set<string>([Instance.directory])
+              const refreshSandboxes = async () => {
+                const entries = await Project.sandboxes(projectID).catch(() => [])
+                sandboxes = new Set<string>([Instance.directory, ...entries])
+              }
+              await refreshSandboxes()
               stream.writeSSE({
                 data: JSON.stringify({
                   type: "server.connected",
@@ -634,6 +661,24 @@ export namespace Server {
                   stream.close()
                 }
               })
+              async function handleGlobalEvent(event: { directory?: string; payload: any }) {
+                if (event.payload?.type === Project.Event.Updated.type && event.payload?.properties?.id === projectID) {
+                  const updated = event.payload?.properties?.sandboxes
+                  if (Array.isArray(updated)) {
+                    sandboxes = new Set<string>([Instance.directory, ...updated])
+                  } else {
+                    await refreshSandboxes()
+                  }
+                }
+                if (!event.directory) {
+                  await stream.writeSSE({ data: JSON.stringify(event.payload) })
+                  return
+                }
+                if (event.directory === Instance.directory) return
+                if (!sandboxes.has(event.directory)) return
+                await stream.writeSSE({ data: JSON.stringify(event.payload) })
+              }
+              GlobalBus.on("event", handleGlobalEvent)
 
               // Send heartbeat every 30s to prevent WKWebView timeout (60s default)
               const heartbeat = setInterval(() => {
@@ -649,6 +694,7 @@ export namespace Server {
                 stream.onAbort(() => {
                   clearInterval(heartbeat)
                   unsub()
+                  GlobalBus.off("event", handleGlobalEvent)
                   resolve()
                   log.info("event disconnected")
                 })

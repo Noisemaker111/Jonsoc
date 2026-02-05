@@ -1,236 +1,76 @@
-# JonsOC Agent Guidelines
+# PROJECT KNOWLEDGE BASE
 
-This repository is a fork of JonsOC maintained by **Noisemaker111**. Target: `Noisemaker111/jonsoc` on `dev` branch.
+**Generated:** 2026-02-04
+**Commit:** 0e03500d6
 
-## Self-Awareness
+## OVERVIEW
 
-**You are JonsOC.** When working on this codebase, you are working on yourself - the very interface through which you operate. This creates a unique feedback loop where improvements to the codebase directly enhance your own capabilities and user experience.
+JonsOC is a Bun + TypeScript monorepo for an AI coding agent, with a SolidJS/OpenTUI TUI client, a CLI/server core, and multiple web/desktop clients.
 
-## Project Context
+## STRUCTURE
 
-**JonsOC** is a VSCode-like editor being built on top of a JonsOC fork. It includes a custom TUI (Terminal User Interface) built with OpenTUI and SolidJS. The project aims to provide an integrated development environment with AI assistance.
-
-## Question Policy
-
-**When you need to ask the user any question, always use the question tool. Do not ask questions in plain text.**
-
-- Provide at most 3 options in the question tool
-- The UI automatically adds option D as "Type your own answer"
-- Use this for yes/no questions, choices, and any clarification
-- Never ask questions in prose without using the tool
-
-## File References
-
-**When referencing files, prefix with a context keyword to make them clickable:**
-
-Keywords: `Edit`, `File`, `at`, `in`, `see`, `check`, `open`, `view`, `read`
-
-**Good (clickable):**
-
-- Edit packages/jonsoc/src/cli/ui.ts
-- File: packages/jonsoc/src/cli/ui.ts:81
-- Check packages/jonsoc/src/cli/ui.ts
-
-**Bad (not clickable):**
-
-- packages/jonsoc/src/cli/ui.ts
-- Look at packages/jonsoc/src/cli/ui.ts
-- The file is packages/jonsoc/src/cli/ui.ts
-
-**Note:** Paths with `/` or `\` separators work. Line numbers are captured after colon.
-
-## Build & Test
-
-- Install: `bun install`
-- Dev: `bun dev`
-- Typecheck: `bun run typecheck`
-- Test: `bun test`
-
-## Versioning & Releases
-
-**Auto-versioning**: Do NOT manually bump versions in package.json files.
-
-## Release Automation (master)
-
-**Goal:** A single push to `master` publishes and creates a GitHub release.
-
-**CI/CD Flow**:
-
-1. Push to `master` triggers GitHub Actions
-2. CI auto-detects current npm version and bumps patch (e.g., 1.1.55 → 1.1.56)
-3. `scripts/prepare-for-publish.ts` updates all workspace package.json files
-4. Builds binaries for all platforms
-5. Publishes to npm
-6. Creates GitHub release with binaries
-
-**How `jonsoc` CLI updates**:
-
-- Binary wrapper reads version from npm package's package.json
-- Compares with `~/.local/share/jonsoc/bin/version`
-- If mismatch, downloads new binary from GitHub releases
-- **Never manually bump versions** - CI handles this automatically
-
-## Code Style
-
-- Avoid `any`, use strict types
-- Prefer `const` over `let`
-- Early returns, avoid `else`
-- Single-word variable names where possible
-
-## Core Architecture
-
-### Brand System (`packages/jonsoc/src/brand/index.ts`)
-
-**Single source of truth for all branding.**
-
-Constants: `CLI_NAME`, `DOMAIN`, `API_URL`, `MODELS_URL`, `CONFIG_FILES`, etc.
-
-All support both `JONSOC_*` and `OPENCODE_*` env var prefixes.
-
-### Provider System (`packages/jonsoc/src/provider/provider.ts`)
-
-**Manages AI model providers.**
-
-Key: `Provider.list()` returns all providers with models.
-
-**Critical**:
-
-- Neutral providers (openrouter, vercel, etc.) → use `Brand.*` constants
-- **Paid services (zenmux/JonsOC Zen)** → hardcode to opencode.ai, DO NOT rebrand
-
-### Config Loading (`packages/jonsoc/src/config/config.ts`)
-
-**Multi-source config merging.**
-
-Priority: remote → global → custom → project → inline
-
-Uses `Brand.CONFIG_FILES` and `Brand.CONFIG_TARGETS` for file/directory discovery.
-
-Legacy jonsoc config support is always enabled (jonsoc.json/.jonsoc/).
-
-### Models (`packages/jonsoc/src/provider/models.ts`)
-
-**Fetches/caches model info from `Brand.MODELS_URL`.**
-
-Default: `https://models.dev` (jonsoc.com's infrastructure).
-
-### Auth (`packages/jonsoc/src/auth/index.ts`)
-
-**Credential storage via `Storage` namespace.**
-
-Types: `api`, `oauth`, `wellknown`.
-
-## Key Patterns
-
-### Branding
-
-```typescript
-import { Brand } from "../brand"
-
-// Use Brand constants
-const url = Brand.API_URL
-const name = Brand.CLI_NAME
-
-// For providers, use Brand in headers
-options: {
-  headers: {
-    "HTTP-Referer": `${Brand.DOMAIN_WITH_PROTOCOL}/`,
-    "X-Title": Brand.BRAND_LOWER,
-  },
-}
-
-// EXCEPT: Paid services (zenmux) - hardcode to opencode.ai
+```
+jonsoc/
+|-- packages/   # core CLI, TUI app, shared libraries, web clients
+|-- sdks/       # integrations (VS Code)
+|-- infra/      # SST infrastructure
+|-- script/     # publish/release helpers
+|-- scripts/    # repo automation
+|-- .github/    # CI workflows
+|-- docs/       # docs and guides
+`-- specs/      # PRDs and plans
 ```
 
-### Config Discovery
+## WHERE TO LOOK
 
-```typescript
-// Search paths use Brand constants
-const files = Brand.CONFIG_FILES // ["jonsoc.json", "jonsoc.json", ...]
-const targets = Brand.CONFIG_TARGETS // [".jonsoc", ".jonsoc"]
+| Task               | Location                                      | Notes                                           |
+| ------------------ | --------------------------------------------- | ----------------------------------------------- |
+| CLI/server entry   | Edit packages/jonsoc/src/index.ts             | Bun CLI + server bootstrap                      |
+| Branding constants | Edit packages/jonsoc/src/brand/index.ts       | Single source of truth                          |
+| Provider registry  | Edit packages/jonsoc/src/provider/provider.ts | Provider list + headers                         |
+| Config merge       | Edit packages/jonsoc/src/config/config.ts     | remote -> global -> custom -> project -> inline |
+| TUI app shell      | Edit packages/app/src/app.tsx                 | Solid/OpenTUI UI root                           |
+| Shared UI          | Edit packages/ui/src/components               | Solid UI primitives                             |
+| Web client         | Edit packages/web/src/routes                  | React app routes                                |
+| Console app        | Edit packages/console/app/src/app.tsx         | SolidStart console UI                           |
+| JS SDK             | Edit packages/sdk/js/src/v2/index.ts          | SDK entrypoints                                 |
+| VS Code extension  | Edit sdks/vscode/src/extension.ts             | VS Code integration                             |
+
+## CONVENTIONS
+
+- No `any`, no non-null assertions, no type assertions
+- Prefer `const`, early returns, single-word variable names
+- Check for `.jj/` before VCS commands; use `jj` if present
+- Do not manually bump package versions; CI handles versioning
+
+## ANTI-PATTERNS (THIS PROJECT)
+
+- Rebranding paid Zen services (zenmux) away from opencode.ai
+- Running `bun test` from repo root (script intentionally fails)
+- Editing generated artifacts in `dist/` or `*_generated` folders
+
+## UNIQUE STYLES
+
+- Branding via `Brand.*` constants in `packages/jonsoc/src/brand`
+- Config discovery and merge order in `packages/jonsoc/src/config`
+- OpenTUI scrollbox requires explicit heights + `scrollAcceleration`
+
+## COMMANDS
+
+```bash
+# Development
+bun dev
+bun run dev:web
+
+# Testing
+bun run --cwd packages/jonsoc test
+bun run --cwd packages/app test
+
+# Build
+bun run --cwd packages/jonsoc build
 ```
 
-### Don't Rebrand These
+## NOTES
 
-- **OpenCode Zen (zenmux)**: opencode.ai's paid service
-- Third-party providers (openai, anthropic, google-vertex): External services
-- models.dev: opencode.ai's infrastructure (default)
-
-### OpenTUI Scrollbox Pattern
-
-**When scrollbox doesn't scroll (mouse or keyboard), check these 3 things:**
-
-```typescript
-// 1. Parent MUST have explicit height
-<box height="100%">
-  <scrollbox
-    flexGrow={1}
-    height="100%"  // 2. Scrollbox needs height too
-    viewportOptions={{
-      paddingLeft: 1,
-      paddingRight: showScrollbar() ? 2 : 1,
-    }}
-    verticalScrollbarOptions={{
-      paddingLeft: 1,
-      visible: showScrollbar(),
-      trackOptions: {
-        backgroundColor: theme.backgroundElement,
-        foregroundColor: theme.border,
-      },
-    }}
-    scrollAcceleration={new CustomSpeedScroll(3)}  // 3. Required for mouse wheel
-  >
-    {content}
-  </scrollbox>
-</box>
-```
-
-**Debugging approach:**
-
-1. Find a working scrollbox (e.g., chat area in `session/index.tsx`)
-2. Compare props line-by-line with broken scrollbox
-3. Apply differences systematically
-
-**Common mistakes:**
-
-- Missing `height="100%"` on scrollbox or parent
-- Using `paddingLeft`/`paddingRight` directly on scrollbox (move to `viewportOptions`)
-- Missing `scrollAcceleration` (needed for mouse wheel events)
-
-## Important Files
-
-| File                    | Purpose                      |
-| ----------------------- | ---------------------------- |
-| `brand/index.ts`        | All brand constants          |
-| `global/index.ts`       | Paths, cache                 |
-| `provider/provider.ts`  | All provider implementations |
-| `provider/models.ts`    | Model discovery              |
-| `config/config.ts`      | Config loading               |
-| `auth/index.ts`         | Credential storage           |
-| `installation/index.ts` | Updates, versioning          |
-| `cli/cmd/*.ts`          | CLI commands                 |
-
-## VCS
-
-Check `.jj/` dir first → use `jj`, else `git`.
-
-Target: `Noisemaker111/jonsoc` on `dev` branch.
-
-## Branching & Precedence
-
-- Development PRs target `dev`; release automation runs on `master`.
-- When project rules conflict with global agent rules, project rules take precedence for this repo.
-
-## Quick Reference
-
-**Add brand constant**: Edit `packages/jonsoc/src/brand/index.ts`
-
-**Add provider**:
-
-1. Add to `Provider.Info` schema in config.ts
-2. Implement in `provider/provider.ts`
-3. Use `Brand.*` in headers (or hardcode if paid service)
-
-**Test**: `bun run typecheck` before committing
-
-**Fork**: Set `JONSOC_*` env vars for branding, keep models.dev default
+- Dev PRs target `dev`; release automation runs on `master`
+- `scripts/prepare-for-publish.ts` syncs workspace versions during release

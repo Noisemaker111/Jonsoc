@@ -1117,6 +1117,15 @@ export namespace Config {
                 .optional(),
             })
             .optional(),
+          vcs: z
+            .object({
+              auto_branch: z
+                .boolean()
+                .optional()
+                .describe("Create a new git worktree + branch per session (default: true)"),
+              auto_commit: z.boolean().optional().describe("Auto-commit changes per assistant step (default: true)"),
+            })
+            .optional(),
           chatMaxRetries: z.number().optional().describe("Number of retries for chat completions on failure"),
           disable_paste_summary: z.boolean().optional(),
           paste_clipboard_image: z

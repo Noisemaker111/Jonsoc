@@ -27,7 +27,7 @@ import { DialogSelect } from "@tui/ui/dialog-select"
 import { SplitBorder } from "@tui/component/border"
 import { Locale } from "@/util/locale"
 import { Global } from "@/global"
-import type { File as FileStatus, FileNode } from "@jonsoc/sdk/v2"
+import type { Config as ConfigInfo, File as FileStatus, FileNode } from "@jonsoc/sdk/v2"
 
 type FileStatusWithStaged = FileStatus & { staged: boolean }
 import { GitCommit } from "./git-commit"
@@ -57,6 +57,7 @@ interface ExplorerPanelProps {
   onSelect: (path: string, type: "file" | "directory" | "diff") => void
   isActive?: Accessor<boolean>
   onFocus?: () => void
+  sessionID?: string
 }
 
 export function ExplorerPanel(props: ExplorerPanelProps) {
@@ -94,6 +95,7 @@ export function ExplorerPanel(props: ExplorerPanelProps) {
   const [gitScroll, setGitScroll] = createSignal<ScrollBoxRenderable | undefined>(undefined)
   const [commitMessage, setCommitMessage] = createSignal("")
   const [commitInput, setCommitInput] = createSignal<InputRenderable | undefined>(undefined)
+  const [vcsUpdate, setVcsUpdate] = createSignal<"auto_branch" | "auto_commit" | undefined>(undefined)
 
   const [status, { refetch: refreshStatus, mutate: mutateStatus }] = createResource(
     () => (loaded() ? "open" : undefined),
@@ -147,6 +149,48 @@ export function ExplorerPanel(props: ExplorerPanelProps) {
   })
 
   const branch = createMemo(() => sync.data.vcs?.branch)
+  const sessionInfo = createMemo(() => (props.sessionID ? sync.session.get(props.sessionID) : undefined))
+  const sessionWorktree = createMemo(() => {
+    const session = sessionInfo()
+    if (!session || typeof session !== "object") return undefined
+    const raw = Reflect.get(session, "worktree")
+    if (!raw || typeof raw !== "object") return undefined
+    const name = Reflect.get(raw, "name")
+    const branch = Reflect.get(raw, "branch")
+    const directory = Reflect.get(raw, "directory")
+    if (typeof name !== "string" && typeof branch !== "string" && typeof directory !== "string") return undefined
+    return {
+      name: typeof name === "string" ? name : undefined,
+      branch: typeof branch === "string" ? branch : undefined,
+      directory: typeof directory === "string" ? directory : undefined,
+    }
+  })
+  const autoBranchEnabled = createMemo(() => {
+    const experimental = sync.data.config.experimental
+    if (!experimental || typeof experimental !== "object") return true
+    const vcs = Reflect.get(experimental, "vcs")
+    if (!vcs || typeof vcs !== "object") return true
+    const value = Reflect.get(vcs, "auto_branch")
+    return value !== false
+  })
+  const autoCommitEnabled = createMemo(() => {
+    const experimental = sync.data.config.experimental
+    if (!experimental || typeof experimental !== "object") return true
+    const vcs = Reflect.get(experimental, "vcs")
+    if (!vcs || typeof vcs !== "object") return true
+    const value = Reflect.get(vcs, "auto_commit")
+    return value !== false
+  })
+  const worktreeBranch = createMemo(() => {
+    const info = sessionWorktree()
+    if (!info?.branch) return ""
+    return Locale.truncateMiddle(info.branch, 36)
+  })
+  const worktreeName = createMemo(() => {
+    const info = sessionWorktree()
+    if (!info?.name) return ""
+    return Locale.truncateMiddle(info.name, 36)
+  })
 
   const rawStatusEntries = createMemo(() => status() ?? [])
   const filteredStatusEntries = createMemo(() =>
@@ -381,6 +425,38 @@ export function ExplorerPanel(props: ExplorerPanelProps) {
     refreshStatus()
     refreshHistory()
     refreshStashList()
+  }
+
+  const buildConfigUpdate = (patch: { auto_branch?: boolean; auto_commit?: boolean }): ConfigInfo => {
+    const current = sync.data.config
+    const experimentalBase =
+      current.experimental && typeof current.experimental === "object" ? current.experimental : {}
+    const vcsBaseRaw = Reflect.get(experimentalBase, "vcs")
+    const vcsBase = vcsBaseRaw && typeof vcsBaseRaw === "object" ? vcsBaseRaw : {}
+    const nextVcs = { ...vcsBase, ...patch }
+    const experimental = Object.assign({}, experimentalBase, { vcs: nextVcs })
+    return {
+      ...current,
+      experimental,
+    }
+  }
+
+  const updateVcsConfig = async (
+    patch: { auto_branch?: boolean; auto_commit?: boolean },
+    key: "auto_branch" | "auto_commit",
+  ) => {
+    if (vcsUpdate()) return
+    setVcsUpdate(key)
+    try {
+      const result = await sdk.client.config.update({ config: buildConfigUpdate(patch) }).catch(() => undefined)
+      if (result?.data) {
+        sync.set("config", result.data)
+      }
+    } catch (err: any) {
+      toast.show({ variant: "error", message: `Failed to update config: ${err.message}` })
+    } finally {
+      setVcsUpdate(undefined)
+    }
   }
 
   const runShell = (command: string) => {
@@ -826,6 +902,57 @@ export function ExplorerPanel(props: ExplorerPanelProps) {
 
       <Switch>
         <Match when={tab() === "git"}>
+          <Show when={props.sessionID}>
+            <box
+              paddingLeft={2}
+              paddingRight={2}
+              paddingTop={1}
+              paddingBottom={1}
+              border={["bottom"]}
+              borderColor={theme.theme.border}
+              customBorderChars={NavigatorBorderChars}
+              backgroundColor={theme.theme.backgroundPanel}
+              flexDirection="column"
+              gap={1}
+              flexShrink={0}
+              onMouseUp={(event) => event.stopPropagation()}
+            >
+              <box flexDirection="column" gap={0}>
+                <text fg={theme.theme.textMuted} wrapMode="none">
+                  Session branch
+                </text>
+                <text fg={theme.theme.text} wrapMode="none">
+                  {worktreeBranch() || "Not available"}
+                </text>
+              </box>
+              <Show when={worktreeName()}>
+                <box flexDirection="column" gap={0}>
+                  <text fg={theme.theme.textMuted} wrapMode="none">
+                    Worktree
+                  </text>
+                  <text fg={theme.theme.text} wrapMode="none">
+                    {worktreeName()}
+                  </text>
+                </box>
+              </Show>
+              <box flexDirection="row" gap={1}>
+                <ActionButton
+                  label={`Auto-branch: ${autoBranchEnabled() ? "On" : "Off"}`}
+                  onSelect={() => updateVcsConfig({ auto_branch: !autoBranchEnabled() }, "auto_branch")}
+                  disabled={vcsUpdate() !== undefined}
+                  primary={autoBranchEnabled()}
+                  flexGrow={0}
+                />
+                <ActionButton
+                  label={`Auto-commit: ${autoCommitEnabled() ? "On" : "Off"}`}
+                  onSelect={() => updateVcsConfig({ auto_commit: !autoCommitEnabled() }, "auto_commit")}
+                  disabled={vcsUpdate() !== undefined}
+                  primary={autoCommitEnabled()}
+                  flexGrow={0}
+                />
+              </box>
+            </box>
+          </Show>
           <GitCommit
             commitMessage={commitMessage}
             setCommitMessage={setCommitMessage}
@@ -844,7 +971,6 @@ export function ExplorerPanel(props: ExplorerPanelProps) {
           >
             <scrollbox
               flexGrow={1}
-              height="100%"
               ref={(el) => setGitScroll(el)}
               viewportOptions={viewportOptions()}
               verticalScrollbarOptions={verticalScrollbarOptions()}

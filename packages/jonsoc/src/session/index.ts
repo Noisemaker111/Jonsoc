@@ -39,12 +39,24 @@ export namespace Session {
     ).test(title)
   }
 
+  const WorktreeInfo = z
+    .object({
+      name: z.string(),
+      branch: z.string(),
+      directory: z.string(),
+    })
+    .meta({
+      ref: "Worktree",
+    })
+  type WorktreeInfo = z.output<typeof WorktreeInfo>
+
   export const Info = z
     .object({
       id: Identifier.schema("session"),
       slug: z.string(),
       projectID: z.string(),
       directory: z.string(),
+      worktree: WorktreeInfo.optional(),
       parentID: Identifier.schema("session").optional(),
       summary: z
         .object({
@@ -81,6 +93,40 @@ export namespace Session {
       ref: "Session",
     })
   export type Info = z.output<typeof Info>
+
+  const Index = z.object({
+    sessionID: Identifier.schema("session"),
+    projectID: z.string(),
+    directory: z.string(),
+  })
+  type Index = z.output<typeof Index>
+
+  async function writeIndex(info: Info) {
+    const payload: Index = {
+      sessionID: info.id,
+      projectID: info.projectID,
+      directory: info.directory,
+    }
+    await Storage.write(["session_index", info.id], payload)
+  }
+
+  async function removeIndex(sessionID: string) {
+    await Storage.remove(["session_index", sessionID]).catch(() => {})
+  }
+
+  export async function resolveDirectory(sessionID: string) {
+    const indexed = await Storage.read<Index>(["session_index", sessionID]).catch(() => undefined)
+    if (indexed?.directory) return indexed.directory
+
+    const matches = await Storage.list(["session"]).then((keys) =>
+      keys.filter((key) => key.length >= 3 && key[2] === sessionID),
+    )
+    if (matches.length === 0) return undefined
+    const match = await Storage.read<Info>(matches[0]).catch(() => undefined)
+    if (!match?.directory) return undefined
+    await writeIndex(match)
+    return match.directory
+  }
 
   export const ShareInfo = z
     .object({
@@ -196,12 +242,30 @@ export namespace Session {
     directory: string
     permission?: PermissionNext.Ruleset
   }) {
+    const cfg = await Config.get()
+    const slug = Slug.create()
+    const autoBranch = Instance.project.vcs === "git" && cfg.experimental?.vcs?.auto_branch !== false
+    let worktree: WorktreeInfo | undefined
+    let directory = input.directory
+    if (autoBranch) {
+      const { Worktree } = await import("@/worktree")
+      worktree = await Worktree.create({ name: `session-${slug}` }).catch((error) => {
+        const message = error instanceof Error ? error.message : String(error)
+        log.warn("worktree create failed", { message })
+        return undefined
+      })
+      if (worktree) {
+        directory = worktree.directory
+      }
+    }
+
     const result: Info = {
       id: Identifier.descending("session", input.id),
-      slug: Slug.create(),
+      slug,
       version: Installation.VERSION,
       projectID: Instance.project.id,
-      directory: input.directory,
+      directory,
+      worktree,
       parentID: input.parentID,
       title: input.title ?? createDefaultTitle(!!input.parentID),
       permission: input.permission,
@@ -212,10 +276,10 @@ export namespace Session {
     }
     log.info("created", result)
     await Storage.write(["session", Instance.project.id, result.id], result)
+    await writeIndex(result)
     Bus.publish(Event.Created, {
       info: result,
     })
-    const cfg = await Config.get()
     if (!result.parentID && (Flag.OPENCODE_AUTO_SHARE || cfg.share === "auto"))
       share(result.id)
         .then((share) => {
@@ -348,6 +412,7 @@ export namespace Session {
         await Storage.remove(msg)
       }
       await Storage.remove(["session", project.id, sessionID])
+      await removeIndex(sessionID)
       Bus.publish(Event.Deleted, {
         info: session,
       })

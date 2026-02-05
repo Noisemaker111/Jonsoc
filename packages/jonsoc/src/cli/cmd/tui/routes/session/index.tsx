@@ -995,6 +995,13 @@ export function Session() {
   // snap to bottom when session changes
   createEffect(on(() => route.sessionID, toBottom))
 
+  createEffect(() => {
+    if (!sync.ready) return
+    const sessionID = route.sessionID
+    if (!sessionID) return
+    void sync.session.sync(sessionID)
+  })
+
   return (
     <context.Provider
       value={{
@@ -1020,6 +1027,7 @@ export function Session() {
             width={explorerWidth()}
             isActive={() => activePanel() === "explorer"}
             onFocus={() => setActivePanel("explorer")}
+            sessionID={route.sessionID}
             onSelect={(path, type) => {
               if (type === "file") {
                 setSelectedFilePath(path)
