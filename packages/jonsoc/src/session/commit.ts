@@ -18,6 +18,26 @@ export namespace SessionCommit {
     return [outputText(result.stderr), outputText(result.stdout)].filter(Boolean).join("\n")
   }
 
+  async function pushCommit(worktree: string) {
+    const branch = await $`git rev-parse --abbrev-ref HEAD`.quiet().nothrow().cwd(worktree).text()
+    const name = branch.trim()
+    if (!name || name === "HEAD") return
+
+    const upstream = await $`git rev-parse --abbrev-ref --symbolic-full-name @{u}`.quiet().nothrow().cwd(worktree)
+    if (upstream.exitCode === 0) {
+      const pushed = await $`git push`.quiet().nothrow().cwd(worktree)
+      if (pushed.exitCode !== 0) {
+        log.warn("auto push failed", { exitCode: pushed.exitCode, message: errorText(pushed) })
+      }
+      return
+    }
+
+    const pushed = await $`git push -u origin ${name}`.quiet().nothrow().cwd(worktree)
+    if (pushed.exitCode !== 0) {
+      log.warn("auto push failed", { exitCode: pushed.exitCode, message: errorText(pushed) })
+    }
+  }
+
   export async function autoCommit(input: {
     sessionID: string
     messageID?: string
@@ -75,7 +95,9 @@ export namespace SessionCommit {
     const committed = await $`git commit -m ${message}`.quiet().nothrow().cwd(worktree)
     if (committed.exitCode !== 0) {
       log.warn("auto commit failed", { exitCode: committed.exitCode })
+      return
     }
+    await pushCommit(worktree)
   }
 
   async function buildCommitMessage(sessionID: string, messageID?: string) {
