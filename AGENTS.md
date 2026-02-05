@@ -146,8 +146,8 @@ options: {
 
 ```typescript
 // Search paths use Brand constants
-const files = Brand.CONFIG_FILES // ["jonsoc.json", "jonsoc.json", ...]
-const targets = Brand.CONFIG_TARGETS // [".jonsoc", ".jonsoc"]
+const files = Brand.CONFIG_FILES // ["jonsoc.json", "opencode.json", ...]
+const targets = Brand.CONFIG_TARGETS // [".jonsoc", ".opencode"]
 ```
 
 ### Don't Rebrand These
