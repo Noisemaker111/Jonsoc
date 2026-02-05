@@ -40,7 +40,20 @@ export const EditTool = Tool.define("edit", {
       throw new Error("oldString and newString must be different")
     }
 
-    const filePath = path.isAbsolute(params.filePath) ? params.filePath : path.join(Instance.directory, params.filePath)
+    const resolvedPath = path.isAbsolute(params.filePath)
+      ? params.filePath
+      : path.join(Instance.directory, params.filePath)
+    const { Session } = await import("../session")
+    const ensured = await Session.ensureWorktree({
+      sessionID: ctx.sessionID,
+      files: [resolvedPath],
+    })
+    const relative = path.relative(Instance.worktree, resolvedPath)
+    const filePath = ensured.files[0]
+      ? ensured.files[0]
+      : !relative || relative.startsWith("..")
+        ? resolvedPath
+        : path.join(ensured.directory, relative)
     await assertExternalDirectory(ctx, filePath)
 
     let diff = ""
@@ -52,7 +65,7 @@ export const EditTool = Tool.define("edit", {
         diff = trimDiff(createTwoFilesPatch(filePath, filePath, contentOld, contentNew))
         await ctx.ask({
           permission: "edit",
-          patterns: [path.relative(Instance.worktree, filePath)],
+          patterns: [path.relative(ensured.directory, filePath)],
           always: ["*"],
           metadata: {
             filepath: filePath,
@@ -80,7 +93,7 @@ export const EditTool = Tool.define("edit", {
       )
       await ctx.ask({
         permission: "edit",
-        patterns: [path.relative(Instance.worktree, filePath)],
+        patterns: [path.relative(ensured.directory, filePath)],
         always: ["*"],
         metadata: {
           filepath: filePath,
@@ -138,7 +151,7 @@ export const EditTool = Tool.define("edit", {
         diff,
         filediff,
       },
-      title: `${path.relative(Instance.worktree, filePath)}`,
+      title: `${path.relative(ensured.directory, filePath)}`,
       output,
     }
   },

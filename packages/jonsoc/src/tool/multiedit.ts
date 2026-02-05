@@ -22,11 +22,25 @@ export const MultiEditTool = Tool.define("multiedit", {
   }),
   async execute(params, ctx) {
     const tool = await EditTool.init()
+    const resolvedPath = path.isAbsolute(params.filePath)
+      ? params.filePath
+      : path.join(Instance.directory, params.filePath)
+    const { Session } = await import("../session")
+    const ensured = await Session.ensureWorktree({
+      sessionID: ctx.sessionID,
+      files: [resolvedPath],
+    })
+    const relative = path.relative(Instance.worktree, resolvedPath)
+    const filePath = ensured.files[0]
+      ? ensured.files[0]
+      : !relative || relative.startsWith("..")
+        ? resolvedPath
+        : path.join(ensured.directory, relative)
     const results = []
     for (const [, edit] of params.edits.entries()) {
       const result = await tool.execute(
         {
-          filePath: params.filePath,
+          filePath,
           oldString: edit.oldString,
           newString: edit.newString,
           replaceAll: edit.replaceAll,
@@ -36,7 +50,7 @@ export const MultiEditTool = Tool.define("multiedit", {
       results.push(result)
     }
     return {
-      title: path.relative(Instance.worktree, params.filePath),
+      title: path.relative(ensured.directory, filePath),
       metadata: {
         results: results.map((r) => r.metadata),
       },

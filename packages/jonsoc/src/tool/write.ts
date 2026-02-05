@@ -22,7 +22,20 @@ export const WriteTool = Tool.define("write", {
     filePath: z.string().describe("The absolute path to the file to write (must be absolute, not relative)"),
   }),
   async execute(params, ctx) {
-    const filepath = path.isAbsolute(params.filePath) ? params.filePath : path.join(Instance.directory, params.filePath)
+    const resolvedPath = path.isAbsolute(params.filePath)
+      ? params.filePath
+      : path.join(Instance.directory, params.filePath)
+    const { Session } = await import("../session")
+    const ensured = await Session.ensureWorktree({
+      sessionID: ctx.sessionID,
+      files: [resolvedPath],
+    })
+    const relative = path.relative(Instance.worktree, resolvedPath)
+    const filepath = ensured.files[0]
+      ? ensured.files[0]
+      : !relative || relative.startsWith("..")
+        ? resolvedPath
+        : path.join(ensured.directory, relative)
     await assertExternalDirectory(ctx, filepath)
 
     const file = Bun.file(filepath)
@@ -33,7 +46,7 @@ export const WriteTool = Tool.define("write", {
     const diff = trimDiff(createTwoFilesPatch(filepath, filepath, contentOld, params.content))
     await ctx.ask({
       permission: "edit",
-      patterns: [path.relative(Instance.worktree, filepath)],
+      patterns: [path.relative(ensured.directory, filepath)],
       always: ["*"],
       metadata: {
         filepath,
@@ -68,7 +81,7 @@ export const WriteTool = Tool.define("write", {
     }
 
     return {
-      title: path.relative(Instance.worktree, filepath),
+      title: path.relative(ensured.directory, filepath),
       metadata: {
         diagnostics,
         filepath,

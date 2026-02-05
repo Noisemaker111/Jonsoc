@@ -52,6 +52,15 @@ export namespace Session {
     })
   type WorktreeInfo = z.output<typeof WorktreeInfo>
 
+  const DevInfo = z
+    .object({
+      port: z.number().int().min(1).max(65535).optional(),
+    })
+    .meta({
+      ref: "SessionDev",
+    })
+  type DevInfo = z.output<typeof DevInfo>
+
   export const Info = z
     .object({
       id: Identifier.schema("session"),
@@ -59,6 +68,7 @@ export namespace Session {
       projectID: z.string(),
       directory: z.string(),
       worktree: WorktreeInfo.optional(),
+      dev: DevInfo.optional(),
       parentID: Identifier.schema("session").optional(),
       summary: z
         .object({

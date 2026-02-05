@@ -43,6 +43,21 @@ export const ApplyPatchTool = Tool.define("apply_patch", {
       throw new Error("apply_patch verification failed: no hunks found")
     }
 
+    const sessionFiles = new Set<string>()
+    for (const hunk of hunks) {
+      sessionFiles.add(path.resolve(Instance.directory, hunk.path))
+      const movePath = "move_path" in hunk ? hunk.move_path : undefined
+      if (movePath) {
+        sessionFiles.add(path.resolve(Instance.directory, movePath))
+      }
+    }
+    const { Session } = await import("../session")
+    const ensured = await Session.ensureWorktree({
+      sessionID: ctx.sessionID,
+      files: Array.from(sessionFiles),
+    })
+    const baseDirectory = ensured.directory
+
     // Validate file paths and check permissions
     const fileChanges: Array<{
       filePath: string
@@ -58,7 +73,7 @@ export const ApplyPatchTool = Tool.define("apply_patch", {
     let totalDiff = ""
 
     for (const hunk of hunks) {
-      const filePath = path.resolve(Instance.directory, hunk.path)
+      const filePath = path.resolve(baseDirectory, hunk.path)
       await assertExternalDirectory(ctx, filePath)
 
       switch (hunk.type) {
@@ -116,7 +131,7 @@ export const ApplyPatchTool = Tool.define("apply_patch", {
             if (change.removed) deletions += change.count || 0
           }
 
-          const movePath = hunk.move_path ? path.resolve(Instance.directory, hunk.move_path) : undefined
+          const movePath = hunk.move_path ? path.resolve(baseDirectory, hunk.move_path) : undefined
           await assertExternalDirectory(ctx, movePath)
 
           fileChanges.push({
@@ -159,7 +174,7 @@ export const ApplyPatchTool = Tool.define("apply_patch", {
     }
 
     // Check permissions if needed
-    const relativePaths = fileChanges.map((c) => path.relative(Instance.worktree, c.filePath))
+    const relativePaths = fileChanges.map((c) => path.relative(baseDirectory, c.filePath))
     await ctx.ask({
       permission: "edit",
       patterns: relativePaths,
@@ -227,13 +242,13 @@ export const ApplyPatchTool = Tool.define("apply_patch", {
     // Generate output summary
     const summaryLines = fileChanges.map((change) => {
       if (change.type === "add") {
-        return `A ${path.relative(Instance.worktree, change.filePath)}`
+        return `A ${path.relative(baseDirectory, change.filePath)}`
       }
       if (change.type === "delete") {
-        return `D ${path.relative(Instance.worktree, change.filePath)}`
+        return `D ${path.relative(baseDirectory, change.filePath)}`
       }
       const target = change.movePath ?? change.filePath
-      return `M ${path.relative(Instance.worktree, target)}`
+      return `M ${path.relative(baseDirectory, target)}`
     })
     let output = `Success. Updated the following files:\n${summaryLines.join("\n")}`
 
@@ -249,14 +264,14 @@ export const ApplyPatchTool = Tool.define("apply_patch", {
         const limited = errors.slice(0, MAX_DIAGNOSTICS_PER_FILE)
         const suffix =
           errors.length > MAX_DIAGNOSTICS_PER_FILE ? `\n... and ${errors.length - MAX_DIAGNOSTICS_PER_FILE} more` : ""
-        output += `\n\nLSP errors detected in ${path.relative(Instance.worktree, target)}, please fix:\n<diagnostics file="${target}">\n${limited.map(LSP.Diagnostic.pretty).join("\n")}${suffix}\n</diagnostics>`
+        output += `\n\nLSP errors detected in ${path.relative(baseDirectory, target)}, please fix:\n<diagnostics file="${target}">\n${limited.map(LSP.Diagnostic.pretty).join("\n")}${suffix}\n</diagnostics>`
       }
     }
 
     // Build per-file metadata for UI rendering
     const files = fileChanges.map((change) => ({
       filePath: change.filePath,
-      relativePath: path.relative(Instance.worktree, change.movePath ?? change.filePath),
+      relativePath: path.relative(baseDirectory, change.movePath ?? change.filePath),
       type: change.type,
       diff: change.diff,
       before: change.oldContent,

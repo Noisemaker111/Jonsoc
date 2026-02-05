@@ -265,6 +265,11 @@ export const SessionRoutes = lazy(() =>
         "json",
         z.object({
           title: z.string().optional(),
+          dev: z
+            .object({
+              port: z.number().int().min(1).max(65535).nullable().optional(),
+            })
+            .optional(),
           time: z
             .object({
               archived: z.number().optional(),
@@ -281,6 +286,15 @@ export const SessionRoutes = lazy(() =>
           (session) => {
             if (updates.title !== undefined) {
               session.title = updates.title
+            }
+            if (updates.dev) {
+              if (updates.dev.port === null) {
+                session.dev = undefined
+              } else if (updates.dev.port !== undefined) {
+                session.dev = {
+                  port: updates.dev.port,
+                }
+              }
             }
             if (updates.time?.archived !== undefined) session.time.archived = updates.time.archived
           },
