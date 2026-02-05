@@ -70,6 +70,14 @@ bun run --cwd packages/app test
 bun run --cwd packages/jonsoc build
 ```
 
+## Config Discovery
+
+```typescript
+// Search paths use Brand constants
+const files = Brand.CONFIG_FILES // ["jonsoc.json", "opencode.json", ...]
+const targets = Brand.CONFIG_TARGETS // [".jonsoc", ".opencode"]
+```
+
 ## NOTES
 
 - Dev PRs target `dev`; release automation runs on `master`

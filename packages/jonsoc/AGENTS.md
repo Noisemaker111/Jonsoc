@@ -1,27 +1,37 @@
-# jonsoc agent guidelines
+# packages/jonsoc
 
-## Build/Test Commands
+## OVERVIEW
 
-- **Install**: `bun install`
-- **Run**: `bun run --conditions=browser ./src/index.ts`
-- **Typecheck**: `bun run typecheck` (npm run typecheck)
-- **Test**: `bun test` (runs all tests)
-- **Single test**: `bun test test/tool/tool.test.ts` (specific test file)
+Core CLI/server package: providers, tools, server APIs, and build scripts.
 
-## Code Style
+## STRUCTURE
 
-- **Runtime**: Bun with TypeScript ESM modules
-- **Imports**: Use relative imports for local modules, named imports preferred
-- **Types**: Zod schemas for validation, TypeScript interfaces for structure
-- **Naming**: camelCase for variables/functions, PascalCase for classes/namespaces
-- **Error handling**: Use Result patterns, avoid throwing exceptions in tools
-- **File structure**: Namespace-based organization (e.g., `Tool.define()`, `Session.create()`)
+- src/cli: command entrypoints and prompts
+- src/server: HTTP + websocket server
+- src/provider: model providers + registry
+- src/config: config loading/merging
+- src/brand: branding constants
+- src/tool: tool definitions and registry
+- src/session: session lifecycle and storage
 
-## Architecture
+## WHERE TO LOOK
 
-- **Tools**: Implement `Tool.Info` interface with `execute()` method
-- **Context**: Pass `sessionID` in tool context, use `App.provide()` for DI
-- **Validation**: All inputs validated with Zod schemas
-- **Logging**: Use `Log.create({ service: "name" })` pattern
-- **Storage**: Use `Storage` namespace for persistence
-- **API Client**: The TypeScript TUI (built with SolidJS + OpenTUI) communicates with the JonsOC server using `@jonsoc/sdk`. When adding/modifying server endpoints in `packages/jonsoc/src/server/server.ts`, run `./script/generate.ts` to regenerate the SDK and related files.
+- Edit packages/jonsoc/src/index.ts: CLI entry
+- Edit packages/jonsoc/src/server/server.ts: API routes and handlers
+- Edit packages/jonsoc/src/provider/provider.ts: provider list and headers
+- Edit packages/jonsoc/src/config/config.ts: config priority + merge
+- Edit packages/jonsoc/src/brand/index.ts: brand constants
+- Edit packages/jonsoc/src/tool: tool implementations
+- Edit packages/jonsoc/script/generate.ts: SDK regeneration
+
+## CONVENTIONS
+
+- Validate inputs with Zod at boundaries
+- Tools implement `Tool.Info` with `execute()` and Result-style errors
+- Use `Log.create({ service })` and `Storage` namespace for persistence
+- When server endpoints change, run `./script/generate.ts` to refresh SDK
+
+## ANTI-PATTERNS
+
+- Throwing exceptions inside tools (use Result errors)
+- Editing files under `dist/` or generated SDK outputs
