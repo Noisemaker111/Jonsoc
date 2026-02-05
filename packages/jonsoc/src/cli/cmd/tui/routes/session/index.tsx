@@ -79,6 +79,7 @@ import { useExit } from "../../context/exit"
 import { Filesystem } from "@/util/filesystem"
 import { Global } from "@/global"
 import { PermissionPrompt } from "./permission"
+import { collectFileRefs, formatMarkdownLines, splitFileRefs } from "../../util/markdown-text"
 import { QuestionPrompt } from "./question"
 import { DialogExportOptions } from "../../ui/dialog-export-options"
 import { formatTranscript } from "../../util/transcript"
@@ -1443,69 +1444,30 @@ const PART_MAPPING = {
 }
 
 function FileReferenceText(props: { last: boolean; part: TextPart; message: AssistantMessage }) {
-  const ctx = use()
-  const { theme, syntax } = useTheme()
+  const { theme } = useTheme()
   const sdk = useSDK()
   const kv = useKV()
+  const layout = useLayout()
+  const dimensions = useTerminalDimensions()
 
-  // Context keywords that indicate a file reference (case-insensitive)
-  const FILE_REF_KEYWORDS = ["edit", "file", "at", "in", "see", "check", "open", "view", "read"]
-
-  // Regex to match file references with context keywords
-  // Supports: / and \ separators, quoted paths, optional line numbers
-  const fileRefRegex = new RegExp(
-    `(?:^|\\s)(?:${FILE_REF_KEYWORDS.join("|")})(?::)?\\s+([\`'"<]?)([^\\s\`'">:]+)(?::(\\d+))?([\`'">]?)`,
-    "gi",
-  )
-
-  // Regex to detect if something looks like a path
-  // Must contain at least one / or \ to be a path
-  const pathLikeRegex = /[\\/]/
-
-  const hasFileRefs = createMemo(() => fileRefRegex.test(props.part.text.trim()))
+  const wrapWidth = createMemo(() => {
+    const dims = dimensions()
+    if (!dims?.width) return 80
+    const explorer = layout.getPanelByType("explorer")
+    const viewer = layout.getPanelByType("viewer")
+    const explorerWidth = explorer?.visible ? Math.floor(dims.width * ((explorer.width ?? 20) / 100)) : 0
+    const viewerWidth = viewer?.visible ? Math.floor(dims.width * ((viewer.width ?? 30) / 100)) : 0
+    const padding = 6
+    return Math.max(20, dims.width - explorerWidth - viewerWidth - padding)
+  })
 
   // Cache for file existence checks (to avoid repeated validation)
   const [fileExistsCache, setFileExistsCache] = createSignal<Map<string, boolean>>(new Map())
 
-  const parseFileReferences = (text: string) => {
-    const parts: Array<{ type: "text" | "fileref"; content: string; path?: string; line?: number; exists?: boolean }> =
-      []
-    let lastIndex = 0
-    let match
+  const lines = createMemo(() => formatMarkdownLines(props.part.text.trim(), wrapWidth()))
+  const fileRefs = createMemo(() => collectFileRefs(props.part.text.trim()))
 
-    while ((match = fileRefRegex.exec(text)) !== null) {
-      const textBefore = text.slice(lastIndex, match.index)
-      if (textBefore) {
-        parts.push({ type: "text", content: textBefore })
-      }
-
-      const fullMatch = match[0]
-      const filePath = match[2]
-      const lineNum = match[3] ? parseInt(match[3], 10) : undefined
-
-      // Check if it looks like a path
-      const looksLikePath = pathLikeRegex.test(filePath)
-
-      parts.push({
-        type: "fileref",
-        content: fullMatch,
-        path: filePath,
-        line: lineNum,
-        exists: looksLikePath ? undefined : false,
-      })
-
-      lastIndex = match.index + fullMatch.length
-    }
-
-    const remaining = text.slice(lastIndex)
-    if (remaining) {
-      parts.push({ type: "text", content: remaining })
-    }
-
-    return parts
-  }
-
-  const parts = createMemo(() => parseFileReferences(props.part.text.trim()))
+  const normalizePath = (filePath: string) => filePath.replace(/\\/g, "/")
 
   // Validate file existence (async, non-blocking)
   const validateFile = async (filePath: string): Promise<boolean> => {
@@ -1536,11 +1498,8 @@ function FileReferenceText(props: { last: boolean; part: TextPart; message: Assi
 
   // Validate all file references on mount
   createEffect(() => {
-    const partsList = parts()
-    partsList.forEach((part) => {
-      if (part.type === "fileref" && part.path && part.exists === undefined) {
-        validateFile(part.path)
-      }
+    fileRefs().forEach((ref) => {
+      void validateFile(ref.path)
     })
   })
 
@@ -1551,45 +1510,49 @@ function FileReferenceText(props: { last: boolean; part: TextPart; message: Assi
   return (
     <Show when={props.part.text.trim()}>
       <box id={"text-" + props.part.id} paddingLeft={3} marginTop={1} flexShrink={0}>
-        <Show
-          when={hasFileRefs()}
-          fallback={
-            <code
-              filetype="markdown"
-              drawUnstyledText={false}
-              streaming={true}
-              syntaxStyle={syntax()}
-              content={props.part.text.trim()}
-              conceal={ctx.conceal()}
-              fg={theme.text}
-            />
-          }
-        >
-          <For each={parts()}>
-            {(part) => (
-              <Switch>
-                <Match when={part.type === "fileref" && (part.exists ?? true)}>
-                  <text fg={theme.markdownLink} onMouseUp={() => handleFileClick(part.path!, part.line)}>
-                    {part.content}
+        <box flexDirection="column">
+          <For each={lines()}>
+            {(line) => {
+              const segments = splitFileRefs(line.text)
+              const codeColor = line.isCode ? theme.markdownCodeBlock : theme.text
+              if (segments.length === 0) {
+                return (
+                  <text fg={codeColor} wrapMode="none">
+                    {" "}
                   </text>
-                </Match>
-                <Match when={part.type === "fileref" && !part.exists}>
-                  <text fg={theme.textMuted}>{part.content}</text>
-                </Match>
-                <Match when={true}>
-                  <code
-                    filetype="markdown"
-                    drawUnstyledText={false}
-                    streaming={true}
-                    syntaxStyle={syntax()}
-                    content={part.content}
-                    fg={theme.text}
-                  />
-                </Match>
-              </Switch>
-            )}
+                )
+              }
+              return (
+                <box flexDirection="row">
+                  <For each={segments}>
+                    {(segment) => {
+                      if (segment.type === "fileref") {
+                        const normalized = normalizePath(segment.path)
+                        const known = fileExistsCache().get(normalized)
+                        const canOpen = known !== false
+                        const color = canOpen ? theme.markdownLink : theme.textMuted
+                        return (
+                          <text
+                            fg={color}
+                            wrapMode="none"
+                            onMouseUp={canOpen ? () => handleFileClick(segment.path, segment.line) : undefined}
+                          >
+                            {segment.text}
+                          </text>
+                        )
+                      }
+                      return (
+                        <text fg={codeColor} wrapMode="none">
+                          {segment.text}
+                        </text>
+                      )
+                    }}
+                  </For>
+                </box>
+              )
+            }}
           </For>
-        </Show>
+        </box>
       </box>
     </Show>
   )
