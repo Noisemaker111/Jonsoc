@@ -1,5 +1,6 @@
 import { Slug } from "@jonsoc/util/slug"
 import path from "path"
+import fs from "fs/promises"
 import { BusEvent } from "@/bus/bus-event"
 import { Bus } from "@/bus"
 import { Decimal } from "decimal.js"
@@ -18,6 +19,7 @@ import { SessionPrompt } from "./prompt"
 import { fn } from "@/util/fn"
 import { Command } from "../command"
 import { Snapshot } from "@/snapshot"
+import { Filesystem } from "@/util/filesystem"
 
 import type { Provider } from "@/provider/provider"
 import { PermissionNext } from "@/permission/next"
@@ -244,20 +246,7 @@ export namespace Session {
   }) {
     const cfg = await Config.get()
     const slug = Slug.create()
-    const autoBranch = Instance.project.vcs === "git" && cfg.experimental?.vcs?.auto_branch !== false
-    let worktree: WorktreeInfo | undefined
-    let directory = input.directory
-    if (autoBranch) {
-      const { Worktree } = await import("@/worktree")
-      worktree = await Worktree.create({ name: `session-${slug}` }).catch((error) => {
-        const message = error instanceof Error ? error.message : String(error)
-        log.warn("worktree create failed", { message })
-        return undefined
-      })
-      if (worktree) {
-        directory = worktree.directory
-      }
-    }
+    const directory = input.directory
 
     const result: Info = {
       id: Identifier.descending("session", input.id),
@@ -265,7 +254,6 @@ export namespace Session {
       version: Installation.VERSION,
       projectID: Instance.project.id,
       directory,
-      worktree,
       parentID: input.parentID,
       title: input.title ?? createDefaultTitle(!!input.parentID),
       permission: input.permission,
@@ -294,6 +282,52 @@ export namespace Session {
       info: result,
     })
     return result
+  }
+
+  export async function ensureWorktree(input: { sessionID: string; files: string[] }) {
+    const session = await get(input.sessionID)
+    if (Instance.project.vcs !== "git") return { directory: session.directory, files: input.files }
+
+    const cfg = await Config.get()
+    if (cfg.experimental?.vcs?.auto_branch === false) return { directory: session.directory, files: input.files }
+
+    if (session.worktree?.directory) {
+      return { directory: session.worktree.directory, files: input.files }
+    }
+
+    if (input.files.length === 0) return { directory: session.directory, files: input.files }
+
+    const { Worktree } = await import("@/worktree")
+    const worktree = await Worktree.create({ name: `session-${session.slug}` }).catch((error) => {
+      const message = error instanceof Error ? error.message : String(error)
+      log.warn("worktree create failed", { message })
+      return undefined
+    })
+    if (!worktree) return { directory: session.directory, files: input.files }
+
+    const mappedFiles: string[] = []
+    for (const file of input.files) {
+      const relative = path.relative(Instance.worktree, file)
+      if (!relative || relative.startsWith("..")) continue
+      const target = path.join(worktree.directory, relative)
+      const stat = await fs.stat(file).catch(() => undefined)
+      if (stat?.isFile()) {
+        await fs.mkdir(path.dirname(target), { recursive: true })
+        await fs.copyFile(file, target)
+      } else if (!(await Filesystem.exists(target))) {
+        continue
+      } else {
+        await fs.unlink(target).catch(() => {})
+      }
+      mappedFiles.push(target)
+    }
+
+    const updated = await update(input.sessionID, (draft) => {
+      draft.directory = worktree.directory
+      draft.worktree = worktree
+    })
+    await writeIndex(updated)
+    return { directory: worktree.directory, files: mappedFiles }
   }
 
   export function plan(input: { slug: string; time: { created: number } }) {

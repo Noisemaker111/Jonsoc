@@ -18,14 +18,20 @@ export namespace SessionCommit {
     return [outputText(result.stderr), outputText(result.stdout)].filter(Boolean).join("\n")
   }
 
-  export async function autoCommit(input: { sessionID: string; messageID?: string; files: string[] }) {
+  export async function autoCommit(input: {
+    sessionID: string
+    messageID?: string
+    files: string[]
+    worktree?: string
+  }) {
     if (Instance.project.vcs !== "git") return
     if (input.files.length === 0) return
 
     const cfg = await Config.get()
     if (cfg.experimental?.vcs?.auto_commit === false) return
 
-    const stagedCheck = await $`git diff --cached --quiet`.quiet().nothrow().cwd(Instance.worktree)
+    const worktree = input.worktree ?? Instance.worktree
+    const stagedCheck = await $`git diff --cached --quiet`.quiet().nothrow().cwd(worktree)
     if (stagedCheck.exitCode === 1) {
       log.info("skipping auto commit; staged changes present")
       return
@@ -36,18 +42,18 @@ export namespace SessionCommit {
     }
 
     const relativePaths = input.files
-      .map((file) => path.relative(Instance.worktree, file))
+      .map((file) => path.relative(worktree, file))
       .filter((file) => file && !file.startsWith(".."))
     if (relativePaths.length === 0) return
 
-    const staged = await $`git add -- ${relativePaths}`.quiet().nothrow().cwd(Instance.worktree)
+    const staged = await $`git add -- ${relativePaths}`.quiet().nothrow().cwd(worktree)
     if (staged.exitCode !== 0) {
       log.warn("auto commit stage failed", {
         exitCode: staged.exitCode,
         message: errorText(staged),
         files: relativePaths,
       })
-      const retry = await $`git add -A -- ${relativePaths}`.quiet().nothrow().cwd(Instance.worktree)
+      const retry = await $`git add -A -- ${relativePaths}`.quiet().nothrow().cwd(worktree)
       if (retry.exitCode !== 0) {
         log.warn("auto commit stage retry failed", {
           exitCode: retry.exitCode,
@@ -58,7 +64,7 @@ export namespace SessionCommit {
       }
     }
 
-    const hasChanges = await $`git diff --cached --quiet`.quiet().nothrow().cwd(Instance.worktree)
+    const hasChanges = await $`git diff --cached --quiet`.quiet().nothrow().cwd(worktree)
     if (hasChanges.exitCode === 0) return
     if (hasChanges.exitCode !== 1) {
       log.warn("auto commit diff failed", { exitCode: hasChanges.exitCode })
@@ -66,7 +72,7 @@ export namespace SessionCommit {
     }
 
     const message = await buildCommitMessage(input.sessionID, input.messageID)
-    const committed = await $`git commit -m ${message}`.quiet().nothrow().cwd(Instance.worktree)
+    const committed = await $`git commit -m ${message}`.quiet().nothrow().cwd(worktree)
     if (committed.exitCode !== 0) {
       log.warn("auto commit failed", { exitCode: committed.exitCode })
     }

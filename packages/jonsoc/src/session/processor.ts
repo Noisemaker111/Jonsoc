@@ -265,10 +265,15 @@ export namespace SessionProcessor {
                         hash: patch.hash,
                         files: patch.files,
                       })
+                      const worktree = await Session.ensureWorktree({
+                        sessionID: input.sessionID,
+                        files: patch.files,
+                      })
                       await SessionCommit.autoCommit({
                         sessionID: input.sessionID,
                         messageID: input.assistantMessage.parentID,
-                        files: patch.files,
+                        files: worktree.files,
+                        worktree: worktree.directory,
                       })
                     }
                     snapshot = undefined
@@ -400,10 +405,15 @@ export namespace SessionProcessor {
                 hash: patch.hash,
                 files: patch.files,
               })
+              const worktree = await Session.ensureWorktree({
+                sessionID: input.sessionID,
+                files: patch.files,
+              })
               await SessionCommit.autoCommit({
                 sessionID: input.sessionID,
                 messageID: input.assistantMessage.parentID,
-                files: patch.files,
+                files: worktree.files,
+                worktree: worktree.directory,
               })
             }
             snapshot = undefined
